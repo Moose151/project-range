@@ -94,6 +94,22 @@ code {
   display: inline-block;
 }
 
+/* ── Documentation rendered content ─────────────────────────── */
+.doc-content h1 { font-size: 1.6rem; border-bottom: 1px solid #343a40; padding-bottom: 0.4rem; margin-bottom: 1rem; }
+.doc-content h2 { font-size: 1.3rem; border-bottom: 1px solid #2b3035; padding-bottom: 0.3rem; margin-top: 1.8rem; }
+.doc-content h3 { font-size: 1.1rem; margin-top: 1.4rem; }
+.doc-content table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.875rem; }
+.doc-content th, .doc-content td { border: 1px solid #495057; padding: 6px 12px; }
+.doc-content th { background: #212529; font-weight: 600; }
+.doc-content pre { background: #1a1d20; border: 1px solid #343a40; border-radius: 4px; padding: 12px; overflow-x: auto; }
+.doc-content code { background: #1a1d20; border-radius: 3px; padding: 2px 5px; font-size: 0.85em; color: #a8dadc; }
+.doc-content pre code { background: none; padding: 0; color: inherit; }
+.doc-content blockquote { border-left: 4px solid #0ea5e9; padding: 0.5em 1em; margin: 1em 0; background: rgba(14, 165, 233, 0.08); color: #93c5fd; border-radius: 0 4px 4px 0; }
+.doc-content ul, .doc-content ol { padding-left: 1.5rem; }
+.doc-content li { margin-bottom: 0.25rem; }
+.doc-content p { margin-bottom: 0.75rem; }
+.doc-content hr { border-color: #343a40; margin: 1.5rem 0; }
+
 /* ── Buzzer alert animation ─────────────────────────────────── */
 .buzzer-alert {
   animation: pulse-border 1.2s ease-in-out infinite;

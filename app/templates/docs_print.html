@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ doc_page.title }} — Project Range</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; margin: 2cm; }
+    h1, h2, h3, h4 { margin-top: 1.5em; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    th, td { border: 1px solid #999; padding: 6px 10px; text-align: left; }
+    th { background: #eee; }
+    pre, code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-size: 10pt; }
+    pre { padding: 12px; overflow: auto; }
+    blockquote { border-left: 4px solid #ccc; margin: 1em 0; padding: 0.5em 1em; color: #555; }
+    hr { border: none; border-top: 1px solid #ccc; }
+    .meta { color: #666; font-size: 9pt; margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 0.5em; }
+    @media print { body { margin: 1.5cm; } }
+  </style>
+</head>
+<body>
+  <h1>{{ doc_page.title }}</h1>
+  <div class="meta">
+    Project Range — Documentation<br>
+    Created: {{ doc_page.created_at.strftime('%d %B %Y') }} by {{ doc_page.created_by.display_name }}
+    {% if doc_page.updated_at %}
+    · Last updated: {{ doc_page.updated_at.strftime('%d %B %Y %H:%M') }} by {{ doc_page.updated_by.display_name }}
+    {% endif %}
+  </div>
+  {{ rendered | safe }}
+  <script>window.onload = function() { window.print(); }</script>
+</body>
+</html>

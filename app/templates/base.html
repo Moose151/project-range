@@ -82,6 +82,11 @@
             <i class="bi bi-clock-history me-1"></i>History
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link {% if page == 'docs' %}active{% endif %}" href="/docs">
+            <i class="bi bi-book me-1"></i>Docs
+          </a>
+        </li>
         {% if user.role == 'supervisor' %}
         <li class="nav-item">
           <a class="nav-link {% if page == 'users' %}active{% endif %}" href="/users">

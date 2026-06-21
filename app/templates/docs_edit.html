@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == 'new' %}New Page{% elif mode == 'propose' %}Propose Edit — {{ doc_page.title }}{% else %}Edit — {{ doc_page.title }}{% endif %}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <div>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-1">
+        <li class="breadcrumb-item"><a href="/docs">Documentation</a></li>
+        {% if doc_page %}<li class="breadcrumb-item"><a href="/docs/{{ doc_page.slug }}">{{ doc_page.title }}</a></li>{% endif %}
+        <li class="breadcrumb-item active">{% if mode == 'new' %}New Page{% elif mode == 'propose' %}Propose Edit{% else %}Edit{% endif %}</li>
+      </ol>
+    </nav>
+    <h4 class="mb-0">
+      {% if mode == 'new' %}<i class="bi bi-file-earmark-plus me-2"></i>New Documentation Page
+      {% elif mode == 'propose' %}<i class="bi bi-pencil-square me-2"></i>Propose Edit — {{ doc_page.title }}
+      {% else %}<i class="bi bi-pencil me-2"></i>Edit — {{ doc_page.title }}{% endif %}
+    </h4>
+  </div>
+</div>
+
+{% if mode == 'propose' %}
+<div class="alert alert-info py-2 mb-3">
+  <i class="bi bi-info-circle me-1"></i>
+  Your edit will be submitted for supervisor review. It will not appear on the page until approved.
+</div>
+{% endif %}
+
+<form method="post" action="{% if mode == 'new' %}/docs/new{% else %}/docs/{{ doc_page.slug }}/edit{% endif %}">
+  <div class="row g-4">
+    <div class="col-lg-8">
+      {% if mode == 'new' or user.role == 'supervisor' %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Page Title</label>
+        <input type="text" class="form-control" name="title" required
+               value="{{ doc_page.title if doc_page else '' }}"
+               placeholder="e.g. Signal Setup Procedure">
+        {% if mode == 'new' %}
+        <div class="form-text">The URL slug will be auto-generated from the title.</div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Content <span class="text-muted fw-normal">(Markdown)</span></label>
+        <textarea class="form-control font-monospace" name="content" rows="28"
+                  placeholder="Write your content using Markdown…">{{ doc_page.content if doc_page else '' }}</textarea>
+        <div class="form-text">
+          Supports Markdown: **bold**, *italic*, # headings, | tables |, ```code blocks```, - lists.
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Change Summary <span class="text-muted fw-normal">(optional)</span></label>
+        <input type="text" class="form-control" name="change_summary"
+               placeholder="e.g. Added step 4, corrected frequencies">
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          {% if mode == 'new' %}<i class="bi bi-plus-lg me-1"></i>Create Page
+          {% elif mode == 'propose' %}<i class="bi bi-send me-1"></i>Submit Proposal
+          {% else %}<i class="bi bi-check-lg me-1"></i>Save Changes{% endif %}
+        </button>
+        <a href="{% if doc_page %}/docs/{{ doc_page.slug }}{% else %}/docs{% endif %}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card border-secondary">
+        <div class="card-header small fw-semibold"><i class="bi bi-markdown me-1"></i>Markdown Reference</div>
+        <div class="card-body small font-monospace">
+          <div class="mb-2"># Heading 1</div>
+          <div class="mb-2">## Heading 2</div>
+          <div class="mb-2">**bold text**</div>
+          <div class="mb-2">*italic text*</div>
+          <div class="mb-2">- Bullet list item</div>
+          <div class="mb-2">1. Numbered item</div>
+          <div class="mb-2">[Link text](url)</div>
+          <div class="mb-2">```<br>code block<br>```</div>
+          <div class="mb-2">`inline code`</div>
+          <div class="mb-2">---  (horizontal rule)</div>
+          <div class="border-top border-secondary pt-2 mt-2">
+            <div class="text-muted fw-normal mb-1">Tables:</div>
+            <div>| Col 1 | Col 2 |</div>
+            <div>|---|---|</div>
+            <div>| A | B |</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

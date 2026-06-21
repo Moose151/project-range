@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Version History — {{ doc_page.title }}{% endblock %}
+
+{% block content %}
+{% if toast %}
+<div class="alert alert-success alert-dismissible fade show py-2 mb-3">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
+
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <div>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-1">
+        <li class="breadcrumb-item"><a href="/docs">Documentation</a></li>
+        <li class="breadcrumb-item"><a href="/docs/{{ doc_page.slug }}">{{ doc_page.title }}</a></li>
+        <li class="breadcrumb-item active">Version History</li>
+      </ol>
+    </nav>
+    <h4 class="mb-0"><i class="bi bi-clock-history me-2"></i>Version History — {{ doc_page.title }}</h4>
+  </div>
+  <a href="/docs/{{ doc_page.slug }}" class="btn btn-sm btn-outline-secondary ms-auto">
+    <i class="bi bi-arrow-left me-1"></i>Back to Page
+  </a>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-sm table-dark table-hover align-middle">
+    <thead class="table-secondary">
+      <tr>
+        <th>Version</th>
+        <th>Date</th>
+        <th>Author</th>
+        <th>Status</th>
+        <th>Summary</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in versions %}
+      <tr>
+        <td><span class="badge bg-secondary">v{{ v.version_number }}</span></td>
+        <td class="text-muted small">{{ v.created_at.strftime('%d %b %Y %H:%M') }}</td>
+        <td>{{ v.created_by.display_name }}</td>
+        <td>
+          {% if v.approval_status == 'approved' %}
+            <span class="badge bg-success">Approved</span>
+            {% if v.approved_by %}<span class="text-muted small">by {{ v.approved_by.display_name }}</span>{% endif %}
+          {% elif v.approval_status == 'pending' %}
+            <span class="badge bg-warning text-dark">Pending</span>
+          {% else %}
+            <span class="badge bg-danger">Rejected</span>
+            {% if v.rejection_reason %}
+            <span class="text-muted small d-block">{{ v.rejection_reason }}</span>
+            {% endif %}
+          {% endif %}
+        </td>
+        <td class="text-muted small">{{ v.change_summary or '—' }}</td>
+        <td class="text-end">
+          <div class="d-flex gap-1 justify-content-end">
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0"
+                    data-bs-toggle="modal" data-bs-target="#versionModal{{ v.id }}">
+              <i class="bi bi-eye"></i>
+            </button>
+            {% if v.approval_status == 'approved' %}
+            <form method="post" action="/docs/versions/{{ v.id }}/restore"
+                  onsubmit="return confirm('Restore page to version {{ v.version_number }}? This will create a new version with this content.')">
+              <button type="submit" class="btn btn-sm btn-outline-warning py-0" title="Restore this version">
+                <i class="bi bi-arrow-counterclockwise"></i>
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Version preview modals -->
+{% for v in versions %}
+<div class="modal fade" id="versionModal{{ v.id }}" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Version {{ v.version_number }} — {{ v.created_at.strftime('%d %b %Y %H:%M') }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <pre style="white-space:pre-wrap;font-family:monospace;max-height:60vh;overflow-y:auto" class="small">{{ v.content }}</pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        {% if v.approval_status == 'approved' %}
+        <form method="post" action="/docs/versions/{{ v.id }}/restore">
+          <button type="submit" class="btn btn-warning">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Restore this version
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Documentation Approval Queue{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <h4 class="mb-0"><i class="bi bi-hourglass-split me-2"></i>Edit Approval Queue</h4>
+  <a href="/docs" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-arrow-left me-1"></i>Back to Docs</a>
+</div>
+
+{% if toast %}
+<div class="alert alert-success alert-dismissible fade show py-2 mb-3">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
+
+{% if proposals %}
+{% for v in proposals %}
+<div class="card border-warning mb-4">
+  <div class="card-header d-flex align-items-center gap-2">
+    <span class="badge bg-warning text-dark">Pending</span>
+    <strong>{{ v.page.title }}</strong>
+    <span class="text-muted small ms-2">
+      Proposed by {{ v.created_by.display_name }} on {{ v.created_at.strftime('%d %b %Y %H:%M') }}
+    </span>
+    {% if v.change_summary %}
+    <span class="text-muted small">— {{ v.change_summary }}</span>
+    {% endif %}
+    <div class="ms-auto d-flex gap-2">
+      <a href="/docs/{{ v.page.slug }}" class="btn btn-sm btn-outline-secondary" target="_blank">
+        <i class="bi bi-eye me-1"></i>View Current
+      </a>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-lg-8">
+        <div class="border border-secondary rounded p-3 bg-body-secondary" style="max-height:400px;overflow-y:auto;">
+          <pre class="mb-0 small" style="white-space:pre-wrap;font-family:monospace">{{ v.content }}</pre>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <form method="post" action="/docs/versions/{{ v.id }}/approve" class="mb-2">
+          <button type="submit" class="btn btn-success w-100">
+            <i class="bi bi-check-lg me-1"></i>Approve &amp; Publish
+          </button>
+        </form>
+        <form method="post" action="/docs/versions/{{ v.id }}/reject">
+          <div class="mb-2">
+            <input type="text" class="form-control form-control-sm" name="rejection_reason"
+                   placeholder="Reason for rejection (optional)">
+          </div>
+          <button type="submit" class="btn btn-outline-danger w-100">
+            <i class="bi bi-x-lg me-1"></i>Reject
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-check-circle display-4 d-block mb-3 text-success"></i>
+  No pending edits — queue is clear.
+</div>
+{% endif %}
+{% endblock %}

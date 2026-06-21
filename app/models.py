@@ -252,6 +252,51 @@ class FrequencyTemplate(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+# ── Documentation / Wiki ──────────────────────────────────────────────────────
+
+class DocPage(Base):
+    __tablename__ = "doc_pages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    slug: Mapped[str] = mapped_column(String(256), nullable=False, unique=True, index=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    is_published: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    created_by: Mapped[User] = relationship("User", foreign_keys="DocPage.created_by_id")
+    updated_by: Mapped[User | None] = relationship("User", foreign_keys="DocPage.updated_by_id")
+    versions: Mapped[list["DocVersion"]] = relationship(
+        "DocVersion", back_populates="page",
+        cascade="all, delete-orphan",
+        order_by="DocVersion.version_number.desc()",
+    )
+
+
+class DocVersion(Base):
+    __tablename__ = "doc_versions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    page_id: Mapped[int] = mapped_column(ForeignKey("doc_pages.id"), nullable=False)
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    change_summary: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # approval_status: approved | pending | rejected
+    approval_status: Mapped[str] = mapped_column(String(16), nullable=False, default="approved")
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    approved_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    page: Mapped[DocPage] = relationship("DocPage", back_populates="versions")
+    created_by: Mapped[User] = relationship("User", foreign_keys="DocVersion.created_by_id")
+    approved_by: Mapped[User | None] = relationship("User", foreign_keys="DocVersion.approved_by_id")
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
