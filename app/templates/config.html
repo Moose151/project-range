@@ -1,0 +1,569 @@
+{% extends "base.html" %}
+{% block title %}System Configuration{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script>
+{% if toast %}
+document.addEventListener('DOMContentLoaded', () => showToast({{ toast | tojson }}, 'success'));
+{% endif %}
+
+function makeSortable(tbodyId, reorderUrl) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  Sortable.create(tbody, {
+    handle: '.drag-handle',
+    animation: 150,
+    onEnd() {
+      const rows = tbody.querySelectorAll('tr[data-id]');
+      const form = new FormData();
+      rows.forEach((row, i) => form.append('order_' + row.dataset.id, i));
+      fetch(reorderUrl, { method: 'POST', body: form })
+        .then(r => { if (r.ok || r.redirected) showToast('Order saved', 'success'); });
+    },
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  makeSortable('tbody-mod',     '/config/modulation/reorder');
+  makeSortable('tbody-fec',     '/config/fec/reorder');
+  makeSortable('tbody-sources', '/config/sources/reorder');
+  makeSortable('tbody-antennas','/config/antennas/reorder');
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-gear me-2"></i>System Configuration</h4>
+
+<div class="row g-4">
+
+  <!-- Modulation Types -->
+  <div class="col-lg-6">
+    <div class="card border-secondary">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-broadcast me-1"></i>Modulation Types</span>
+        <span class="text-muted small">{{ mod_types | selectattr('is_active') | list | length }} active</span>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-dark table-sm align-middle mb-0">
+          <thead class="table-secondary">
+            <tr>
+              <th style="width:28px"></th>
+              <th>Name</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-mod">
+            {% for m in mod_types %}
+            <tr class="{% if not m.is_active %}opacity-50{% endif %}" data-id="{{ m.id }}">
+              <td class="drag-handle text-muted ps-2" style="cursor:grab" title="Drag to reorder"><i class="bi bi-grip-vertical"></i></td>
+              <td class="fw-semibold">{{ m.name }}</td>
+              <td>
+                {% if m.is_active %}
+                <span class="badge bg-success">Active</span>
+                {% else %}
+                <span class="badge bg-secondary">Disabled</span>
+                {% endif %}
+              </td>
+              <td class="text-nowrap">
+                <form method="post" action="/config/modulation/{{ m.id }}/toggle" class="d-inline">
+                  <button type="submit" class="btn btn-sm py-0 px-1
+                    {% if m.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                    title="{{ 'Disable' if m.is_active else 'Enable' }}">
+                    <i class="bi bi-{% if m.is_active %}eye-slash{% else %}eye{% endif %}"></i>
+                  </button>
+                </form>
+                <form method="post" action="/config/modulation/{{ m.id }}/delete" class="d-inline"
+                      onsubmit="return confirm('Delete modulation type {{ m.name }}?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer">
+        <form method="post" action="/config/modulation/add" class="d-flex gap-2">
+          <input type="text" class="form-control form-control-sm" name="name"
+                 placeholder="New modulation type, e.g. OQPSK" required
+                 style="max-width: 220px">
+          <button type="submit" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Add
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEC Types -->
+  <div class="col-lg-6">
+    <div class="card border-secondary">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-code-slash me-1"></i>FEC / Code Rates</span>
+        <span class="text-muted small">{{ fec_types | selectattr('is_active') | list | length }} active</span>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-dark table-sm align-middle mb-0">
+          <thead class="table-secondary">
+            <tr><th style="width:28px"></th><th>Name</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="tbody-fec">
+            {% for f in fec_types %}
+            <tr class="{% if not f.is_active %}opacity-50{% endif %}" data-id="{{ f.id }}">
+              <td class="drag-handle text-muted ps-2" style="cursor:grab" title="Drag to reorder"><i class="bi bi-grip-vertical"></i></td>
+              <td class="fw-semibold">{{ f.name }}</td>
+              <td>
+                {% if f.is_active %}<span class="badge bg-success">Active</span>
+                {% else %}<span class="badge bg-secondary">Disabled</span>{% endif %}
+              </td>
+              <td class="text-nowrap">
+                <form method="post" action="/config/fec/{{ f.id }}/toggle" class="d-inline">
+                  <button type="submit" class="btn btn-sm py-0 px-1 {% if f.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                          title="{{ 'Disable' if f.is_active else 'Enable' }}">
+                    <i class="bi bi-{% if f.is_active %}eye-slash{% else %}eye{% endif %}"></i>
+                  </button>
+                </form>
+                <form method="post" action="/config/fec/{{ f.id }}/delete" class="d-inline"
+                      onsubmit="return confirm('Delete FEC type {{ f.name }}?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer">
+        <form method="post" action="/config/fec/add" class="d-flex gap-2">
+          <input type="text" class="form-control form-control-sm" name="name"
+                 placeholder="e.g. 3/4 or Turbo 0.95" required style="max-width: 200px">
+          <button type="submit" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Add
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Signal Sources -->
+  <div class="col-lg-6">
+    <div class="card border-secondary">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-hdd-rack me-1"></i>Signal Sources</span>
+        <span class="text-muted small">Modems &amp; signal generators</span>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-dark table-sm align-middle mb-0">
+          <thead class="table-secondary">
+            <tr><th style="width:28px"></th><th>Name</th><th>Description</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="tbody-sources">
+            {% for s in signal_sources %}
+            <tr class="{% if not s.is_active %}opacity-50{% endif %}" data-id="{{ s.id }}">
+              <td class="drag-handle text-muted ps-2" style="cursor:grab" title="Drag to reorder"><i class="bi bi-grip-vertical"></i></td>
+              <td class="fw-semibold">{{ s.name }}</td>
+              <td class="text-muted small">{{ s.description or '—' }}</td>
+              <td>
+                {% if s.is_active %}<span class="badge bg-success">Active</span>
+                {% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
+              </td>
+              <td class="text-nowrap">
+                <form method="post" action="/config/sources/{{ s.id }}/toggle" class="d-inline">
+                  <button type="submit" class="btn btn-sm py-0 px-1 {% if s.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                          title="{{ 'Disable' if s.is_active else 'Enable' }}">
+                    <i class="bi bi-{% if s.is_active %}eye-slash{% else %}eye{% endif %}"></i>
+                  </button>
+                </form>
+                <form method="post" action="/config/sources/{{ s.id }}/delete" class="d-inline"
+                      onsubmit="return confirm('Delete source {{ s.name }}?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer">
+        <form method="post" action="/config/sources/add" class="row g-2 align-items-end">
+          <div class="col-auto">
+            <input type="text" class="form-control form-control-sm" name="name"
+                   placeholder="e.g. CBM400-1" required style="width:130px">
+          </div>
+          <div class="col-auto">
+            <input type="text" class="form-control form-control-sm" name="description"
+                   placeholder="Description (optional)" style="width:180px">
+          </div>
+          <div class="col-auto">
+            <button type="submit" class="btn btn-sm btn-primary">
+              <i class="bi bi-plus-lg me-1"></i>Add
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Antenna Types -->
+  <div class="col-lg-6">
+    <div class="card border-secondary">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-broadcast me-1"></i>Antennas</span>
+        <span class="text-muted small">Transmit antennas</span>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-dark table-sm align-middle mb-0">
+          <thead class="table-secondary">
+            <tr><th style="width:28px"></th><th>Name</th><th>Description</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="tbody-antennas">
+            {% for a in antenna_types %}
+            <tr class="{% if not a.is_active %}opacity-50{% endif %}" data-id="{{ a.id }}">
+              <td class="drag-handle text-muted ps-2" style="cursor:grab" title="Drag to reorder"><i class="bi bi-grip-vertical"></i></td>
+              <td class="fw-semibold">{{ a.name }}</td>
+              <td class="text-muted small">{{ a.description or '—' }}</td>
+              <td>
+                {% if a.is_active %}<span class="badge bg-success">Active</span>
+                {% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
+              </td>
+              <td class="text-nowrap">
+                <form method="post" action="/config/antennas/{{ a.id }}/toggle" class="d-inline">
+                  <button type="submit" class="btn btn-sm py-0 px-1 {% if a.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                          title="{{ 'Disable' if a.is_active else 'Enable' }}">
+                    <i class="bi bi-{% if a.is_active %}eye-slash{% else %}eye{% endif %}"></i>
+                  </button>
+                </form>
+                <form method="post" action="/config/antennas/{{ a.id }}/delete" class="d-inline"
+                      onsubmit="return confirm('Delete antenna {{ a.name }}?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer">
+        <form method="post" action="/config/antennas/add" class="row g-2 align-items-end">
+          <div class="col-auto">
+            <input type="text" class="form-control form-control-sm" name="name"
+                   placeholder="e.g. STLT-M" required style="width:130px">
+          </div>
+          <div class="col-auto">
+            <input type="text" class="form-control form-control-sm" name="description"
+                   placeholder="Description (optional)" style="width:180px">
+          </div>
+          <div class="col-auto">
+            <button type="submit" class="btn btn-sm btn-primary">
+              <i class="bi bi-plus-lg me-1"></i>Add
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Frequency Templates -->
+  <div class="col-12">
+    <div class="card border-secondary">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-calculator me-1"></i>Frequency Templates</span>
+        <span class="text-muted small">Saved BUC/LO/TTF plans loaded from the RF calculator</span>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-dark table-sm align-middle mb-0">
+          <thead class="table-secondary">
+            <tr>
+              <th>Name</th><th>Band</th><th>BUC</th><th>LO</th>
+              <th>TTF Dir</th><th>TTF</th><th>Unit</th><th>Notes</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in freq_templates %}
+            <tr>
+              <td class="fw-semibold">{{ t.name }}</td>
+              <td>{{ t.band or '—' }}</td>
+              <td>{{ t.buc if t.buc is not none else '—' }}</td>
+              <td>{{ t.lo if t.lo is not none else '—' }}</td>
+              <td class="text-muted">{{ t.ttf_direction }}</td>
+              <td>{{ t.ttf if t.ttf is not none else '—' }}</td>
+              <td class="text-muted small">{{ t.default_unit }}</td>
+              <td class="text-muted small">{{ t.notes or '—' }}</td>
+              <td class="text-nowrap">
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
+                        data-bs-toggle="collapse" data-bs-target="#tmpl-edit-{{ t.id }}"
+                        title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <form method="post" action="/config/freq-templates/{{ t.id }}/delete" class="d-inline"
+                      onsubmit="return confirm('Delete template {{ t.name }}?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            <tr class="collapse" id="tmpl-edit-{{ t.id }}">
+              <td colspan="9" class="p-0">
+                <div class="p-2 bg-body-tertiary border-top border-secondary">
+                  <form method="post" action="/config/freq-templates/{{ t.id }}/update"
+                        class="row g-2 align-items-end">
+                    <div class="col-auto">
+                      <label class="form-label small mb-1">Name</label>
+                      <input type="text" class="form-control form-control-sm" name="name"
+                             value="{{ t.name }}" required style="width:160px">
+                    </div>
+                    <div class="col-auto">
+                      <label class="form-label small mb-1">Band</label>
+                      <select class="form-select form-select-sm" name="band" style="width:90px">
+                        <option value="">—</option>
+                        {% for b in bands %}
+                        <option value="{{ b }}" {% if t.band == b %}selected{% endif %}>{{ b }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="col-auto">
+                      <label class="form-label small mb-1">BUC</label>
+                      <input type="number" class="form-control form-control-sm" name="buc" step="any"
+                             value="{{ t.buc or '' }}" style="width:90px">
+                    </div>
+                    <div class="col-auto">
+                      <label class="form-label small mb-1">LO</label>
+                      <input type="number" class="form-control form-control-sm" name="lo" step="any"
+                             value="{{ t.lo or '' }}" style="width:90px">
+                    </div>
+                    <div class="col-auto">
+                      <label class="form-label small mb-1">TTF Dir</label>
+                      <select class="form-select form-select-sm" name="ttf_direction" style="width:70px">
+                        <option value="+" {% if t.ttf_direction == '+' %}selected{% endif %}>+</option>
+                        <option value="-" {% if t.ttf_direction == '-' %}selected{% endif %}>−</option>
+                      </select>
+                    </div>
+                    <div class="col-auto">
+                      <label class="form-label small mb-1">TTF</label>
+                      <input type="number" class="form-control form-control-sm" name="ttf" step="any"
+                             value="{{ t.ttf or '' }}" style="width:90px">
+                    </div>
+                    <div class="col-auto">
+                      <label class="form-label small mb-1">Unit</label>
+                      <select class="form-select form-select-sm" name="default_unit" style="width:80px">
+                        <option value="MHz" {% if t.default_unit == 'MHz' %}selected{% endif %}>MHz</option>
+                        <option value="GHz" {% if t.default_unit == 'GHz' %}selected{% endif %}>GHz</option>
+                      </select>
+                    </div>
+                    <div class="col-auto">
+                      <label class="form-label small mb-1">Notes</label>
+                      <input type="text" class="form-control form-control-sm" name="notes"
+                             value="{{ t.notes or '' }}" style="width:180px">
+                    </div>
+                    <div class="col-auto d-flex gap-1">
+                      <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary"
+                              data-bs-toggle="collapse" data-bs-target="#tmpl-edit-{{ t.id }}">Cancel</button>
+                    </div>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer">
+        <form method="post" action="/config/freq-templates/add" class="row g-2 align-items-end">
+          <div class="col-auto">
+            <label class="form-label small mb-1">Name</label>
+            <input type="text" class="form-control form-control-sm" name="name"
+                   placeholder="e.g. Ku-Band Uplink" required style="width:160px">
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-1">Band</label>
+            <select class="form-select form-select-sm" name="band" style="width:90px">
+              <option value="">—</option>
+              {% for b in bands %}
+              <option value="{{ b }}">{{ b }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-1">BUC</label>
+            <input type="number" class="form-control form-control-sm" name="buc" step="any" style="width:90px" placeholder="BUC">
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-1">LO</label>
+            <input type="number" class="form-control form-control-sm" name="lo" step="any" style="width:90px" placeholder="LO">
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-1">TTF Dir</label>
+            <select class="form-select form-select-sm" name="ttf_direction" style="width:70px">
+              <option value="+">+</option>
+              <option value="-">−</option>
+            </select>
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-1">TTF</label>
+            <input type="number" class="form-control form-control-sm" name="ttf" step="any" style="width:90px" placeholder="TTF">
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-1">Unit</label>
+            <select class="form-select form-select-sm" name="default_unit" style="width:80px">
+              <option value="MHz">MHz</option>
+              <option value="GHz">GHz</option>
+            </select>
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-1">Notes</label>
+            <input type="text" class="form-control form-control-sm" name="notes"
+                   placeholder="Optional" style="width:160px">
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-1 d-block">&nbsp;</label>
+            <button type="submit" class="btn btn-sm btn-primary">
+              <i class="bi bi-plus-lg me-1"></i>Add Template
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Signal Registry -->
+  <div class="col-12">
+    <div class="card border-secondary">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-reception-4 me-1"></i>Signal Registry</span>
+        <span class="text-muted small">
+          Signals listed here appear in autocomplete and can be assigned to exclusivity groups.
+          Exclusivity groups enforce mutual exclusion: only one signal per group can be <strong>Up</strong> at a time.
+        </span>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-dark table-sm align-middle mb-0">
+          <thead class="table-secondary">
+            <tr>
+              <th>Signal Name</th>
+              <th>Description</th>
+              <th>Exclusivity Group</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for sig in signals %}
+            <tr class="{% if not sig.is_active %}opacity-50{% endif %}">
+              <td class="fw-semibold">{{ sig.name }}</td>
+              <td class="text-muted small">{{ sig.description or '—' }}</td>
+              <td>
+                {% if sig.exclusivity_group %}
+                <span class="badge bg-info text-dark">{{ sig.exclusivity_group }}</span>
+                {% else %}
+                <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if sig.is_active %}
+                <span class="badge bg-success">Active</span>
+                {% else %}
+                <span class="badge bg-secondary">Inactive</span>
+                {% endif %}
+              </td>
+              <td class="text-nowrap">
+                <!-- Inline edit (collapsible) -->
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
+                        data-bs-toggle="collapse" data-bs-target="#sig-edit-{{ sig.id }}"
+                        title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <form method="post" action="/config/signals/{{ sig.id }}/toggle" class="d-inline">
+                  <button type="submit" class="btn btn-sm py-0 px-1
+                    {% if sig.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                    title="{{ 'Deactivate' if sig.is_active else 'Activate' }}">
+                    <i class="bi bi-{% if sig.is_active %}eye-slash{% else %}eye{% endif %}"></i>
+                  </button>
+                </form>
+                <form method="post" action="/config/signals/{{ sig.id }}/delete" class="d-inline"
+                      onsubmit="return confirm('Remove {{ sig.name }} from the registry? Existing log entries are unaffected.')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            <!-- Inline edit row -->
+            <tr class="collapse" id="sig-edit-{{ sig.id }}">
+              <td colspan="5" class="p-0">
+                <div class="p-2 bg-body-tertiary border-top border-secondary">
+                  <form method="post" action="/config/signals/{{ sig.id }}/update"
+                        class="d-flex gap-2 flex-wrap align-items-end">
+                    <div>
+                      <label class="form-label small mb-1">Description</label>
+                      <input type="text" class="form-control form-control-sm" name="description"
+                             value="{{ sig.description or '' }}" style="width:220px">
+                    </div>
+                    <div>
+                      <label class="form-label small mb-1">Exclusivity Group</label>
+                      <input list="groupList" type="text" class="form-control form-control-sm" name="exclusivity_group"
+                             value="{{ sig.exclusivity_group or '' }}"
+                             placeholder="e.g. S101 or leave blank"
+                             style="width:160px">
+                      <datalist id="groupList">
+                        {% for g in groups %}<option value="{{ g }}">{% endfor %}
+                      </datalist>
+                    </div>
+                    <div class="d-flex gap-1">
+                      <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary"
+                              data-bs-toggle="collapse" data-bs-target="#sig-edit-{{ sig.id }}">Cancel</button>
+                    </div>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer">
+        <form method="post" action="/config/signals/add" class="row g-2 align-items-end">
+          <div class="col-auto">
+            <label class="form-label small mb-1">Signal Name</label>
+            <input type="text" class="form-control form-control-sm" name="name"
+                   placeholder="e.g. S101" required style="width:130px">
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-1">Description (optional)</label>
+            <input type="text" class="form-control form-control-sm" name="description"
+                   placeholder="Brief description" style="width:200px">
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-1">Exclusivity Group (optional)</label>
+            <input list="groupListAdd" type="text" class="form-control form-control-sm" name="exclusivity_group"
+                   placeholder="e.g. S101" style="width:140px">
+            <datalist id="groupListAdd">
+              {% for g in groups %}<option value="{{ g }}">{% endfor %}
+            </datalist>
+          </div>
+          <div class="col-auto">
+            <button type="submit" class="btn btn-sm btn-primary">
+              <i class="bi bi-plus-lg me-1"></i>Add Signal
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="6" fill="#1a1a2e"/>
+  <!-- Signal arcs (bottom-left origin, radiating outward) -->
+  <g fill="none" stroke="#20c997" stroke-linecap="round">
+    <path stroke-width="2.5" d="M6 26 Q6 20 12 20"/>
+    <path stroke-width="2.2" d="M6 26 Q6 14 18 14"/>
+    <path stroke-width="2" d="M6 26 Q6 8 24 8"/>
+  </g>
+  <!-- Origin dot -->
+  <circle cx="6" cy="26" r="2.5" fill="#20c997"/>
+</svg>

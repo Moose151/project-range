@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}EIRP Calculator{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <h4 class="mb-0"><i class="bi bi-broadcast-pin me-2"></i>EIRP Calculator</h4>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/calculator/rf" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-broadcast me-1"></i>RF Freq
+    </a>
+    <a href="/calculator/power" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-lightning-charge me-1"></i>Power
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <!-- Input form -->
+  <div class="col-lg-5">
+    <div class="card border-secondary">
+      <div class="card-header"><i class="bi bi-sliders me-1"></i>Link Parameters</div>
+      <div class="card-body">
+        <form method="post" action="/calculator/eirp">
+
+          <div class="mb-3">
+            <label class="form-label">Transmit Power</label>
+            <div class="input-group">
+              <input type="number" class="form-control" name="tx_power" step="any"
+                     value="{{ form.tx_power or '' }}" placeholder="Value" required>
+              <select class="form-select" name="tx_unit" style="max-width:90px">
+                {% for u in ["dBm", "dBW", "W"] %}
+                <option value="{{ u }}" {% if (form.tx_unit or 'dBm') == u %}selected{% endif %}>{{ u }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Cable / Feed Loss <span class="text-muted small">(dB, positive = loss)</span></label>
+            <div class="input-group">
+              <input type="number" class="form-control" name="cable_loss" step="any" min="0"
+                     value="{{ form.cable_loss if form.cable_loss is defined else '0' }}" placeholder="0">
+              <span class="input-group-text">dB</span>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Antenna Gain</label>
+            <div class="input-group">
+              <input type="number" class="form-control" name="antenna_gain" step="any"
+                     value="{{ form.antenna_gain or '' }}" placeholder="e.g. 40" required>
+              <span class="input-group-text">dBi</span>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Other Losses <span class="text-muted small">(pointing, radome, etc., dB)</span></label>
+            <div class="input-group">
+              <input type="number" class="form-control" name="other_losses" step="any" min="0"
+                     value="{{ form.other_losses if form.other_losses is defined else '0' }}" placeholder="0">
+              <span class="input-group-text">dB</span>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-calculator me-1"></i>Calculate EIRP
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Formula reference -->
+    <div class="card border-secondary mt-3">
+      <div class="card-header small text-muted"><i class="bi bi-info-circle me-1"></i>Formula</div>
+      <div class="card-body small text-muted">
+        <p class="mb-1"><strong>EIRP (dBW)</strong> = P<sub>Tx</sub> (dBW) − L<sub>cable</sub> (dB) + G<sub>ant</sub> (dBi) − L<sub>other</sub> (dB)</p>
+        <p class="mb-0">Where EIRP is the radiated power relative to an isotropic antenna, accounting for all losses between the transmitter output and the antenna.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="col-lg-7">
+    {% if error %}
+    <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>{{ error }}</div>
+    {% endif %}
+
+    {% if result %}
+    <div class="card border-success mb-3">
+      <div class="card-header bg-success bg-opacity-10 text-success fw-semibold">
+        <i class="bi bi-check-circle me-1"></i>EIRP Result
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-sm-4 text-center">
+            <div class="text-muted small mb-1">EIRP</div>
+            <div class="fs-3 fw-bold text-success">{{ result.eirp_dbw }}</div>
+            <div class="text-muted small">dBW</div>
+          </div>
+          <div class="col-sm-4 text-center">
+            <div class="text-muted small mb-1">EIRP</div>
+            <div class="fs-3 fw-bold text-success">{{ result.eirp_dbm }}</div>
+            <div class="text-muted small">dBm</div>
+          </div>
+          <div class="col-sm-4 text-center">
+            <div class="text-muted small mb-1">EIRP</div>
+            <div class="fs-3 fw-bold text-success">
+              {% if result.eirp_w >= 1000 %}
+              {{ result.eirp_kw }} kW
+              {% else %}
+              {{ result.eirp_w }} W
+              {% endif %}
+            </div>
+            <div class="text-muted small">Linear</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Calculation breakdown -->
+    <div class="card border-secondary">
+      <div class="card-header small text-muted"><i class="bi bi-list-ol me-1"></i>Calculation Breakdown</div>
+      <div class="card-body p-0">
+        <table class="table table-dark table-sm mb-0">
+          <tbody>
+            <tr>
+              <td class="text-muted">Transmit Power</td>
+              <td class="text-end fw-semibold">{{ form.tx_power }} {{ form.tx_unit }}</td>
+              <td class="text-end text-muted">= {{ result.tx_dbw }} dBW</td>
+            </tr>
+            <tr class="text-danger">
+              <td>− Cable / Feed Loss</td>
+              <td class="text-end fw-semibold">{{ form.cable_loss }} dB</td>
+              <td class="text-end text-muted"></td>
+            </tr>
+            <tr class="table-secondary">
+              <td class="text-muted">Power at Antenna Input</td>
+              <td></td>
+              <td class="text-end fw-semibold">{{ result.power_at_antenna_dbw }} dBW</td>
+            </tr>
+            <tr class="text-success">
+              <td>+ Antenna Gain</td>
+              <td class="text-end fw-semibold">{{ form.antenna_gain }} dBi</td>
+              <td></td>
+            </tr>
+            {% if form.other_losses and form.other_losses | float > 0 %}
+            <tr class="text-danger">
+              <td>− Other Losses</td>
+              <td class="text-end fw-semibold">{{ form.other_losses }} dB</td>
+              <td></td>
+            </tr>
+            {% endif %}
+            <tr class="table-success">
+              <td class="fw-bold">EIRP</td>
+              <td></td>
+              <td class="text-end fw-bold">{{ result.eirp_dbw }} dBW</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-broadcast-pin display-4 d-block mb-3"></i>
+      Enter transmit power, cable loss, and antenna gain, then click <strong>Calculate EIRP</strong>.
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

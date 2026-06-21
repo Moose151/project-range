@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Serials{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <h4 class="mb-0"><i class="bi bi-collection-play me-2"></i>Active Serials</h4>
+  <a href="/history" class="btn btn-sm btn-outline-secondary ms-auto">
+    <i class="bi bi-clock-history me-1"></i>History
+  </a>
+</div>
+
+{% if toast %}
+<div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
+
+<!-- Pending (created but not yet started) serials -->
+{% if pending_serials %}
+<div class="mb-4">
+  <h6 class="text-muted text-uppercase small mb-2"><i class="bi bi-hourglass me-1"></i>Pending — not yet started</h6>
+  <div class="row g-2">
+    {% for serial in pending_serials %}
+    <div class="col-lg-6">
+      <div class="card border-warning border-opacity-50">
+        <div class="card-body py-2 d-flex align-items-center gap-3">
+          <div class="flex-grow-1">
+            <span class="fw-semibold">{{ serial.title }}</span>
+            <span class="badge bg-warning text-dark ms-2 small">Pending</span>
+            {% if serial.package_links %}
+            <div class="text-muted small mt-1">
+              <i class="bi bi-box-seam me-1"></i>
+              {% for sp in serial.package_links %}{{ sp.package.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          <div class="d-flex gap-2">
+            <a href="/serials/{{ serial.id }}/start" class="btn btn-sm btn-success">
+              <i class="bi bi-play-circle me-1"></i>Start
+            </a>
+            <form method="post" action="/serials/{{ serial.id }}/delete"
+                  onsubmit="return confirm('Discard pending serial {{ serial.title | e }}?')">
+              <button type="submit" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Active serials -->
+{% if active_serials %}
+<div class="row g-3 mb-4">
+  {% for serial in active_serials %}
+  <div class="col-lg-6">
+    <div class="card border-success">
+      <div class="card-header d-flex align-items-center gap-2">
+        <span class="badge bg-success">Active</span>
+        <span class="fw-semibold">{{ serial.title }}</span>
+        <span class="text-muted small ms-auto">Started {{ serial.opened_at.strftime('%d/%m/%y %H:%M') }}</span>
+      </div>
+      <div class="card-body py-2">
+        {% if serial.notes %}
+        <p class="text-muted small mb-2">{{ serial.notes }}</p>
+        {% endif %}
+        {% if serial.package_links %}
+        <div class="small text-muted mb-2">
+          <i class="bi bi-box-seam me-1"></i>Packages:
+          {% for sp in serial.package_links %}
+          <a href="/packages/{{ sp.package_id }}" class="text-decoration-none ms-1">{{ sp.package.name }}</a>{% if not loop.last %},{% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Add package to serial -->
+        {% if packages %}
+        <form method="post" action="/serials/{{ serial.id }}/packages/add" class="d-flex gap-2 mt-2">
+          <select class="form-select form-select-sm" name="package_id">
+            {% for pkg in packages %}
+            <option value="{{ pkg.id }}">{{ pkg.name }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-sm btn-outline-secondary text-nowrap">
+            <i class="bi bi-plus me-1"></i>Add Package
+          </button>
+        </form>
+        {% endif %}
+      </div>
+      <div class="card-footer d-flex gap-2 py-2">
+        <a href="/" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-speedometer2 me-1"></i>Dashboard
+        </a>
+        <form method="post" action="/serials/{{ serial.id }}/end" class="ms-auto"
+              onsubmit="return confirm('End serial {{ serial.title | e }}? It will be moved to history.')">
+          <button type="submit" class="btn btn-sm btn-danger">
+            <i class="bi bi-stop-circle me-1"></i>End Serial
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-secondary d-flex align-items-center gap-3 mb-4">
+  <i class="bi bi-collection-play fs-4 text-muted"></i>
+  <div>No active serials. Create one below to start logging.</div>
+</div>
+{% endif %}
+
+<!-- Create new serial -->
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card border-secondary">
+      <div class="card-header"><i class="bi bi-plus-circle me-1"></i>Start New Serial</div>
+      <div class="card-body">
+        <form method="post" action="/serials/new">
+          <div class="mb-3">
+            <label class="form-label">Serial Title <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="title"
+                   placeholder="e.g. Exercise Bright Star — Serial 1" required autofocus>
+          </div>
+
+          {% if packages %}
+          <div class="mb-3">
+            <label class="form-label">Signal Package(s)</label>
+            <div class="border border-secondary rounded p-2" style="max-height:200px;overflow-y:auto">
+              {% for pkg in packages %}
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="package_ids"
+                       value="{{ pkg.id }}" id="pkg_{{ pkg.id }}">
+                <label class="form-check-label" for="pkg_{{ pkg.id }}">
+                  {{ pkg.name }}
+                  <span class="text-muted small">({{ pkg.signals | length }} signals)</span>
+                </label>
+              </div>
+              {% endfor %}
+            </div>
+            <div class="text-muted small mt-1">Signals from selected packages will be pre-loaded when the serial starts.</div>
+          </div>
+          {% else %}
+          <div class="alert alert-warning py-2 small">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            No signal packages defined yet. <a href="/packages/new">Create a package</a> to pre-load signals, or start with an empty serial and add signals ad-hoc.
+          </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label class="form-label">Notes <span class="text-muted small">(optional)</span></label>
+            <textarea class="form-control" name="notes" rows="2" placeholder="Crew, objectives, or other context…"></textarea>
+          </div>
+
+          <button type="submit" class="btn btn-success w-100">
+            <i class="bi bi-play-circle me-1"></i>Create &amp; Start Serial
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

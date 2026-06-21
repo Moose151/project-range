@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% block title %}{% if package %}Edit: {{ package.name }}{% else %}New Signal Package{% endif %}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <h4 class="mb-0">
+    <i class="bi bi-box-seam me-2"></i>
+    {% if package %}{{ package.name }}{% else %}New Signal Package{% endif %}
+  </h4>
+  <div class="ms-auto d-flex gap-2">
+    {% if package %}
+    <a href="/packages/{{ package.id }}/export" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-download me-1"></i>Export JSON
+    </a>
+    <form method="post" action="/packages/{{ package.id }}/duplicate"
+          onsubmit="return confirm('Duplicate package {{ package.name | e }}?')">
+      <button type="submit" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-copy me-1"></i>Duplicate
+      </button>
+    </form>
+    {% endif %}
+    <a href="/packages" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>All Packages
+    </a>
+  </div>
+</div>
+
+{% if toast %}
+<div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
+
+<div class="row g-4">
+  <!-- Package metadata -->
+  <div class="col-lg-4">
+    <div class="card border-secondary">
+      <div class="card-header">Package Details</div>
+      <div class="card-body">
+        <form method="post" action="{% if package %}/packages/{{ package.id }}/update{% else %}/packages/new{% endif %}">
+          <div class="mb-3">
+            <label class="form-label">Package Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="name"
+                   value="{{ package.name if package else '' }}" required autofocus>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Description <span class="text-muted small">(optional)</span></label>
+            <textarea class="form-control" name="description" rows="3">{{ package.description or '' }}</textarea>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">
+            {% if package %}<i class="bi bi-check2 me-1"></i>Save Details{% else %}<i class="bi bi-plus-lg me-1"></i>Create Package{% endif %}
+          </button>
+        </form>
+      </div>
+      {% if package %}
+      <div class="card-footer text-muted small">
+        Created {{ package.created_at.strftime('%d/%m/%Y %H:%M') }} by {{ package.created_by.display_name }}
+      </div>
+      {% endif %}
+    </div>
+
+    {% if package %}
+    <!-- Add signal from registry -->
+    <div class="card border-secondary mt-3">
+      <div class="card-header small text-muted"><i class="bi bi-lightning me-1"></i>Quick-add from Registry</div>
+      <div class="card-body py-2">
+        <div class="input-group input-group-sm">
+          <select class="form-select form-select-sm" id="registrySelect">
+            <option value="">— Select signal —</option>
+            {% for s in registry_signals %}
+            <option value="{{ s }}">{{ s }}</option>
+            {% endfor %}
+          </select>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="prefillFromRegistry()">Use</button>
+        </div>
+        <div class="text-muted small mt-1">Pre-fills the signal name in the form below.</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Signals list and add form -->
+  {% if package %}
+  <div class="col-lg-8">
+
+    <!-- Existing signals -->
+    {% if package.signals %}
+    <div class="card border-secondary mb-3">
+      <div class="card-header d-flex align-items-center">
+        <span><i class="bi bi-list-ul me-1"></i>Signals ({{ package.signals | length }})</span>
+        <span class="text-muted small ms-2">drag <i class="bi bi-grip-vertical"></i> to reorder</span>
+      </div>
+      <div class="card-body p-0 overflow-auto">
+        <table class="table table-dark table-hover table-sm align-middle mb-0">
+          <thead class="table-secondary">
+            <tr>
+              <th style="width:28px"></th>
+              <th>Name</th>
+              <th>Band</th>
+              <th>TxIF</th>
+              <th>TxRF</th>
+              <th>RxRF</th>
+              <th>RxIF</th>
+              <th>Unit</th>
+              <th>Mod</th>
+              <th>FEC</th>
+              <th>Power</th>
+              <th>Source</th>
+              <th>Antenna</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-signals">
+            {% for entry in package.signals %}
+            <tr data-id="{{ entry.id }}">
+              <td class="drag-handle text-muted ps-2" style="cursor:grab"><i class="bi bi-grip-vertical"></i></td>
+              <td class="fw-semibold">{{ entry.signal_name }}</td>
+              <td>{{ entry.band or '—' }}</td>
+              <td>{{ entry.tx_if or '—' }}</td>
+              <td>{{ entry.tx_rf or '—' }}</td>
+              <td>{{ entry.rx_rf or '—' }}</td>
+              <td>{{ entry.rx_if or '—' }}</td>
+              <td class="text-muted small">{{ entry.freq_unit }}</td>
+              <td class="small">{{ entry.modulation or '—' }}</td>
+              <td class="small">{{ entry.fec or '—' }}</td>
+              <td class="small">{% if entry.power is not none %}{{ entry.power }} {{ entry.power_unit }}{% else %}—{% endif %}</td>
+              <td class="small text-muted">{{ entry.source or '—' }}</td>
+              <td class="small text-muted">{{ entry.antenna or '—' }}</td>
+              <td class="text-nowrap">
+                <button type="button" class="btn btn-xs btn-outline-secondary btn-sm py-0 px-1"
+                        onclick="editSignal({{ {
+                          'id': entry.id,
+                          'signal_name': entry.signal_name,
+                          'description': entry.description or '',
+                          'band': entry.band or '',
+                          'tx_if': entry.tx_if,
+                          'tx_rf': entry.tx_rf,
+                          'rx_rf': entry.rx_rf,
+                          'rx_if': entry.rx_if,
+                          'freq_unit': entry.freq_unit or 'MHz',
+                          'modulation': entry.modulation or '',
+                          'fec': entry.fec or '',
+                          'symbol_rate': entry.symbol_rate or '',
+                          'power': entry.power,
+                          'power_unit': entry.power_unit or 'dBm',
+                          'eb_no': entry.eb_no,
+                          'source': entry.source or '',
+                          'antenna': entry.antenna or '',
+                          'notes': entry.notes or '',
+                        } | tojson }})" title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <form method="post" action="/packages/{{ package.id }}/signals/{{ entry.id }}/delete" class="d-inline"
+                      onsubmit="return confirm('Remove {{ entry.signal_name | e }}?')">
+                  <button type="submit" class="btn btn-xs btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Add / Edit signal form -->
+    <div class="card border-secondary" id="signalFormCard">
+      <div class="card-header" id="signalFormTitle"><i class="bi bi-plus-lg me-1"></i>Add Signal</div>
+      <div class="card-body">
+        <form method="post" id="signalForm" action="/packages/{{ package.id }}/signals/add">
+          <input type="hidden" name="_entry_id" id="editEntryId">
+          <div class="row g-2">
+            <div class="col-sm-4">
+              <label class="form-label small">Signal Name <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-sm" name="signal_name" id="f_signal_name" required>
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label small">Description</label>
+              <input type="text" class="form-control form-control-sm" name="description" id="f_description">
+            </div>
+            <div class="col-sm-2">
+              <label class="form-label small">Band</label>
+              <select class="form-select form-select-sm" name="band" id="f_band">
+                <option value="">—</option>
+                {% for b in bands %}<option value="{{ b }}">{{ b }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-2">
+              <label class="form-label small">Freq Unit</label>
+              <select class="form-select form-select-sm" name="freq_unit" id="f_freq_unit">
+                {% for u in freq_units %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small">TxIF</label>
+              <input type="number" class="form-control form-control-sm" name="tx_if" id="f_tx_if" step="any">
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small">TxRF</label>
+              <input type="number" class="form-control form-control-sm" name="tx_rf" id="f_tx_rf" step="any">
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small">RxRF</label>
+              <input type="number" class="form-control form-control-sm" name="rx_rf" id="f_rx_rf" step="any">
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small">RxIF</label>
+              <input type="number" class="form-control form-control-sm" name="rx_if" id="f_rx_if" step="any">
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small">Modulation</label>
+              <select class="form-select form-select-sm" name="modulation" id="f_modulation">
+                <option value="">—</option>
+                {% for m in mod_types %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-2">
+              <label class="form-label small">FEC</label>
+              <select class="form-select form-select-sm" name="fec" id="f_fec">
+                <option value="">—</option>
+                {% for f in fec_types %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small">Symbol Rate</label>
+              <input type="text" class="form-control form-control-sm" name="symbol_rate" id="f_symbol_rate" placeholder="ksps">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label small">Power</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control form-control-sm" name="power" id="f_power" step="any">
+                <select class="form-select form-select-sm" name="power_unit" id="f_power_unit" style="max-width:70px">
+                  {% for u in power_units %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small">Eb/No (dB)</label>
+              <input type="number" class="form-control form-control-sm" name="eb_no" id="f_eb_no" step="any">
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small">Source</label>
+              <select class="form-select form-select-sm" name="source" id="f_source">
+                <option value="">—</option>
+                {% for s in signal_sources %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small">Antenna</label>
+              <select class="form-select form-select-sm" name="antenna" id="f_antenna">
+                <option value="">—</option>
+                {% for a in antenna_types %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label small">Notes</label>
+              <input type="text" class="form-control form-control-sm" name="notes" id="f_notes">
+            </div>
+            <div class="col-12 d-flex gap-2">
+              <button type="submit" class="btn btn-sm btn-success" id="signalSubmitBtn">
+                <i class="bi bi-plus-lg me-1"></i>Add Signal
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="resetForm()">Reset</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-lg-8">
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle me-2"></i>
+      Create the package first, then you can add signals to it.
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+{% if package %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+{% endif %}
+<script>
+{% if toast %}
+document.addEventListener('DOMContentLoaded', () => showToast({{ toast | tojson }}, 'success'));
+{% endif %}
+
+{% if package and package.signals %}
+document.addEventListener('DOMContentLoaded', () => {
+  const tbody = document.getElementById('tbody-signals');
+  if (!tbody) return;
+  Sortable.create(tbody, {
+    handle: '.drag-handle',
+    animation: 150,
+    onEnd() {
+      const rows = tbody.querySelectorAll('tr[data-id]');
+      const form = new FormData();
+      rows.forEach((row, i) => form.append('order_' + row.dataset.id, i));
+      fetch('/packages/{{ package.id }}/signals/reorder', { method: 'POST', body: form })
+        .then(r => { if (r.ok || r.redirected) showToast('Order saved', 'success'); });
+    },
+  });
+});
+{% endif %}
+
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.tagName === 'SELECT') {
+    el.value = val || '';
+  } else {
+    el.value = (val !== null && val !== undefined) ? val : '';
+  }
+}
+
+function editSignal(entry) {
+  document.getElementById('signalFormTitle').innerHTML = '<i class="bi bi-pencil me-1"></i>Edit Signal: ' + entry.signal_name;
+  document.getElementById('signalSubmitBtn').innerHTML = '<i class="bi bi-check2 me-1"></i>Update Signal';
+  document.getElementById('signalForm').action = '/packages/{{ package.id if package }}/signals/' + entry.id + '/update';
+  setVal('f_signal_name', entry.signal_name);
+  setVal('f_description', entry.description);
+  setVal('f_band', entry.band);
+  setVal('f_freq_unit', entry.freq_unit);
+  setVal('f_tx_if', entry.tx_if);
+  setVal('f_tx_rf', entry.tx_rf);
+  setVal('f_rx_rf', entry.rx_rf);
+  setVal('f_rx_if', entry.rx_if);
+  setVal('f_modulation', entry.modulation);
+  setVal('f_fec', entry.fec);
+  setVal('f_symbol_rate', entry.symbol_rate);
+  setVal('f_power', entry.power);
+  setVal('f_power_unit', entry.power_unit);
+  setVal('f_eb_no', entry.eb_no);
+  setVal('f_source', entry.source);
+  setVal('f_antenna', entry.antenna);
+  setVal('f_notes', entry.notes);
+  document.getElementById('signalFormCard').scrollIntoView({behavior: 'smooth'});
+}
+
+function resetForm() {
+  document.getElementById('signalFormTitle').innerHTML = '<i class="bi bi-plus-lg me-1"></i>Add Signal';
+  document.getElementById('signalSubmitBtn').innerHTML = '<i class="bi bi-plus-lg me-1"></i>Add Signal';
+  document.getElementById('signalForm').action = '/packages/{{ package.id if package }}/signals/add';
+  document.getElementById('signalForm').reset();
+}
+
+function prefillFromRegistry() {
+  const name = document.getElementById('registrySelect').value;
+  if (name) setVal('f_signal_name', name);
+}
+</script>
+{% endblock %}

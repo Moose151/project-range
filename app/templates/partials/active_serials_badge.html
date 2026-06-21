@@ -1,0 +1,10 @@
+{% if active_serials %}
+<a href="/serials" class="text-success small text-decoration-none">
+  <i class="bi bi-collection-play-fill me-1"></i>
+  <strong>{{ active_serials | length }} serial{{ 's' if active_serials | length != 1 else '' }} active</strong>
+</a>
+{% else %}
+<a href="/serials" class="text-muted small text-decoration-none">
+  <i class="bi bi-dash-circle me-1"></i>No active serial
+</a>
+{% endif %}

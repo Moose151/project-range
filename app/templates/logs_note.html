@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Add Log Note{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <h4 class="mb-0"><i class="bi bi-sticky me-2"></i>Add Narrative Note</h4>
+  <a href="/logs" class="btn btn-sm btn-outline-secondary ms-auto">
+    <i class="bi bi-arrow-left me-1"></i>Back to Logs
+  </a>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card border-secondary">
+      <div class="card-header text-muted small">
+        <i class="bi bi-info-circle me-1"></i>
+        Narrative notes are plain-text annotations interleaved in the log by timestamp. Use them for
+        handover remarks, safety calls, operator changes, or any event that doesn't correspond to a
+        specific signal parameter change.
+      </div>
+      <div class="card-body">
+        <form method="post" action="/logs/note">
+
+          <div class="mb-3">
+            <label class="form-label">Note <span class="text-danger">*</span></label>
+            <textarea class="form-control" name="notes" rows="4"
+                      placeholder="e.g. Operator Smith relieved at 1400Z. Handover complete."
+                      required autofocus></textarea>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Activity / Reference <span class="text-muted small">(optional)</span></label>
+            <input type="text" class="form-control" name="activity_ref"
+                   placeholder="e.g. OP-2024-001, Safety briefing, etc.">
+          </div>
+
+          {% if active_serials %}
+          <div class="mb-3">
+            <label class="form-label">Serial</label>
+            <select class="form-select" name="serial_id">
+              <option value="">— No serial —</option>
+              {% for s in active_serials %}
+              <option value="{{ s.id }}"
+                {% if loop.first %}selected{% endif %}>
+                {{ s.title }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          {% else %}
+          <input type="hidden" name="serial_id" value="">
+          {% endif %}
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-warning">
+              <i class="bi bi-sticky me-1"></i>Save Note
+            </button>
+            <a href="/logs" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

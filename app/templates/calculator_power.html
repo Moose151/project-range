@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% block title %}Power Calculator{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <h4 class="mb-0"><i class="bi bi-lightning-charge me-2"></i>Power Calculator</h4>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/calculator/rf" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-broadcast me-1"></i>RF Freq
+    </a>
+    <a href="/calculator/eirp" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-broadcast-pin me-1"></i>EIRP
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Unit Converter -->
+  <div class="col-lg-4">
+    <div class="card border-secondary">
+      <div class="card-header"><i class="bi bi-arrow-left-right me-1"></i>Unit Converter</div>
+      <div class="card-body">
+        <form method="post" action="/calculator/power">
+          <div class="mb-3">
+            <label class="form-label">Input Value</label>
+            <div class="input-group">
+              <input type="number" class="form-control" name="power_value" step="any"
+                     value="{{ form.power_value or '' }}" placeholder="Value" required>
+              <select class="form-select" name="from_unit" style="max-width:90px">
+                {% for u in ["dBm", "dBW", "W"] %}
+                <option value="{{ u }}" {% if form.from_unit == u %}selected{% endif %}>{{ u }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Convert To</label>
+            <select class="form-select" name="to_unit">
+              {% for u in ["dBm", "dBW", "W"] %}
+              <option value="{{ u }}" {% if form.to_unit == u %}selected{% endif %}>{{ u }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-arrow-left-right me-1"></i>Convert
+          </button>
+        </form>
+
+        {% if error %}
+        <div class="alert alert-danger mt-3">{{ error }}</div>
+        {% endif %}
+
+        {% if result %}
+        <div class="card bg-body-secondary border-secondary mt-3">
+          <div class="card-body text-center">
+            <div class="fs-2 fw-bold text-primary">{{ result.output }} {{ result.to_unit }}</div>
+            <div class="text-muted small">{{ result.input }} {{ result.from_unit }}</div>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="mt-3 border-top border-secondary pt-3">
+          <div class="text-muted small fw-semibold mb-1">Quick Reference</div>
+          <code class="small">
+            dBm = dBW + 30<br>
+            W = 10^(dBW/10)<br>
+            W = 10^((dBm−30)/10)
+          </code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Power Chain Calculator -->
+  <div class="col-lg-8">
+    <div class="card border-secondary">
+      <div class="card-header"><i class="bi bi-diagram-3 me-1"></i>Gain / Loss Chain Calculator</div>
+      <div class="card-body">
+        <form method="post" action="/calculator/power/chain" id="chainForm">
+          <div class="row g-2 mb-3 align-items-end">
+            <div class="col-6 col-sm-4">
+              <label class="form-label">Starting Power</label>
+              <input type="number" class="form-control" name="start_power" step="any"
+                     value="{{ form.start_power or '' }}" placeholder="e.g. 20" required>
+            </div>
+            <div class="col-6 col-sm-3">
+              <label class="form-label">Unit</label>
+              <select class="form-select" name="start_unit">
+                {% for u in ["dBm", "dBW", "W"] %}
+                <option value="{{ u }}" {% if form.start_unit == u %}selected{% endif %}>{{ u }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-sm-5">
+              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addStage()">
+                <i class="bi bi-plus-lg me-1"></i>Add Stage
+              </button>
+              <button type="submit" class="btn btn-primary btn-sm ms-1">
+                <i class="bi bi-calculator me-1"></i>Calculate Chain
+              </button>
+            </div>
+          </div>
+
+          <!-- Default stages -->
+          <div id="stages">
+            {% set stage_names = [] %}
+            {% for key in form %}
+              {% if key.startswith('stage_name_') %}
+                {% set idx = key.split('_')[-1] %}
+                <div class="row g-2 mb-2 stage-row align-items-center" id="stage_{{ idx }}">
+                  <div class="col-5">
+                    <input type="text" class="form-control form-control-sm" name="stage_name_{{ idx }}"
+                           value="{{ form[key] }}" placeholder="Stage name">
+                  </div>
+                  <div class="col-3">
+                    <div class="input-group input-group-sm">
+                      <input type="number" class="form-control" name="stage_value_{{ idx }}"
+                             step="any" value="{{ form['stage_value_' ~ idx] or '' }}" placeholder="dB">
+                    </div>
+                  </div>
+                  <div class="col-3">
+                    <select class="form-select form-select-sm" name="stage_type_{{ idx }}">
+                      <option value="loss" {% if form['stage_type_' ~ idx] == 'loss' %}selected{% endif %}>Loss</option>
+                      <option value="gain" {% if form['stage_type_' ~ idx] == 'gain' %}selected{% endif %}>Gain</option>
+                    </select>
+                  </div>
+                  <div class="col-1">
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeStage('stage_{{ idx }}')">
+                      <i class="bi bi-x"></i>
+                    </button>
+                  </div>
+                </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+
+          <div class="text-muted small mt-1" id="noStages" {% if form %}style="display:none"{% endif %}>
+            Click <strong>Add Stage</strong> to build your gain/loss chain.
+          </div>
+        </form>
+
+        {% if chain_result %}
+        <hr class="border-secondary">
+        <h6 class="text-muted">Chain Results</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-dark table-hover align-middle mb-2">
+            <thead class="table-secondary">
+              <tr>
+                <th>Stage</th>
+                <th>Delta (dB)</th>
+                <th>Output (dBm)</th>
+                <th>Output (dBW)</th>
+                <th>Output (W)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="text-muted">
+                <td><em>Input</em></td>
+                <td>—</td>
+                <td>{{ chain_result.start_dbm }}</td>
+                <td>{{ chain_result.start_dbm - 30 }}</td>
+                <td>—</td>
+              </tr>
+              {% for s in chain_result.stages %}
+              <tr>
+                <td>{{ s.name }}</td>
+                <td class="{% if s.delta > 0 %}text-success{% elif s.delta < 0 %}text-danger{% endif %}">
+                  {{ '+' if s.delta > 0 else '' }}{{ s.delta }} dB
+                </td>
+                <td class="fw-semibold">{{ s.power_dbm }}</td>
+                <td>{{ s.power_dbw }}</td>
+                <td>{{ s.power_w }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr class="table-primary fw-bold">
+                <td>Final Output</td>
+                <td>—</td>
+                <td>{{ chain_result.final_dbm }} dBm</td>
+                <td>{{ chain_result.final_dbw }} dBW</td>
+                <td>{{ chain_result.final_w }} W</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let stageCount = {{ form | length }};
+
+function addStage() {
+  const idx = stageCount++;
+  const row = `
+    <div class="row g-2 mb-2 stage-row align-items-center" id="stage_${idx}">
+      <div class="col-5">
+        <input type="text" class="form-control form-control-sm" name="stage_name_${idx}" placeholder="Stage name">
+      </div>
+      <div class="col-3">
+        <input type="number" class="form-control form-control-sm" name="stage_value_${idx}" step="any" placeholder="dB">
+      </div>
+      <div class="col-3">
+        <select class="form-select form-select-sm" name="stage_type_${idx}">
+          <option value="loss">Loss</option>
+          <option value="gain">Gain</option>
+        </select>
+      </div>
+      <div class="col-1">
+        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeStage('stage_${idx}')">
+          <i class="bi bi-x"></i>
+        </button>
+      </div>
+    </div>`;
+  document.getElementById('stages').insertAdjacentHTML('beforeend', row);
+  document.getElementById('noStages').style.display = 'none';
+}
+
+function removeStage(id) {
+  document.getElementById(id)?.remove();
+  const rows = document.querySelectorAll('#stages .stage-row');
+  if (!rows.length) {
+    document.getElementById('noStages').style.display = '';
+  } else {
+    // Renumber remaining stages to fill the gap
+    rows.forEach((row, i) => {
+      row.id = 'stage_' + i;
+      row.querySelector('[name^="stage_name_"]').name   = 'stage_name_'  + i;
+      row.querySelector('[name^="stage_value_"]').name  = 'stage_value_' + i;
+      row.querySelector('[name^="stage_type_"]').name   = 'stage_type_'  + i;
+      row.querySelector('button').setAttribute('onclick', `removeStage('stage_${i}')`);
+    });
+    stageCount = rows.length;
+  }
+}
+</script>
+{% endblock %}

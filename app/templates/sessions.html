@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Log Sessions{% endblock %}
+
+{% block scripts %}
+{% if toast %}
+<script>
+document.addEventListener('DOMContentLoaded', () => showToast({{ toast | tojson }}, 'success'));
+</script>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3">
+  <h4 class="mb-0"><i class="bi bi-journals me-2"></i>Log Sessions / Serials</h4>
+</div>
+
+<!-- Active session banner -->
+{% if active_session %}
+<div class="alert alert-success d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <i class="bi bi-play-circle-fill me-2"></i>
+    <strong>Active Session:</strong> {{ active_session.name }}
+    <span class="text-muted ms-2 small">— opened {{ active_session.opened_at.strftime('%d/%m/%y %H:%M') }}
+    by {{ active_session.opened_by.display_name if active_session.opened_by else '?' }}</span>
+  </div>
+  <form method="post" action="/sessions/{{ active_session.id }}/close" class="mb-0">
+    <button type="submit" class="btn btn-sm btn-warning"
+            onclick="return confirm('Close session \'{{ active_session.name }}\'?')">
+      <i class="bi bi-stop-circle me-1"></i>Close Session
+    </button>
+  </form>
+</div>
+{% else %}
+<div class="alert alert-secondary d-flex align-items-center mb-3">
+  <i class="bi bi-dash-circle me-2"></i>
+  <span>No active session. Open a new session below to associate log entries with it.</span>
+</div>
+{% endif %}
+
+<!-- Open new session -->
+<div class="card border-secondary mb-4">
+  <div class="card-header"><i class="bi bi-plus-circle me-1"></i>Open New Session</div>
+  <div class="card-body">
+    <form method="post" action="/sessions/open" class="row g-3 align-items-end">
+      <div class="col-md-5">
+        <label class="form-label">Session Name / Serial <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" name="name" required
+               placeholder="e.g. SERIAL 01 — EX BRIGHT STAR — DAY 2">
+      </div>
+      <div class="col-md-5">
+        <label class="form-label">Notes (optional)</label>
+        <input type="text" class="form-control" name="notes"
+               placeholder="Any relevant context for this serial">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-success">
+          <i class="bi bi-play-circle me-1"></i>Open Session
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Session history -->
+<div class="card border-secondary">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span><i class="bi bi-clock-history me-1"></i>Session History</span>
+    <span class="text-muted small">{{ sessions | length }} total</span>
+  </div>
+  <div class="card-body p-0">
+    {% if sessions %}
+    <table class="table table-dark table-hover table-sm align-middle mb-0">
+      <thead class="table-secondary">
+        <tr>
+          <th>#</th>
+          <th>Name</th>
+          <th>Notes</th>
+          <th>Opened</th>
+          <th>Opened By</th>
+          <th>Closed</th>
+          <th>Closed By</th>
+          <th>Duration</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sessions %}
+        {% set is_active = not s.closed_at %}
+        <tr class="{% if is_active %}table-success{% endif %}">
+          <td class="text-muted small">{{ s.id }}</td>
+          <td class="fw-semibold">
+            {{ s.name }}
+            {% if is_active %}<span class="badge bg-success ms-1">Active</span>{% endif %}
+          </td>
+          <td class="small text-muted">{{ s.notes or '—' }}</td>
+          <td class="small text-nowrap">{{ s.opened_at.strftime('%d/%m/%y %H:%M') }}</td>
+          <td class="small">{{ s.opened_by.display_name if s.opened_by else '—' }}</td>
+          <td class="small text-nowrap">
+            {% if s.closed_at %}{{ s.closed_at.strftime('%d/%m/%y %H:%M') }}{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="small">{{ s.closed_by.display_name if s.closed_by else '—' }}</td>
+          <td class="small text-muted">
+            {% if s.closed_at %}
+              {% set dur = (s.closed_at - s.opened_at).total_seconds() | int %}
+              {% set h = (dur // 3600) %}
+              {% set m = ((dur % 3600) // 60) %}
+              {{ '%dh %02dm' | format(h, m) }}
+            {% elif is_active %}
+              <span class="text-success">Ongoing</span>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            <a href="/logs?session_id={{ s.id }}" class="btn btn-sm btn-outline-secondary py-0 px-1"
+               title="View logs for this session">
+              <i class="bi bi-journal-text"></i>
+            </a>
+            {% if is_active %}
+            <form method="post" action="/sessions/{{ s.id }}/close" class="d-inline">
+              <button type="submit" class="btn btn-sm btn-outline-warning py-0 px-1"
+                      title="Close session"
+                      onclick="return confirm('Close session \'{{ s.name }}\'?')">
+                <i class="bi bi-stop-circle"></i>
+              </button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="text-center text-muted py-4">
+      <i class="bi bi-journals display-4 d-block mb-2"></i>
+      No sessions yet. Open one above to begin.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

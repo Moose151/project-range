@@ -1,0 +1,104 @@
+/* ── Range Banner ───────────────────────────────────────────── */
+.range-banner {
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+  min-height: 32px;
+}
+.banner-live {
+  background: #4a0a0a;
+  color: #ff8080;
+  border-bottom: 2px solid #dc3545;
+}
+.banner-closed {
+  background: #0a1f2e;
+  color: #7dd3fc;
+  border-bottom: 1px solid #0ea5e9;
+}
+.banner-standby {
+  background: #1a1a1a;
+  color: #6c757d;
+  border-bottom: 1px solid #343a40;
+}
+
+/* ── Blinking icon for Live state ───────────────────────────── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+.blink-icon {
+  animation: blink 1.2s ease-in-out infinite;
+}
+
+/* ── Login card ─────────────────────────────────────────────── */
+.login-card {
+  border: 1px solid #343a40;
+}
+
+/* ── Table tweaks ───────────────────────────────────────────── */
+.table th {
+  white-space: nowrap;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.table td {
+  font-size: 0.875rem;
+}
+
+/* ── Card header ────────────────────────────────────────────── */
+.card-header {
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.5rem 0.875rem;
+}
+
+/* ── Navbar brand ───────────────────────────────────────────── */
+.navbar-brand {
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+}
+
+/* ── Scrollable overflow table containers ───────────────────── */
+.overflow-auto {
+  max-height: calc(100vh - 280px);
+}
+
+/* ── Misc ───────────────────────────────────────────────────── */
+main {
+  min-height: calc(100vh - 120px);
+}
+
+code {
+  color: #a8dadc;
+  white-space: pre;
+}
+
+/* Focus outlines for accessibility */
+:focus-visible {
+  outline: 2px solid #0d6efd;
+  outline-offset: 2px;
+}
+
+/* ── Dashboard drag-to-tab merge target ────────────────────── */
+.drop-merge-target {
+  outline: 2px dashed #0d6efd;
+  outline-offset: 2px;
+  background: rgba(13, 110, 253, 0.06);
+}
+
+/* ── HTMX request loading indicator ─────────────────────────── */
+.htmx-request .htmx-indicator, .htmx-indicator {
+  display: none;
+}
+.htmx-request.htmx-indicator, .htmx-request .htmx-indicator {
+  display: inline-block;
+}
+
+/* ── Buzzer alert animation ─────────────────────────────────── */
+.buzzer-alert {
+  animation: pulse-border 1.2s ease-in-out infinite;
+}
+@keyframes pulse-border {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(220, 53, 69, 0); }
+}

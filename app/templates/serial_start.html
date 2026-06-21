@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Start Serial: {{ serial.title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <h4 class="mb-0"><i class="bi bi-play-circle me-2"></i>Confirm Serial Start</h4>
+  <a href="/serials" class="btn btn-sm btn-outline-secondary ms-auto">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card border-success mb-3">
+      <div class="card-header text-success fw-semibold">
+        <i class="bi bi-collection-play me-1"></i>{{ serial.title }}
+      </div>
+      <div class="card-body">
+        {% if serial.notes %}
+        <p class="text-muted mb-3">{{ serial.notes }}</p>
+        {% endif %}
+
+        <p class="mb-2 small">Starting this serial will:</p>
+        <ul class="small mb-3">
+          <li>Create an initial log entry for each signal in the assigned packages (status: <span class="badge bg-info text-dark">Planned</span>)</li>
+          <li>Begin the dashboard for this serial</li>
+          <li>Record a "Serial started" narrative note</li>
+        </ul>
+
+        {% if preview_signals %}
+        <h6 class="text-muted small text-uppercase mb-2">Signals to be loaded</h6>
+        <div class="table-responsive">
+          <table class="table table-dark table-sm table-bordered mb-0">
+            <thead class="table-secondary">
+              <tr>
+                <th>Package</th>
+                <th>Signal</th>
+                <th>Band</th>
+                <th>TxIF</th>
+                <th>TxRF</th>
+                <th>RxRF</th>
+                <th>RxIF</th>
+                <th>Mod</th>
+                <th>FEC</th>
+                <th>Power</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for pkg_name, entry in preview_signals %}
+              <tr>
+                <td class="text-muted small">{{ pkg_name }}</td>
+                <td class="fw-semibold">{{ entry.signal_name }}</td>
+                <td>{{ entry.band or '—' }}</td>
+                <td>{{ entry.tx_if or '—' }}</td>
+                <td>{{ entry.tx_rf or '—' }}</td>
+                <td>{{ entry.rx_rf or '—' }}</td>
+                <td>{{ entry.rx_if or '—' }}</td>
+                <td>{{ entry.modulation or '—' }}</td>
+                <td>{{ entry.fec or '—' }}</td>
+                <td>{% if entry.power is not none %}{{ entry.power }} {{ entry.power_unit }}{% else %}—{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="alert alert-warning py-2 small">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          No signal packages assigned. The serial will start empty — signals can be added ad-hoc via the log form.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 justify-content-end">
+      <a href="/serials" class="btn btn-outline-secondary">Cancel</a>
+      <form method="post" action="/serials/{{ serial.id }}/start">
+        <button type="submit" class="btn btn-success">
+          <i class="bi bi-play-circle me-1"></i>Confirm — Start Serial
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,248 @@
+{% macro status_badge(status) %}
+  {% if status == 'Up' %}
+    <span class="badge bg-success">Up</span>
+  {% elif status == 'Down' %}
+    <span class="badge bg-secondary">Down</span>
+  {% elif status == 'Configured' %}
+    <span class="badge bg-primary">Configured</span>
+  {% elif status == 'Standby' %}
+    <span class="badge bg-warning text-dark">Standby</span>
+  {% elif status == 'Faulted' %}
+    <span class="badge bg-danger">Faulted</span>
+  {% elif status == 'Planned' %}
+    <span class="badge bg-info text-dark">Planned</span>
+  {% else %}
+    <span class="badge bg-secondary">{{ status }}</span>
+  {% endif %}
+{% endmacro %}
+
+<!-- OOB swap: keeps the buzzer alert in sync with table refreshes -->
+<div id="buzzerAlert" hx-swap-oob="true">
+  {% if buzzer_active %}
+  <div class="alert alert-danger d-flex align-items-center gap-3 mb-3 buzzer-alert">
+    <i class="bi bi-volume-up-fill fs-3 blink-icon"></i>
+    <div>
+      <strong class="fs-5">BUZZER ON — Signals Active</strong><br>
+      <span class="small">One or more signals are currently <strong>Up</strong> on a live range.
+      {% if range_state == 'Live' %}RF is transmitting. Ensure all safety procedures are followed.{% endif %}
+      </span>
+    </div>
+  </div>
+  {% elif range_state != 'Standby/Off' %}
+  <div class="alert alert-secondary d-flex align-items-center gap-3 mb-3">
+    <i class="bi bi-volume-mute-fill fs-3"></i>
+    <div>
+      <strong>BUZZER OFF — No Signals Active</strong><br>
+      <span class="small text-muted">No signals are currently Up.</span>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% if signals %}
+<table class="table table-dark table-hover table-sm align-middle mb-0 signal-table"
+       id="signalTable-{{ serial_id if serial_id is not none else 'legacy' }}">
+  <thead class="table-secondary">
+    <tr>
+      <th></th>
+      <th>Signal</th>
+      <th>Source</th>
+      <th>Status</th>
+      <th>TxIF</th>
+      <th>TxRF</th>
+      <th>RxRF</th>
+      <th>RxIF</th>
+      <th>Unit</th>
+      <th>Band</th>
+      <th>Mod</th>
+      <th>Sym Rate</th>
+      <th>FEC</th>
+      <th>Antenna</th>
+      <th>Power</th>
+      <th>Eb/No</th>
+      <th>Updated</th>
+      <th>Warn</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for log in signals %}
+    {% set row_id = "sig-" ~ loop.index %}
+    <tr class="{% if log.signal_status == 'Faulted' %}table-danger{% elif log.signal_status == 'Standby' %}table-warning{% elif log.signal_status == 'Up' %}table-success{% elif log.signal_status == 'Down' %}table-secondary{% endif %}">
+      <td class="ps-2 pe-1" style="width:30px">
+        <button type="button"
+                class="btn btn-sm btn-outline-secondary border-0 py-0 px-1 dashboard-edit-btn"
+                data-bs-toggle="collapse"
+                data-bs-target="#{{ row_id }}-edit"
+                aria-expanded="false"
+                title="Quick-edit {{ log.signal_name }}">
+          <i class="bi bi-pencil-square"></i>
+        </button>
+      </td>
+      <td class="fw-semibold"><a href="/logs?signal_name={{ log.signal_name }}" class="text-reset text-decoration-none" title="View history for {{ log.signal_name }}">{{ log.signal_name }}</a></td>
+      <td class="text-muted small">{{ log.source or '—' }}</td>
+      <td>{{ status_badge(log.signal_status) }}</td>
+      <td>{{ log.tx_if if log.tx_if is not none else '—' }}</td>
+      <td>{{ log.tx_rf if log.tx_rf is not none else '—' }}</td>
+      <td>{{ log.rx_rf if log.rx_rf is not none else '—' }}</td>
+      <td>{{ log.rx_if if log.rx_if is not none else '—' }}</td>
+      <td class="text-muted">{{ log.freq_unit }}</td>
+      <td>{{ log.band or '—' }}</td>
+      <td>{{ log.modulation or '—' }}</td>
+      <td>{{ log.symbol_rate or '—' }}</td>
+      <td>{{ log.fec or '—' }}</td>
+      <td class="text-muted small">{{ log.antenna or '—' }}</td>
+      <td>
+        {% if log.power is not none %}{{ log.power }} {{ log.power_unit }}{% else %}—{% endif %}
+      </td>
+      <td>{{ log.eb_no if log.eb_no is not none else '—' }}</td>
+      <td class="text-muted small">{{ log.timestamp.strftime('%H:%M %d/%m') }}</td>
+      <td>
+        {% if log.warning_flags %}
+          <span class="text-warning" title="{{ log.warning_flags }}"><i class="bi bi-exclamation-triangle-fill"></i></span>
+        {% endif %}
+      </td>
+    </tr>
+
+    <!-- Inline quick-edit row (collapsed by default) -->
+    <tr class="collapse" id="{{ row_id }}-edit">
+      <td colspan="18" class="p-0">
+        <div class="p-2 bg-body-tertiary border-top border-secondary">
+          <form hx-post="/dashboard/quick-update"
+                hx-target="#signalTableContainer-{{ serial_id if serial_id is not none else 'legacy' }}"
+                hx-swap="innerHTML"
+                hx-on::after-request="if(event.detail.successful) showToast('{{ log.signal_name }} updated', 'success')">
+            <input type="hidden" name="signal_name" value="{{ log.signal_name }}">
+            {% if serial_id is not none %}<input type="hidden" name="serial_id" value="{{ serial_id }}">{% endif %}
+            <div class="d-flex gap-2 flex-wrap align-items-end">
+
+              <div>
+                <label class="form-label small mb-1">Status</label>
+                <select class="form-select form-select-sm" name="signal_status" style="width:110px"
+                  {% if exclusivity_map is defined and log.signal_name in exclusivity_map %}
+                  onchange="document.getElementById('excl-warn-{{ row_id }}').style.display=(this.value==='Up')?'block':'none'"
+                  {% endif %}>
+                  {% for s in ['Up','Down','Standby','Configured','Planned','Faulted'] %}
+                  <option value="{{ s }}" {% if log.signal_status == s %}selected{% endif %}>{{ s }}</option>
+                  {% endfor %}
+                </select>
+                {% if exclusivity_map is defined and log.signal_name in exclusivity_map %}
+                <div id="excl-warn-{{ row_id }}"
+                     class="text-warning small mt-1"
+                     style="display:{% if log.signal_status == 'Up' %}block{% else %}none{% endif %}">
+                  <i class="bi bi-arrow-down-circle me-1"></i>
+                  Auto-downs: {{ exclusivity_map[log.signal_name] | join(', ') }}
+                </div>
+                {% endif %}
+              </div>
+
+              <div>
+                <label class="form-label small mb-1">Source</label>
+                <select class="form-select form-select-sm" name="source" style="width:120px">
+                  <option value="">—</option>
+                  {% if signal_sources is defined %}
+                  {% for src in signal_sources %}
+                  <option value="{{ src }}" {% if log.source == src %}selected{% endif %}>{{ src }}</option>
+                  {% endfor %}
+                  {% endif %}
+                </select>
+              </div>
+
+              <div>
+                <label class="form-label small mb-1">Modulation</label>
+                <select class="form-select form-select-sm" name="modulation" style="width:110px">
+                  <option value="">—</option>
+                  {% if mod_types is defined %}
+                  {% for m in mod_types %}
+                  <option value="{{ m }}" {% if log.modulation == m %}selected{% endif %}>{{ m }}</option>
+                  {% endfor %}
+                  {% else %}
+                  {% for m in ['BPSK','QPSK','8PSK','16APSK','32APSK'] %}
+                  <option value="{{ m }}" {% if log.modulation == m %}selected{% endif %}>{{ m }}</option>
+                  {% endfor %}
+                  {% endif %}
+                </select>
+              </div>
+
+              <div>
+                <label class="form-label small mb-1">Sym Rate</label>
+                <input type="text" class="form-control form-control-sm" name="symbol_rate"
+                       value="{{ log.symbol_rate or '' }}" placeholder="ksps" style="width:90px">
+              </div>
+
+              <div>
+                <label class="form-label small mb-1">FEC</label>
+                <select class="form-select form-select-sm" name="fec" style="width:90px">
+                  <option value="">—</option>
+                  {% if fec_types is defined %}
+                  {% for f in fec_types %}
+                  <option value="{{ f }}" {% if log.fec == f %}selected{% endif %}>{{ f }}</option>
+                  {% endfor %}
+                  {% else %}
+                  {% for f in ['1/2','2/3','3/4','5/6','7/8','8/9','9/10'] %}
+                  <option value="{{ f }}" {% if log.fec == f %}selected{% endif %}>{{ f }}</option>
+                  {% endfor %}
+                  {% endif %}
+                </select>
+              </div>
+
+              <div>
+                <label class="form-label small mb-1">Antenna</label>
+                <select class="form-select form-select-sm" name="antenna" style="width:110px">
+                  <option value="">—</option>
+                  {% if antenna_types is defined %}
+                  {% for a in antenna_types %}
+                  <option value="{{ a }}" {% if log.antenna == a %}selected{% endif %}>{{ a }}</option>
+                  {% endfor %}
+                  {% endif %}
+                </select>
+              </div>
+
+              <div>
+                <label class="form-label small mb-1">Power</label>
+                <div class="input-group input-group-sm" style="width:145px">
+                  <input type="number" class="form-control form-control-sm" name="power" step="any"
+                         value="{{ log.power if log.power is not none else '' }}">
+                  <select class="form-select form-select-sm" name="power_unit" style="width:60px">
+                    {% for u in ['dBm','dBW','W'] %}
+                    <option value="{{ u }}" {% if log.power_unit == u %}selected{% endif %}>{{ u }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="form-label small mb-1">Eb/No (dB)</label>
+                <input type="number" class="form-control form-control-sm" name="eb_no" step="any"
+                       value="{{ log.eb_no if log.eb_no is not none else '' }}" style="width:75px">
+              </div>
+
+              <div class="flex-grow-1" style="min-width:140px">
+                <label class="form-label small mb-1">Note (optional)</label>
+                <input type="text" class="form-control form-control-sm" name="notes"
+                       placeholder="Reason or annotation…">
+              </div>
+
+              <div class="ms-auto d-flex gap-1">
+                <button type="submit" class="btn btn-sm btn-primary">
+                  <i class="bi bi-check2 me-1"></i>Update &amp; Log
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        data-bs-toggle="collapse" data-bs-target="#{{ row_id }}-edit">
+                  Cancel
+                </button>
+              </div>
+
+            </div>
+          </form>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-reception-0 display-4 d-block mb-2"></i>
+  No active signals. <a href="/logs/new">Create a signal log entry</a> to get started.
+</div>
+{% endif %}

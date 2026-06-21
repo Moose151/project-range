@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Live Range Dashboard</h4>
+  <div class="d-flex gap-2 align-items-center">
+    <span class="text-muted small" id="lastRefresh">Auto-refreshing every 10s</span>
+    <a href="/logs/note" class="btn btn-sm btn-outline-warning">
+      <i class="bi bi-sticky me-1"></i>Note
+    </a>
+    <a href="/logs/new" class="btn btn-sm btn-success">
+      <i class="bi bi-plus-lg me-1"></i>New Log Entry
+    </a>
+  </div>
+</div>
+
+<!-- Global buzzer alert -->
+{% if buzzer_active %}
+<div class="alert alert-danger d-flex align-items-center gap-3 mb-3 buzzer-alert" id="buzzerAlert">
+  <i class="bi bi-volume-up-fill fs-3 blink-icon"></i>
+  <div>
+    <strong class="fs-5">BUZZER ON — Signals Active</strong><br>
+    <span class="small">One or more signals are currently <strong>Up</strong> on a live range.
+    {% if range_state == 'Live' %}RF is transmitting. Ensure all safety procedures are followed.{% endif %}
+    </span>
+  </div>
+</div>
+{% elif range_state != 'Standby/Off' %}
+<div class="alert alert-secondary d-flex align-items-center gap-3 mb-3" id="buzzerAlert">
+  <i class="bi bi-volume-mute-fill fs-3"></i>
+  <div>
+    <strong>BUZZER OFF — No Signals Active</strong><br>
+    <span class="small text-muted">No signals are currently Up.</span>
+  </div>
+</div>
+{% else %}
+<div id="buzzerAlert"></div>
+{% endif %}
+
+<!-- Summary cards -->
+<div class="row g-3 mb-3">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card border-secondary h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Range State</div>
+        <div class="fw-bold fs-5
+          {% if range_state == 'Live' %}text-danger{% elif range_state == 'Closed Loop' %}text-info{% else %}text-secondary{% endif %}">
+          <i class="bi bi-{% if range_state == 'Live' %}broadcast-pin blink-icon{% elif range_state == 'Closed Loop' %}arrow-repeat{% else %}power{% endif %} me-1"></i>
+          {{ range_state }}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card {% if buzzer_active %}border-danger{% else %}border-secondary{% endif %} h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-1">
+          Active Signals
+          {% if buzzer_active %}<i class="bi bi-volume-up-fill text-danger blink-icon ms-1"></i>{% endif %}
+        </div>
+        <div class="fw-bold fs-5 {% if buzzer_active %}text-danger{% else %}text-success{% endif %}">
+          {{ signals | selectattr("signal_status", "equalto", "Up") | list | length }}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card border-secondary h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Faulted</div>
+        <div class="fw-bold fs-5 {% if signals | selectattr('signal_status', 'equalto', 'Faulted') | list | length > 0 %}text-danger{% else %}text-secondary{% endif %}">
+          {{ signals | selectattr("signal_status", "equalto", "Faulted") | list | length }}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card border-secondary h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Last State Change</div>
+        {% if last_state_change %}
+        <div class="fw-semibold text-primary" style="font-size:0.95rem">{{ last_state_change.timestamp.strftime('%H:%M %d/%m/%y') }}</div>
+        <div class="text-muted small">by {{ last_state_change.changed_by_user.display_name }}</div>
+        {% else %}
+        <div class="text-secondary">—</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if not active_serials %}
+<!-- No active serials notice -->
+<div class="alert alert-info d-flex align-items-center gap-3 mb-3">
+  <i class="bi bi-info-circle fs-4"></i>
+  <div>
+    No active serial running.
+    <a href="/serials" class="alert-link">Start a serial</a> to begin logging, or
+    <a href="/logs/new" class="alert-link">create an ad-hoc log entry</a>.
+  </div>
+</div>
+{% endif %}
+
+<!-- Serial widget container — SortableJS handles reorder; JS handles tab-merge -->
+<div id="serialWidgetsContainer" class="d-flex flex-column gap-3">
+  {% for sd in serial_data %}
+  {% set serial = sd.serial %}
+  {% set w_signals = sd.signals %}
+  {% set w_buzzer = sd.buzzer_active %}
+  <div class="serial-widget-group"
+       data-group-id="group-{{ serial.id if serial else 'legacy' }}"
+       data-serial-ids="{{ serial.id if serial else '' }}">
+    <!-- A group starts as a single serial; JS may merge multiple into tabs -->
+    <div class="serial-widget card border-{% if w_buzzer %}danger{% elif serial %}success{% else %}secondary{% endif %}"
+         data-serial-id="{{ serial.id if serial else '' }}">
+      <div class="card-header d-flex align-items-center gap-2 widget-drag-handle" style="cursor:grab">
+        <i class="bi bi-grip-vertical text-muted"></i>
+        {% if serial %}
+        <span class="fw-semibold">{{ serial.title }}</span>
+        <span class="badge bg-success ms-1 small">Active</span>
+        {% if w_buzzer %}<span class="badge bg-danger blink-icon ms-1">BUZZER</span>{% endif %}
+        <div class="ms-auto d-flex gap-1 align-items-center">
+          <span class="text-muted small me-2">
+          Started {{ serial.opened_at.strftime('%H:%M %d/%m') }}
+          <span class="htmx-indicator spinner-border spinner-border-sm text-secondary ms-1" role="status" style="width:0.7rem;height:0.7rem"></span>
+        </span>
+          <a href="/logs/new?serial_id={{ serial.id }}" class="btn btn-sm btn-outline-success py-0 px-2" title="Add signal log">
+            <i class="bi bi-plus-lg"></i>
+          </a>
+          <a href="/logs?serial_id={{ serial.id }}" class="btn btn-sm btn-outline-secondary py-0 px-2" title="View logs">
+            <i class="bi bi-journal-text"></i>
+          </a>
+          <form method="post" action="/serials/{{ serial.id }}/end" class="d-inline"
+                onsubmit="return confirm('End serial {{ serial.title | e }}? It will be moved to history.')">
+            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="End serial">
+              <i class="bi bi-stop-circle"></i>
+            </button>
+          </form>
+        </div>
+        {% else %}
+        <span class="fw-semibold text-muted">All Signals (no active serial)</span>
+        <div class="ms-auto">
+          <a href="/serials" class="btn btn-sm btn-outline-success py-0 px-2">
+            <i class="bi bi-play-circle me-1"></i>Start Serial
+          </a>
+        </div>
+        {% endif %}
+      </div>
+      <div class="card-body p-0 overflow-auto serial-table-body"
+           id="signalTableContainer-{{ serial.id if serial else 'legacy' }}"
+           {% if serial %}
+           hx-get="/dashboard/fragment/{{ serial.id }}"
+           {% else %}
+           hx-get="/dashboard/fragment"
+           {% endif %}
+           hx-trigger="every 10s"
+           hx-swap="innerHTML"
+           hx-on::after-request="updateRefreshTime()">
+        {% with signals=w_signals, buzzer_active=w_buzzer, serial_id=(serial.id if serial else none) %}
+        {% include "partials/signal_table.html" %}
+        {% endwith %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<!-- SortableJS for drag-to-reorder -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script>
+function updateRefreshTime() {
+  const el = document.getElementById('lastRefresh');
+  if (el) el.textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+// ── Drag-to-reorder ────────────────────────────────────────────────────────
+const container = document.getElementById('serialWidgetsContainer');
+if (container) {
+  Sortable.create(container, {
+    handle: '.widget-drag-handle',
+    animation: 150,
+    ghostClass: 'opacity-50',
+    onEnd: saveLayout,
+  });
+}
+
+// ── Tab-merge state ────────────────────────────────────────────────────────
+// Layout: [{type: 'standalone'|'tabbed', serials: [id,...]}, ...]
+// Persisted in localStorage so refresh restores the layout.
+
+const STORAGE_KEY = 'dashboardLayout_v2';
+
+function saveLayout() {
+  const groups = [];
+  document.querySelectorAll('#serialWidgetsContainer .serial-widget-group').forEach(g => {
+    const ids = g.dataset.serialIds.split(',').filter(Boolean);
+    const tabs = g.querySelectorAll('.serial-tab-btn');
+    groups.push({
+      type: tabs.length > 1 ? 'tabbed' : 'standalone',
+      serials: ids,
+      activeTab: g.dataset.activeTab || ids[0],
+    });
+  });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(groups));
+}
+
+// ── Drag-onto-widget to merge as tabs ────────────────────────────────────
+// Widgets become "merge targets" when another widget is being dragged.
+let dragSourceId = null;
+
+document.querySelectorAll('.serial-widget').forEach(widget => {
+  const handle = widget.querySelector('.widget-drag-handle');
+  if (!handle) return;
+
+  handle.addEventListener('mousedown', () => {
+    dragSourceId = widget.dataset.serialId;
+  });
+});
+
+document.querySelectorAll('.serial-widget-group').forEach(group => {
+  group.addEventListener('dragenter', (e) => {
+    const targetId = group.querySelector('.serial-widget')?.dataset.serialId;
+    if (dragSourceId && targetId && dragSourceId !== targetId) {
+      group.classList.add('drop-merge-target');
+    }
+  });
+  group.addEventListener('dragleave', () => {
+    group.classList.remove('drop-merge-target');
+  });
+  group.addEventListener('drop', (e) => {
+    group.classList.remove('drop-merge-target');
+    const targetId = group.querySelector('.serial-widget')?.dataset.serialId;
+    if (dragSourceId && targetId && dragSourceId !== targetId) {
+      mergeWidgets(dragSourceId, targetId);
+    }
+  });
+});
+
+function mergeWidgets(sourceId, targetId) {
+  const sourceGroup = document.querySelector(`[data-serial-id="${sourceId}"]`)?.closest('.serial-widget-group');
+  const targetGroup = document.querySelector(`[data-serial-id="${targetId}"]`)?.closest('.serial-widget-group');
+  if (!sourceGroup || !targetGroup || sourceGroup === targetGroup) return;
+
+  // Collect all serial IDs in both groups
+  const allIds = [
+    ...targetGroup.dataset.serialIds.split(',').filter(Boolean),
+    ...sourceGroup.dataset.serialIds.split(',').filter(Boolean),
+  ];
+  targetGroup.dataset.serialIds = allIds.join(',');
+
+  // Build tabbed UI
+  buildTabbedWidget(targetGroup, allIds, targetId);
+
+  // Remove source group from DOM
+  sourceGroup.remove();
+  saveLayout();
+}
+
+function buildTabbedWidget(group, serialIds, activeId) {
+  const card = group.querySelector('.serial-widget');
+  if (!card) return;
+
+  // Build tab nav in header
+  const header = card.querySelector('.card-header');
+  const tabsHtml = serialIds.map(id => {
+    const widget = document.querySelector(`[data-serial-id="${id}"]`);
+    const title = widget?.querySelector('.fw-semibold')?.textContent?.trim() || id;
+    return `<button type="button" class="serial-tab-btn btn btn-sm ${id === activeId ? 'btn-primary' : 'btn-outline-secondary'}"
+              data-serial-tab="${id}" onclick="switchTab(this)">${title}</button>`;
+  }).join('');
+  header.innerHTML = `<i class="bi bi-grip-vertical text-muted"></i>
+    <div class="d-flex gap-1 flex-wrap">${tabsHtml}</div>
+    <div class="ms-auto"></div>`;
+
+  // Show only active body, hide others
+  card.querySelectorAll('.serial-table-body').forEach(body => {
+    body.style.display = body.id.includes(activeId) ? '' : 'none';
+  });
+  group.dataset.activeTab = activeId;
+}
+
+function switchTab(btn) {
+  const tabId = btn.dataset.serialTab;
+  const group = btn.closest('.serial-widget-group');
+  if (!group) return;
+
+  group.querySelectorAll('.serial-tab-btn').forEach(b => {
+    b.className = b.dataset.serialTab === tabId
+      ? 'serial-tab-btn btn btn-sm btn-primary'
+      : 'serial-tab-btn btn btn-sm btn-outline-secondary';
+  });
+
+  group.querySelectorAll('.serial-table-body').forEach(body => {
+    body.style.display = body.id.includes(tabId) ? '' : 'none';
+  });
+
+  group.dataset.activeTab = tabId;
+  saveLayout();
+}
+
+// ── Restore saved layout on page load ────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  {% if toast %}showToast({{ toast | tojson }}, 'success');{% endif %}
+  restoreLayout();
+});
+
+function restoreLayout() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (!saved) return;
+  let groups;
+  try { groups = JSON.parse(saved); } catch (e) { return; }
+
+  // Pass 1: merge groups that were tabbed
+  for (const group of groups) {
+    if (group.type !== 'tabbed' || !group.serials || group.serials.length < 2) continue;
+    const [targetId, ...sourceIds] = group.serials;
+    const targetEl = document.querySelector(`[data-serial-id="${targetId}"]`);
+    if (!targetEl) continue;
+    for (const sourceId of sourceIds) {
+      const sourceEl = document.querySelector(`[data-serial-id="${sourceId}"]`);
+      if (sourceEl && sourceEl !== targetEl) {
+        mergeWidgets(sourceId, targetId);
+      }
+    }
+    // Restore active tab
+    if (group.activeTab) {
+      const btn = document.querySelector(`.serial-tab-btn[data-serial-tab="${group.activeTab}"]`);
+      if (btn) switchTab(btn);
+    }
+  }
+
+  // Pass 2: restore drag order by re-appending groups in saved order
+  const container = document.getElementById('serialWidgetsContainer');
+  if (!container) return;
+  for (const group of groups) {
+    const firstId = group.serials && group.serials[0];
+    if (!firstId) continue;
+    const widgetEl = document.querySelector(`[data-serial-id="${firstId}"]`)?.closest('.serial-widget-group');
+    if (widgetEl && widgetEl.parentElement === container) {
+      container.appendChild(widgetEl);
+    }
+  }
+}
+</script>
+{% endblock %}

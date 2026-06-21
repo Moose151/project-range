@@ -1,0 +1,1022 @@
+# Project Range — Initial Application Scope
+
+## 1. Project Overview
+
+**Project Range** is an internal RF range operations support application. It is intended to help range operators calculate RF and IF frequencies, perform power conversions, track live signal status, log range activity, manage range state, and maintain range operating documentation.
+
+The application will initially be built, deployed, and tested on a Linux workstation during early development and prototyping. Once the prototype has been validated, it should be prepared for deployment on the main range server.
+
+The final operational system is expected to be hosted centrally on the main range server and accessed by thin clients on the same range network through a web browser. The system should allow operators to move between thin clients while keeping all logs, range state, signal information, documentation, and configuration stored centrally on the server.
+
+The initial system will be labelled as **MVP / Beta** and used for internal trial purposes only. It will not directly control RF hardware during the MVP. The range state toggle and signal state tracking will be used for logging and operator awareness only.
+
+## 2. Primary Goals
+
+The application must provide a single, reliable place for range operators and supervisors to:
+
+1. Calculate TxIF, TxRF, RxRF, and RxIF from one known frequency and known conversion values.
+2. Convert between dBW, dBm, and Watts.
+3. Calculate or verify system power using gain/loss chains.
+4. Track which signals are active, inactive, faulted, standby, or configured.
+5. Maintain timestamped operational logs.
+6. Display the current range state, such as Live, Closed Loop, or Standby/Off.
+7. Provide a live dashboard showing current signal and range status.
+8. Maintain a built-in documentation/wiki section for range procedures.
+9. Export logs and reports to spreadsheet formats.
+10. Attribute all changes and log entries to authenticated users.
+
+## 3. Intended Users
+
+### 3.1 Range Operator
+
+A Range Operator is a standard user account. Operators can:
+
+* Log into the application.
+* Use RF and power calculators.
+* View the live range dashboard.
+* Create signal logs.
+* Update signal status.
+* View the current range state.
+* Change the range state with confirmation.
+* View documentation.
+* Submit documentation edits for supervisor approval.
+* Export logs if permitted.
+* Add comments and notes to logs.
+
+### 3.2 Range Supervisor
+
+A Range Supervisor is an administrator account. Supervisors can:
+
+* Perform all Range Operator functions.
+* Manage users.
+* Approve documentation edits.
+* Edit published documentation directly.
+* View audit history.
+* Soft-delete and hard-delete logs according to policy.
+* Manage system configuration.
+* Manage frequency bands and range templates.
+* Manage power thresholds and warning limits.
+* Export full logs, reports, and audit data.
+* Restore soft-deleted records where required.
+
+## 4. Core Needs
+
+The following are required for the application to be useful.
+
+### 4.1 RF Frequency Calculator
+
+The application must calculate the following values:
+
+* Transmit IF, referred to as **TxIF**
+* Transmit RF, referred to as **TxRF**
+* Receive RF, referred to as **RxRF**
+* Receive IF, referred to as **RxIF**
+
+The core relationships are:
+
+* **TxIF + BUC = TxRF**
+* **TxRF ± TTF = RxRF**
+* **RxRF - LO = RxIF**
+
+Where:
+
+* **BUC** means Block Up Converter frequency.
+* **TTF** means Transponder Translation Frequency.
+* **LO** means Local Oscillator frequency.
+
+The application must support calculations where any one of the four main frequencies is known, provided the user also knows the required BUC, LO, and TTF values.
+
+The user must be able to enter or select:
+
+* Known frequency type: TxIF, TxRF, RxRF, or RxIF.
+* Known frequency value.
+* Frequency unit: MHz or GHz.
+* BUC value.
+* LO value.
+* TTF value.
+* TTF direction: plus or minus.
+* Desired output unit: MHz or GHz.
+
+The application must calculate and display all four frequency values.
+
+The calculator should support saving common frequency plans or range templates so users do not need to repeatedly enter common BUC, LO, TTF, band, and threshold information.
+
+### 4.2 Frequency Band Validation
+
+The application must support known RF frequency bands, including at minimum:
+
+* C band
+* X band
+* Ku band
+* Ka band
+
+The system must allow supervisors to configure valid frequency ranges for each band.
+
+When a calculated frequency falls outside the selected band or configured allowed range, the application must show a clear warning.
+
+Warnings should not necessarily block the user from saving the calculation, but the warning must be visible and included in any saved log entry or report.
+
+### 4.3 Power Conversion Calculator
+
+The application must convert between:
+
+* dBW and Watts
+* dBm and Watts
+* dBm and dBW
+* Watts and dBW
+* Watts and dBm
+
+The user should be able to select the input unit and output unit.
+
+The live signal view should show power in dBm by default, but the preferred display unit should be user-selectable where practical.
+
+### 4.4 Power Chain Calculator
+
+The application should support a system power chain calculator.
+
+The user should be able to enter a starting power and then add ordered gain/loss stages, such as:
+
+* Modem output power
+* Cable loss
+* Splitter loss
+* Combiner loss
+* Attenuator loss
+* Amplifier gain
+* Other user-defined gain/loss stage
+* Boom output power
+
+The application should calculate the resulting power after each stage and the final expected output power.
+
+Each stage should include:
+
+* Stage name
+* Gain or loss value
+* Unit, such as dB
+* Optional notes
+
+The system should allow common power chains to be saved as templates.
+
+### 4.5 EIRP Calculation
+
+The application should support EIRP calculation if the required values are provided.
+
+The EIRP calculator should allow entry of:
+
+* Transmit power
+* Cable/system losses
+* Antenna gain
+* Other relevant losses or gains
+
+The system should clearly indicate that EIRP output is only as accurate as the user-entered values.
+
+### 4.6 Power Warnings and Limits
+
+The application must allow supervisors to configure warning thresholds for signal power.
+
+The system should support:
+
+* Minimum expected power
+* Maximum expected power
+* High-power warning threshold
+* Per-signal thresholds
+* Per-template thresholds
+* Optional range-state-specific thresholds
+
+When entered or calculated power falls outside the expected range, the application must display a visible warning and include that warning in the relevant log entry.
+
+### 4.7 Signal Logging
+
+The application must provide timestamped logging for range operations.
+
+Each signal log should support, at minimum:
+
+* Timestamp
+* Operator username
+* Range state at time of entry
+* Signal name or designator
+* Signal status
+* TxIF
+* TxRF
+* RxIF
+* RxRF
+* Frequency band
+* Modulation type
+* Symbol rate
+* Inner code rate
+* Power
+* Eb/No
+* Activity, job, task, mission, customer, or range booking reference
+* Notes/comments
+* Whether the entry was manual, automatic, or generated from a system action
+* Any validation warnings
+* Last edited timestamp
+* Last edited by user
+
+The signal status list should include:
+
+* Planned
+* Configured
+* Up
+* Down
+* Faulted
+* Standby
+
+The app must support both manual log entry and automatic log creation from key actions, such as:
+
+* Range state change
+* Signal status change
+* Saved frequency calculation
+* Saved power calculation
+* Documentation or configuration change where relevant
+
+### 4.8 Closed Loop vs Live Logging Behaviour
+
+The application must behave differently depending on the current range state.
+
+When the range is in **Closed Loop**, no RF is being transmitted. In this state:
+
+* RF fields should not be mandatory for signal logs.
+* The application should clearly indicate that the system is operating at IF only.
+* RF-related fields may be hidden, disabled, or marked as not applicable.
+
+When the range is in **Live**, RF is being transmitted. In this state:
+
+* RF fields should be required where relevant.
+* RF warnings and power threshold checks should be active.
+* The application should display clear Live state warnings.
+
+### 4.9 Audit History
+
+The application must keep an audit trail for important changes.
+
+The audit history should include:
+
+* Log creation
+* Log edits
+* Log soft deletion
+* Log restoration
+* Log hard deletion by supervisor/admin
+* Range state changes
+* User account changes
+* Documentation edits
+* Documentation approvals
+* Configuration changes
+* Template changes
+* Threshold changes
+
+Audit records should include:
+
+* Timestamp
+* User
+* Action type
+* Previous value where practical
+* New value where practical
+* Reason/comment where provided
+
+### 4.10 Log Editing and Deletion
+
+Operators and supervisors should be able to edit logs, subject to permissions.
+
+The system must retain edit history.
+
+Deletion should use a two-stage approach:
+
+1. **Soft delete:** hides the log from normal views but keeps it recoverable.
+2. **Hard delete:** permanent deletion by a supervisor/admin only.
+
+Hard deletion should be restricted and recorded in the audit log.
+
+### 4.11 Log Search, Filtering, and Export
+
+Logs must be searchable and filterable by:
+
+* Date/time range
+* Operator
+* Signal name
+* Signal status
+* Frequency
+* Frequency band
+* Range state
+* Modulation type
+* Activity/job/mission/customer/range booking
+* Warning status
+* Manual vs automatic entry
+
+Exports must support:
+
+* `.xlsx`
+* `.csv`
+
+Export options should include:
+
+* All logs
+* Filtered logs only
+* Selected date range
+* Selected activity/job/mission/customer/range booking
+* Include calculated fields
+* Include warnings
+* Include audit history where permitted
+* Include soft-deleted logs where permitted
+
+The application should also support formal range report generation.
+
+## 5. Live Range Dashboard
+
+The application must include a live view for operators.
+
+The dashboard should show:
+
+* Current range state
+* Current operator/session information
+* Active signals
+* Configured signals
+* Signal status
+* Frequencies
+* Modulation type
+* Symbol rate
+* Inner code rate
+* Power
+* Eb/No
+* Warnings
+* Last update time
+* Notes or short status comments
+
+The dashboard should support both:
+
+* Active signal view
+* All configured signal view
+
+The live dashboard should auto-refresh frequently and should allow multiple thin clients to see updates made by other users.
+
+Signal status should be colour-coded, for example:
+
+* Green: Up
+* Grey: Down
+* Blue: Configured
+* Amber: Standby or warning
+* Red: Faulted or critical warning
+
+The exact dashboard layout can be decided later. Initial acceptable layouts include either a table-based view or card-based view.
+
+## 6. Range State Management
+
+The application must show the current range state clearly.
+
+Initial range states should include:
+
+* **Closed Loop**
+* **Live**
+* **Standby/Off**
+
+The range state control is for logging and awareness only. It must not control hardware in the MVP.
+
+Changing range state must require:
+
+* User login
+* Confirmation prompt
+* Reason/comment
+* Automatic timestamped log entry
+* User attribution
+
+The application should not require elevated permissions for range state changes in the MVP unless this requirement changes later.
+
+The application should display clear warnings when the range state is Live.
+
+The system should not prevent signal changes based on state in the MVP, but it should warn users when an action appears inconsistent with the current state.
+
+## 7. Documentation / Wiki Module
+
+The application must include a documentation section that functions like a simple internal wiki.
+
+The documentation module should include pages such as:
+
+* How to use the range
+* How to move from Closed Loop to Live
+* How to move from Live to Closed Loop
+* Signal setup procedure
+* Power verification procedure
+* Emergency shutdown
+* Common fault checks
+* Modem configuration guide
+* Splitter guide
+* Combiner guide
+* Spectrum analyser guide
+
+Documentation pages should support:
+
+* Headings
+* Tables
+* Images
+* Attachments
+* Checklists
+* Links between pages
+* Search
+* Printable view
+* Export where practical
+
+Range Operators should be able to propose edits. Proposed edits should not become visible to general users until approved by a Range Supervisor.
+
+Range Supervisors should be able to:
+
+* Create pages
+* Edit pages directly
+* Approve proposed edits
+* Reject proposed edits
+* View documentation version history
+* Restore previous versions
+
+## 8. User Management and Authentication
+
+The MVP should use local username and password authentication.
+
+The app must support multiple simultaneous users.
+
+Each user should have:
+
+* Username
+* Password
+* Role
+* Display name
+* Active/disabled status
+* Created timestamp
+* Last login timestamp
+
+Required roles:
+
+* Range Operator
+* Range Supervisor
+
+The application must record which user performed each major action.
+
+Users should log in each time rather than relying on thin clients remembering user sessions.
+
+The app should support session timeout and automatic logout after a configurable period of inactivity.
+
+Future authentication options may include Active Directory, Windows authentication, or SSO, but these are not required for the MVP.
+
+## 9. Deployment and Compatibility
+
+The application will initially be built, deployed, and tested on a Linux workstation during early development and prototyping.
+
+After the Linux-based prototype has been validated, the application should be prepared for deployment on the main range server.
+
+The target operational server environment is expected to be:
+
+* Windows Server 2025
+* Hosted directly on the range server where practical
+* Docker not preferred, but may be used if required
+* Temporary internet access may be available during installation
+* Server availability is assumed
+
+Client environment:
+
+* Windows 11 thin clients
+* Firefox
+* Microsoft Edge
+* Same internal range network as the server
+
+The application should be developed in a way that remains compatible with both Linux and Windows Server deployment.
+
+The app should be simple enough to deploy from one folder where practical.
+
+Internal HTTPS/TLS is not required for MVP unless local policy changes.
+
+## 10. Suggested Technical Direction
+
+The recommended initial architecture is a server-hosted web application with a central database.
+
+A suitable MVP technology stack would be:
+
+* Backend: Python Flask or FastAPI
+* Frontend: server-rendered HTML templates or a lightweight JavaScript-enhanced interface
+* Database: PostgreSQL preferred for multi-user reliability; SQLite acceptable only for early prototype
+* Export: `.xlsx` and `.csv` generation
+* Authentication: local username/password
+* Hosting: initially hosted on a Linux workstation during development and prototype testing
+* Target hosting: Windows Server 2025 using a Python runtime, Waitress, or similar production-compatible WSGI/ASGI server
+* Browser access: Firefox and Edge on thin clients
+
+PostgreSQL is recommended because the application will support multiple simultaneous users, audit history, logs, documentation versions, and future growth.
+
+SQLite may be acceptable for a short development prototype, but it is not ideal for the long-term multi-user range server deployment.
+
+The formula engine should be designed to support configurable assumptions. Even if the MVP only supports the main BUC/TTF/LO relationship, templates should store the assumptions so future equipment or transponder variations can be added without redesigning the application.
+
+## 11. MVP Scope
+
+The MVP should be a usable internal trial system labelled as **Beta / MVP**.
+
+The MVP should include the following functions.
+
+### 11.1 User Accounts
+
+The MVP should include:
+
+* Login/logout
+* Range Operator role
+* Range Supervisor role
+* Session timeout
+* User attribution on logs and changes
+
+### 11.2 RF Calculator
+
+The MVP should include:
+
+* Enter one known frequency from TxIF, TxRF, RxRF, or RxIF
+* Enter BUC, LO, and TTF
+* Select TTF direction
+* Select MHz or GHz
+* Calculate all four frequency values
+* Display warnings for invalid or out-of-band results
+* Save calculation to a signal/log entry
+
+### 11.3 Power Calculator
+
+The MVP should include:
+
+* Convert dBW, dBm, and Watts
+* Basic gain/loss chain calculator
+* Final output power calculation
+* Configurable warning thresholds
+* Save calculation results to a log entry
+
+### 11.4 Signal Logs
+
+The MVP should include:
+
+* Create log entries
+* Edit log entries
+* Soft-delete log entries
+* View log history
+* Search and filter logs
+* Export logs to `.xlsx` and `.csv`
+* Include timestamp and operator on all entries
+
+### 11.5 Live Signal Dashboard
+
+The MVP should include:
+
+* Show current range state
+* Show active and configured signals
+* Show signal status
+* Show key frequency and power information
+* Show warnings
+* Colour-code signal states
+* Auto-refresh
+* Support multiple thin clients viewing current data
+
+### 11.6 Range State Control
+
+The MVP should include:
+
+* Toggle between Closed Loop, Live, and Standby/Off
+* Confirmation prompt before changing state
+* Reason/comment required
+* Automatic range state log entry
+* Visible warning banner when Live
+
+### 11.7 Documentation Module
+
+The MVP should include:
+
+* Wiki-style documentation pages
+* Supervisor-created and supervisor-approved content
+* Operator edit suggestions
+* Version history
+* Printable documentation
+* Initial core procedure pages
+
+### 11.8 Reports and Exports
+
+The MVP should include:
+
+* CSV export
+* XLSX export
+* Filtered exports
+* Basic formal range report export
+* Include calculated fields and audit data where selected
+
+### 11.9 Basic Device Status Checks
+
+The MVP may include simple network status checks for key devices.
+
+This should be limited to a simple ping-style status indicator for devices such as:
+
+* Modems
+* Splitters
+* Combiners
+* Spectrum analyser
+* Other configured range devices
+
+The MVP should not attempt hardware control.
+
+## 12. Wants / Future Enhancements
+
+The following are desirable but not essential for the first MVP.
+
+### 12.1 Hardware Integration
+
+Future versions may integrate with:
+
+* Modems
+* Spectrum analysers
+* Signal generators
+* RF switch matrix
+* Power meters
+* SNMP-capable devices
+* Serial devices
+* REST API-enabled equipment
+
+Possible future features:
+
+* Automatic signal status detection
+* Automatic power readings
+* Automatic Eb/No capture
+* Automatic modem configuration validation
+* Device health monitoring
+* Direct pull of modem lock status
+* Spectrum analyser screenshot capture
+* RF switch state display
+
+### 12.2 Advanced Operations Features
+
+Future versions may include:
+
+* Shift handover module
+* Range booking integration
+* Job/mission workflow
+* Supervisor approval for Live state changes
+* Two-person confirmation for high-risk actions
+* Activity-specific checklists
+* Automatic range readiness checks
+* Incident/fault reporting
+* Maintenance mode
+* Calibration mode
+* Restricted access mode
+
+### 12.3 Advanced Reporting
+
+Future reporting features may include:
+
+* Formal PDF range reports
+* Daily activity summary
+* Per-mission reports
+* Operator activity reports
+* Signal uptime reports
+* Fault history reports
+* Power verification reports
+* Exportable audit packages
+
+### 12.4 Authentication Enhancements
+
+Future authentication options may include:
+
+* Active Directory
+* Windows integrated authentication
+* SSO
+* YubiKey or MFA
+* Role-based permissions beyond the two MVP roles
+
+### 12.5 User Interface Enhancements
+
+Future UI improvements may include:
+
+* More polished control-panel style dashboard
+* Large-screen operations display
+* Customisable dashboard widgets
+* User-selected default units
+* User-selected dashboard layout
+* Dark mode
+* Signal card view
+* Range schematic view
+* Trend graphs for power and Eb/No
+
+## 13. Non-Goals for MVP
+
+The MVP will not:
+
+* Directly control RF hardware.
+* Automatically transmit or stop RF.
+* Replace qualified range operator judgement.
+* Act as a safety interlock.
+* Depend on internet access during normal operation.
+* Require HTTPS unless later required by local policy.
+* Support multiple ranges.
+* Require Docker unless direct Windows deployment becomes impractical.
+* Provide full hardware automation.
+
+## 14. Data Model — Initial Entities
+
+The application will likely require the following database entities.
+
+### 14.1 User
+
+Stores account and role information.
+
+Fields may include:
+
+* User ID
+* Username
+* Password hash
+* Display name
+* Role
+* Active status
+* Created timestamp
+* Last login timestamp
+
+### 14.2 Signal
+
+Stores reusable signal information.
+
+Fields may include:
+
+* Signal ID
+* Signal name/designator
+* Description
+* Default band
+* Default modulation type
+* Default symbol rate
+* Default inner code rate
+* Default power limits
+* Active/inactive status
+
+### 14.3 Signal Log
+
+Stores operational signal entries.
+
+Fields may include:
+
+* Log ID
+* Timestamp
+* Operator ID
+* Range state
+* Signal ID or signal name
+* Signal status
+* TxIF
+* TxRF
+* RxIF
+* RxRF
+* Frequency unit
+* Band
+* Modulation type
+* Symbol rate
+* Inner code rate
+* Power
+* Power unit
+* Eb/No
+* Activity/job/mission/customer/range booking
+* Notes
+* Warning flags
+* Created timestamp
+* Updated timestamp
+* Soft-deleted status
+
+### 14.4 Range State Log
+
+Stores range state changes.
+
+Fields may include:
+
+* State log ID
+* Previous state
+* New state
+* Changed by user
+* Timestamp
+* Reason/comment
+
+### 14.5 Frequency Template
+
+Stores reusable RF calculation templates.
+
+Fields may include:
+
+* Template ID
+* Name
+* Band
+* BUC
+* LO
+* TTF
+* TTF direction
+* Default units
+* Valid frequency limits
+* Notes
+
+### 14.6 Power Chain Template
+
+Stores reusable power chain templates.
+
+Fields may include:
+
+* Template ID
+* Name
+* Description
+* Stages
+* Default input unit
+* Expected output limits
+* Warning thresholds
+
+### 14.7 Documentation Page
+
+Stores wiki pages.
+
+Fields may include:
+
+* Page ID
+* Title
+* Slug
+* Current content
+* Created by
+* Updated by
+* Created timestamp
+* Updated timestamp
+* Published status
+
+### 14.8 Documentation Version
+
+Stores documentation history.
+
+Fields may include:
+
+* Version ID
+* Page ID
+* Version number
+* Content
+* Created by
+* Created timestamp
+* Approval status
+* Approved by
+* Approved timestamp
+* Rejection reason
+
+### 14.9 Audit Log
+
+Stores system audit events.
+
+Fields may include:
+
+* Audit ID
+* Timestamp
+* User ID
+* Action type
+* Entity type
+* Entity ID
+* Previous value
+* New value
+* Comment/reason
+
+### 14.10 Device Status
+
+Stores configured devices for simple ping checks.
+
+Fields may include:
+
+* Device ID
+* Device name
+* Device type
+* IP address or hostname
+* Enabled status
+* Last checked timestamp
+* Last known status
+* Notes
+
+## 15. Key Screens
+
+The initial application should include the following screens.
+
+1. Login page
+2. Dashboard / Live Range View
+3. RF Calculator
+4. Power Calculator
+5. Signal Logs
+6. Create/Edit Signal Log
+7. Range State Change Confirmation
+8. Documentation Home
+9. Documentation Page View
+10. Documentation Edit Proposal
+11. Documentation Approval Queue
+12. Export / Reports Page
+13. User Management
+14. System Configuration
+15. Device Status Page
+
+## 16. Initial UI Requirements
+
+The application should be simple, usable, and desktop-focused.
+
+It should include:
+
+* Clear navigation
+* Large readable tables
+* Clear range state banner
+* Warning colours for Live mode and unsafe values
+* Dark mode
+* Search and filters on log-heavy pages
+* Tooltips or inline help for junior operators
+* Minimal clutter on the live dashboard
+* Explicit confirmation before range state changes
+* Clearly labelled Beta/MVP status
+
+The interface should assume users have range knowledge but still provide enough guidance to avoid data entry mistakes.
+
+## 17. Open Questions
+
+The following items still need to be confirmed.
+
+1. Exact frequency ranges for C, X, Ku, and Ka band.
+2. Whether the TTF direction is always selectable or should be template-controlled.
+3. Whether BUC and LO values are always entered as frequencies or selected from equipment templates.
+4. Exact list of modulation types.
+5. Accepted formats for symbol rate and inner code rate.
+6. Default power unit for each screen.
+7. Exact safety/warning thresholds.
+8. Whether Live state should eventually require supervisor approval.
+9. Whether range state should include Maintenance, Calibration, or Fault.
+10. Whether PostgreSQL can be installed on the Windows Server.
+11. Whether Python runtime installation is acceptable on the Windows Server.
+12. Whether exports need to match any existing official reporting format.
+13. Whether device ping/status checks are allowed on the range network.
+14. Whether documentation attachments are allowed to be stored in the app database or file system.
+15. Backup and restore approach.
+16. Log retention policy beyond “stored indefinitely”.
+17. Whether HTTPS will be required before operational use.
+18. Whether future hardware integration should influence the initial database design.
+
+## 18. Recommended Build Phases
+
+### Phase 1 — Linux Workstation Prototype
+
+Build, deploy, and test the initial version on a Linux workstation.
+
+This phase should include:
+
+* Local development environment
+* Local database
+* Login
+* RF calculator
+* Power conversion calculator
+* Basic range state toggle
+* Basic signal log creation
+* Simple dashboard
+* Initial validation of formulas and workflow
+
+### Phase 2 — MVP Feature Build
+
+Add:
+
+* PostgreSQL or production-ready database
+* Multi-user support
+* Full log search/filter/export
+* Documentation module
+* Audit history
+* Soft-delete
+* Dashboard auto-refresh
+* Configurable bands/templates/thresholds
+* Basic device ping checks
+
+### Phase 3 — Windows Server Trial Deployment
+
+Deploy the application to the main Windows Server 2025 range server and test with 2–3 users.
+
+Validate:
+
+* Server deployment process
+* Browser access from Windows 11 thin clients
+* Firefox and Edge compatibility
+* Frequency calculations
+* Power calculations
+* Log workflow
+* Export format
+* User permissions
+* Dashboard usability
+* Documentation approval workflow
+
+### Phase 4 — Operational Hardening
+
+Add:
+
+* Backup and restore
+* Improved permissions
+* Stronger audit reporting
+* More formal reports
+* Better error handling
+* Optional HTTPS
+* More robust Windows service deployment
+* Initial hardware integration planning
+
+## 19. MVP Success Criteria
+
+The MVP is successful if:
+
+1. A range operator can log in from a thin client.
+2. The operator can calculate TxIF, TxRF, RxIF, and RxRF from one known frequency.
+3. The operator can convert dBW, dBm, and Watts.
+4. The operator can create and edit signal logs.
+5. The system records timestamps and users for all logs.
+6. The live dashboard shows current range state and signal status.
+7. Multiple clients can see current status updates.
+8. The range state can be changed with confirmation and reason.
+9. Documentation can be viewed and edited through an approval process.
+10. Logs can be exported to CSV and XLSX.
+11. Supervisors can manage users, documentation approvals, and configuration.
+12. The app is initially built, deployed, and tested on a Linux workstation.
+13. The app is then deployable to Windows Server 2025 and accessible through Firefox and Edge.

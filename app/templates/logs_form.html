@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+{% block title %}{% if log_entry %}Edit Log #{{ log_entry.id }}{% else %}New Signal Log{% endif %}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3">
+  <h4 class="mb-0">
+    <i class="bi bi-{% if log_entry %}pencil{% else %}plus-circle{% endif %} me-2"></i>
+    {% if log_entry %}Edit Log Entry #{{ log_entry.id }}{% else %}New Signal Log Entry{% endif %}
+  </h4>
+  <a href="/logs" class="btn btn-sm btn-outline-secondary ms-auto">
+    <i class="bi bi-arrow-left me-1"></i>Back to Logs
+  </a>
+</div>
+
+{% if range_state == 'Live' %}
+<div class="alert alert-danger d-flex align-items-center gap-2 mb-3">
+  <i class="bi bi-broadcast-pin blink-icon fs-5"></i>
+  <strong>Range is LIVE.</strong> RF fields are active. Ensure all entries are accurate.
+</div>
+{% elif range_state == 'Closed Loop' %}
+<div class="alert alert-info d-flex align-items-center gap-2 mb-3">
+  <i class="bi bi-arrow-repeat fs-5"></i>
+  Range is in <strong>Closed Loop</strong>. IF only — RF fields are optional.
+</div>
+{% endif %}
+
+<form method="post" action="/logs/{% if log_entry %}{{ log_entry.id }}/edit{% else %}new{% endif %}">
+  <div class="row g-3">
+
+    <!-- Signal identity -->
+    <div class="col-12">
+      <div class="card border-secondary">
+        <div class="card-header small text-muted">Signal Identity</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-5">
+              <label class="form-label">Signal Name / Designator <span class="text-danger">*</span></label>
+              {% if signals %}
+              <input list="signalList" class="form-control" name="signal_name" required
+                     value="{{ log_entry.signal_name if log_entry else '' }}" placeholder="Type or select...">
+              <datalist id="signalList">
+                {% for s in signals %}
+                <option value="{{ s.name }}">
+                {% endfor %}
+              </datalist>
+              {% else %}
+              <input type="text" class="form-control" name="signal_name" required
+                     value="{{ log_entry.signal_name if log_entry else '' }}">
+              {% endif %}
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Status <span class="text-danger">*</span></label>
+              <select class="form-select" name="signal_status" required>
+                {% for s in statuses %}
+                <option value="{{ s }}"
+                  {% if log_entry and log_entry.signal_status == s %}selected
+                  {% elif not log_entry and s == 'Configured' %}selected{% endif %}>
+                  {{ s }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Band</label>
+              <select class="form-select" name="band">
+                <option value="">—</option>
+                {% for b in bands %}
+                <option value="{{ b }}" {% if log_entry and log_entry.band == b %}selected{% elif not log_entry and prefill and prefill.band == b %}selected{% endif %}>{{ b }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Freq Unit</label>
+              <select class="form-select" name="freq_unit">
+                {% for u in freq_units %}
+                <option value="{{ u }}" {% if log_entry and log_entry.freq_unit == u %}selected{% elif not log_entry and prefill and prefill.freq_unit == u %}selected{% elif not log_entry and not prefill and u == 'MHz' %}selected{% endif %}>{{ u }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Frequencies + embedded calculator -->
+    <div class="col-12">
+      <div class="card border-secondary">
+        <div class="card-header small text-muted d-flex align-items-center justify-content-between">
+          <span>
+            Frequencies
+            {% if range_state == 'Closed Loop' %}
+            <span class="badge bg-info text-dark ms-2">Optional (Closed Loop)</span>
+            {% elif range_state == 'Live' %}
+            <span class="badge bg-danger ms-2">RF Required (Live)</span>
+            {% endif %}
+          </span>
+          {% if not log_entry %}
+          <span class="text-muted" style="font-weight:normal">
+            <i class="bi bi-calculator me-1"></i>Enter one frequency — others calculate automatically
+          </span>
+          {% endif %}
+        </div>
+        <div class="card-body">
+          {% if not log_entry %}
+          <!-- Conversion values row — pre-filled from last calculator use -->
+          <div class="row g-2 mb-3 align-items-end p-2 rounded"
+               style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08)">
+            <div class="col-12 mb-1">
+              <span class="small text-muted fw-semibold">
+                <i class="bi bi-sliders me-1"></i>Conversion Values
+                {% if last_calc and last_calc.buc %}
+                <span class="badge bg-secondary ms-1">from last calculation</span>
+                {% endif %}
+              </span>
+            </div>
+            <div class="col-6 col-sm-3 col-lg-2">
+              <label class="form-label small">BUC</label>
+              <input type="number" class="form-control form-control-sm" id="fc_buc" step="any"
+                     value="{{ last_calc.buc if last_calc and last_calc.buc is not none else '' }}"
+                     placeholder="BUC">
+            </div>
+            <div class="col-6 col-sm-3 col-lg-2">
+              <label class="form-label small">LO</label>
+              <input type="number" class="form-control form-control-sm" id="fc_lo" step="any"
+                     value="{{ last_calc.lo if last_calc and last_calc.lo is not none else '' }}"
+                     placeholder="LO">
+            </div>
+            <div class="col-6 col-sm-3 col-lg-2">
+              <label class="form-label small">TTF</label>
+              <div class="input-group input-group-sm">
+                <select class="form-select" id="fc_ttf_dir" style="max-width:60px">
+                  <option value="+" {% if not last_calc or last_calc.ttf_direction != '-' %}selected{% endif %}>+</option>
+                  <option value="-" {% if last_calc and last_calc.ttf_direction == '-' %}selected{% endif %}>−</option>
+                </select>
+                <input type="number" class="form-control" id="fc_ttf" step="any"
+                       value="{{ last_calc.ttf if last_calc and last_calc.ttf is not none else '' }}"
+                       placeholder="TTF">
+              </div>
+            </div>
+            <div class="col-6 col-sm-3 col-lg-2">
+              <label class="form-label small">Unit</label>
+              <select class="form-select form-select-sm" id="fc_unit">
+                <option value="MHz" {% if not last_calc or last_calc.freq_unit == 'MHz' %}selected{% endif %}>MHz</option>
+                <option value="GHz" {% if last_calc and last_calc.freq_unit == 'GHz' %}selected{% endif %}>GHz</option>
+              </select>
+            </div>
+            <div class="col-12 col-lg-4">
+              <label class="form-label small d-lg-block d-none">&nbsp;</label>
+              <p class="text-muted small mb-0 mt-1">
+                TxIF + BUC = TxRF &nbsp;·&nbsp; TxRF ± TTF = RxRF &nbsp;·&nbsp; RxRF − LO = RxIF
+              </p>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Four frequency fields -->
+          <div class="row g-3">
+            {% set freq_fields = [
+              ('tx_if', 'TxIF', 'Transmit Intermediate Frequency', log_entry.tx_if if log_entry else (prefill.tx_if if prefill else none)),
+              ('tx_rf', 'TxRF', 'Transmit Radio Frequency',        log_entry.tx_rf if log_entry else (prefill.tx_rf if prefill else none)),
+              ('rx_rf', 'RxRF', 'Receive Radio Frequency',         log_entry.rx_rf if log_entry else (prefill.rx_rf if prefill else none)),
+              ('rx_if', 'RxIF', 'Receive Intermediate Frequency',  log_entry.rx_if if log_entry else (prefill.rx_if if prefill else none)),
+            ] %}
+            {% for field, label, tooltip, val in freq_fields %}
+            <div class="col-6 col-md-3">
+              <label class="form-label">{{ label }}
+                <i class="bi bi-info-circle text-muted small" data-bs-toggle="tooltip" title="{{ tooltip }}"></i>
+              </label>
+              <input type="number" class="form-control log-freq-field" id="lf_{{ field }}"
+                     name="{{ field }}" step="any" data-field="{{ field }}"
+                     value="{{ val if val is not none and val != '' else '' }}"
+                     placeholder="—"
+                     {% if range_state == 'Live' and field in ['tx_rf', 'rx_rf'] %}required{% endif %}>
+            </div>
+            {% endfor %}
+          </div>
+          {% if prefill %}
+          <div class="mt-2 text-muted small">
+            <i class="bi bi-calculator me-1"></i>Frequencies pre-filled from RF calculator.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Modulation / signal params -->
+    <div class="col-md-6">
+      <div class="card border-secondary h-100">
+        <div class="card-header small text-muted">Signal Parameters</div>
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-12">
+              <label class="form-label">Modulation</label>
+              <select class="form-select" name="modulation">
+                <option value="">— Not specified —</option>
+                {% for m in modulations %}
+                <option value="{{ m }}" {% if log_entry and log_entry.modulation == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Symbol Rate</label>
+              <input type="text" class="form-control" name="symbol_rate"
+                     value="{{ log_entry.symbol_rate if log_entry else '' }}" placeholder="e.g. 5000">
+            </div>
+            <div class="col-6">
+              <label class="form-label">FEC / Code Rate</label>
+              <select class="form-select" name="fec">
+                <option value="">— Not specified —</option>
+                {% for f in fec_types %}
+                <option value="{{ f }}" {% if log_entry and log_entry.fec == f %}selected{% endif %}>{{ f }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Source</label>
+              <select class="form-select" name="source">
+                <option value="">— Not specified —</option>
+                {% for s in signal_sources %}
+                <option value="{{ s }}" {% if log_entry and log_entry.source == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Antenna</label>
+              <select class="form-select" name="antenna">
+                <option value="">— Not specified —</option>
+                {% for a in antenna_types %}
+                <option value="{{ a }}" {% if log_entry and log_entry.antenna == a %}selected{% endif %}>{{ a }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Power -->
+    <div class="col-md-6">
+      <div class="card border-secondary h-100">
+        <div class="card-header small text-muted">Power & Quality</div>
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-7">
+              <label class="form-label">Power</label>
+              <div class="input-group">
+                <input type="number" class="form-control" name="power" step="any"
+                       value="{{ log_entry.power if log_entry and log_entry.power is not none else '' }}">
+                <select class="form-select" name="power_unit" style="max-width:90px">
+                  {% for u in power_units %}
+                  <option value="{{ u }}" {% if log_entry and log_entry.power_unit == u %}selected{% elif not log_entry and u == 'dBm' %}selected{% endif %}>{{ u }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="col-5">
+              <label class="form-label">Eb/No (dB)</label>
+              <input type="number" class="form-control" name="eb_no" step="any"
+                     value="{{ log_entry.eb_no if log_entry and log_entry.eb_no is not none else '' }}">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity & notes -->
+    <div class="col-12">
+      <div class="card border-secondary">
+        <div class="card-header small text-muted">Activity & Notes</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">Serial</label>
+              <select class="form-select" name="serial_id">
+                <option value="">— No serial —</option>
+                {% set current_sid = log_entry.serial_id if log_entry else (preselect_serial_id if preselect_serial_id is defined else none) %}
+                {% for s in all_serials %}
+                <option value="{{ s.id }}" {% if current_sid == s.id %}selected{% endif %}>
+                  {{ s.title }}{% if not s.closed_at %} ●{% endif %}
+                </option>
+                {% endfor %}
+              </select>
+              <div class="form-text">
+                <a href="/serials" class="small">Manage serials</a>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Activity / Job / Mission / Booking</label>
+              <input type="text" class="form-control" name="activity_ref"
+                     value="{{ log_entry.activity_ref if log_entry else '' }}"
+                     placeholder="Optional reference">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Notes</label>
+              <textarea class="form-control" name="notes" rows="2"
+                        placeholder="Any relevant notes or observations">{{ log_entry.notes if log_entry else '' }}</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 d-flex gap-2">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check2 me-1"></i>{% if log_entry %}Save Changes{% else %}Create Log Entry{% endif %}
+      </button>
+      <a href="/logs" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+
+// ── Embedded RF calculator ─────────────────────────────────────────────────────
+function toMHz(v, unit) { return unit === 'GHz' ? v * 1000 : v; }
+function fromMHz(v, unit) { return unit === 'GHz' ? v / 1000 : v; }
+
+function logFormCalcAll(known, valueMHz, buc, lo, ttf, sign) {
+  if (known === 'tx_if') {
+    const tx_rf = valueMHz + buc, rx_rf = tx_rf + sign * ttf;
+    return { tx_if: valueMHz, tx_rf, rx_rf, rx_if: rx_rf - lo };
+  } else if (known === 'tx_rf') {
+    const rx_rf = valueMHz + sign * ttf;
+    return { tx_if: valueMHz - buc, tx_rf: valueMHz, rx_rf, rx_if: rx_rf - lo };
+  } else if (known === 'rx_rf') {
+    const tx_rf = valueMHz - sign * ttf;
+    return { tx_if: tx_rf - buc, tx_rf, rx_rf: valueMHz, rx_if: valueMHz - lo };
+  } else { // rx_if
+    const rx_rf = valueMHz + lo, tx_rf = rx_rf - sign * ttf;
+    return { tx_if: tx_rf - buc, tx_rf, rx_rf, rx_if: valueMHz };
+  }
+}
+
+function recalcLogFreqs(changedField) {
+  const bucEl  = document.getElementById('fc_buc');
+  const loEl   = document.getElementById('fc_lo');
+  const ttfEl  = document.getElementById('fc_ttf');
+  const dirEl  = document.getElementById('fc_ttf_dir');
+  const unitEl = document.getElementById('fc_unit');
+  if (!bucEl || !loEl || !ttfEl) return;   // edit form — no calc inputs
+
+  const unit = unitEl?.value || 'MHz';
+  const buc  = toMHz(parseFloat(bucEl.value), unit);
+  const lo   = toMHz(parseFloat(loEl.value),  unit);
+  const ttf  = toMHz(parseFloat(ttfEl.value), unit);
+  const sign = (dirEl?.value || '+') === '+' ? 1 : -1;
+
+  if (isNaN(buc) || isNaN(lo) || isNaN(ttf)) return;
+
+  const changedInput = document.getElementById('lf_' + changedField);
+  const rawVal = parseFloat(changedInput?.value);
+  if (isNaN(rawVal)) return;
+
+  const valueMHz = toMHz(rawVal, unit);
+  const res = logFormCalcAll(changedField, valueMHz, buc, lo, ttf, sign);
+
+  ['tx_if','tx_rf','rx_rf','rx_if'].forEach(f => {
+    if (f === changedField) return;
+    const el = document.getElementById('lf_' + f);
+    if (el) el.value = parseFloat(fromMHz(res[f], unit).toFixed(6));
+  });
+
+  // Keep the log form's freq_unit selector in sync
+  const logUnit = document.querySelector('[name="freq_unit"]');
+  if (logUnit) logUnit.value = unit;
+}
+
+// Wire up: recalc when any freq field or any conversion value changes
+document.querySelectorAll('.log-freq-field').forEach(el => {
+  el.addEventListener('input', () => recalcLogFreqs(el.dataset.field));
+});
+['fc_buc','fc_lo','fc_ttf','fc_ttf_dir','fc_unit'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', () => {
+    // Recalculate from whichever freq field has a value
+    const fields = ['tx_if','tx_rf','rx_rf','rx_if'];
+    const filled = fields.find(f => document.getElementById('lf_' + f)?.value !== '');
+    if (filled) recalcLogFreqs(filled);
+  });
+});
+</script>
+{% endblock %}

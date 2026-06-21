@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}{{ serial.display_title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <div>
+    <h4 class="mb-0"><i class="bi bi-clock-history me-2"></i>{{ serial.title }}</h4>
+    <div class="text-muted small">
+      {{ serial.opened_at.strftime('%d/%m/%Y %H:%M') }}
+      {% if serial.closed_at %}→ {{ serial.closed_at.strftime('%H:%M') }}{% endif %}
+      &nbsp;·&nbsp; {{ serial.opened_by.display_name }}
+    </div>
+  </div>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/history/{{ serial.id }}/export/csv" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-filetype-csv me-1"></i>CSV
+    </a>
+    <a href="/history/{{ serial.id }}/export/xlsx" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-file-earmark-spreadsheet me-1"></i>XLSX
+    </a>
+    <a href="/history" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>History
+    </a>
+  </div>
+</div>
+
+{% if serial.notes %}
+<div class="alert alert-secondary py-2 small mb-3">{{ serial.notes }}</div>
+{% endif %}
+
+<!-- Packages used -->
+{% if serial.package_links %}
+<div class="mb-3 small text-muted">
+  <i class="bi bi-box-seam me-1"></i>Packages:
+  {% for sp in serial.package_links %}
+  <a href="/packages/{{ sp.package_id }}" class="text-decoration-none">{{ sp.package.name }}</a>{% if not loop.last %}, {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Search within serial -->
+<form method="get" action="/history/{{ serial.id }}" class="mb-3">
+  <div class="input-group input-group-sm" style="max-width:400px">
+    <input type="text" class="form-control" name="search" value="{{ search }}"
+           placeholder="Filter by signal name or notes…">
+    <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i></button>
+    {% if search %}<a href="/history/{{ serial.id }}" class="btn btn-outline-secondary">Clear</a>{% endif %}
+  </div>
+</form>
+
+{% if logs %}
+<div class="card border-secondary">
+  <div class="card-body p-0 overflow-auto">
+    <table class="table table-dark table-hover table-sm align-middle mb-0">
+      <thead class="table-secondary">
+        <tr>
+          <th>Time</th>
+          <th>Operator</th>
+          <th>Signal</th>
+          <th>Status</th>
+          <th>TxIF</th>
+          <th>TxRF</th>
+          <th>RxRF</th>
+          <th>RxIF</th>
+          <th>Unit</th>
+          <th>Band</th>
+          <th>Mod</th>
+          <th>Power</th>
+          <th>Notes</th>
+          <th>Type</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        {% if log.entry_type in ('Narrative', 'SerialStart', 'SerialEnd') %}
+        <tr class="table-warning bg-opacity-10">
+          <td class="text-nowrap small">{{ log.timestamp.strftime('%H:%M:%S') }}</td>
+          <td class="small">{{ log.operator.username if log.operator else '—' }}</td>
+          <td colspan="11" class="fst-italic">
+            <i class="bi bi-sticky text-warning me-1"></i>
+            <span class="text-warning-emphasis">{{ log.notes }}</span>
+          </td>
+          <td class="small text-muted">{{ log.entry_type }}</td>
+        </tr>
+        {% else %}
+        <tr class="{% if log.signal_status == 'Faulted' %}table-danger{% elif log.signal_status == 'Up' %}table-success{% endif %}">
+          <td class="text-nowrap small">{{ log.timestamp.strftime('%H:%M:%S') }}</td>
+          <td class="small">{{ log.operator.username if log.operator else '—' }}</td>
+          <td class="fw-semibold">{{ log.signal_name }}</td>
+          <td>
+            {% if log.signal_status == 'Up' %}<span class="badge bg-success">Up</span>
+            {% elif log.signal_status == 'Down' %}<span class="badge bg-secondary">Down</span>
+            {% elif log.signal_status == 'Configured' %}<span class="badge bg-primary">Configured</span>
+            {% elif log.signal_status == 'Standby' %}<span class="badge bg-warning text-dark">Standby</span>
+            {% elif log.signal_status == 'Faulted' %}<span class="badge bg-danger">Faulted</span>
+            {% elif log.signal_status == 'Planned' %}<span class="badge bg-info text-dark">Planned</span>
+            {% else %}<span class="badge bg-secondary">{{ log.signal_status }}</span>{% endif %}
+          </td>
+          <td>{{ log.tx_if or '—' }}</td>
+          <td>{{ log.tx_rf or '—' }}</td>
+          <td>{{ log.rx_rf or '—' }}</td>
+          <td>{{ log.rx_if or '—' }}</td>
+          <td class="text-muted small">{{ log.freq_unit }}</td>
+          <td>{{ log.band or '—' }}</td>
+          <td class="small">{{ log.modulation or '—' }}</td>
+          <td class="small">{% if log.power is not none %}{{ log.power }} {{ log.power_unit }}{% else %}—{% endif %}</td>
+          <td class="small text-muted" style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+              title="{{ log.notes or '' }}">{{ log.notes or '—' }}</td>
+          <td class="small text-muted">{{ log.entry_type }}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer text-muted small">
+    {{ logs | length }} log entr{{ 'y' if logs | length == 1 else 'ies' }}
+    {% if search %} matching "{{ search }}"{% endif %}
+  </div>
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-journal display-4 d-block mb-2"></i>
+  No log entries{% if search %} matching "{{ search }}"{% endif %}.
+</div>
+{% endif %}
+{% endblock %}

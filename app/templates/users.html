@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}User Management{% endblock %}
+
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-people me-2"></i>User Management</h4>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<div class="row g-4">
+  <!-- User list -->
+  <div class="col-lg-8">
+    <div class="card border-secondary">
+      <div class="card-header">Users</div>
+      <div class="card-body p-0">
+        <table class="table table-dark table-hover table-sm align-middle mb-0">
+          <thead class="table-secondary">
+            <tr>
+              <th>Username</th>
+              <th>Display Name</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Last Login</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+            <tr class="{% if not u.is_active %}opacity-50{% endif %}">
+              <td class="fw-semibold">{{ u.username }}</td>
+              <td>{{ u.display_name }}</td>
+              <td>
+                {% if u.role == 'supervisor' %}
+                <span class="badge bg-primary">Supervisor</span>
+                {% else %}
+                <span class="badge bg-secondary">Operator</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if u.is_active %}
+                <span class="badge bg-success">Active</span>
+                {% else %}
+                <span class="badge bg-danger">Disabled</span>
+                {% endif %}
+              </td>
+              <td class="small text-muted">{{ u.created_at.strftime('%d/%m/%Y') if u.created_at else '—' }}</td>
+              <td class="small text-muted">{{ u.last_login.strftime('%d/%m/%Y %H:%M') if u.last_login else 'Never' }}</td>
+              <td class="text-nowrap">
+                {% if u.id != user.id %}
+                <form method="post" action="/users/{{ u.id }}/toggle" class="d-inline">
+                  <button type="submit" class="btn btn-sm py-0 px-1
+                    {% if u.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                    title="{{ 'Disable' if u.is_active else 'Enable' }} user">
+                    <i class="bi bi-{% if u.is_active %}person-dash{% else %}person-check{% endif %}"></i>
+                  </button>
+                </form>
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
+                        data-bs-toggle="modal" data-bs-target="#resetModal{{ u.id }}"
+                        title="Reset password">
+                  <i class="bi bi-key"></i>
+                </button>
+                {% else %}
+                <span class="text-muted small">(you)</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create user form -->
+  <div class="col-lg-4">
+    <div class="card border-secondary">
+      <div class="card-header"><i class="bi bi-person-plus me-1"></i>Add User</div>
+      <div class="card-body">
+        <form method="post" action="/users/new">
+          <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input type="text" class="form-control" name="username" required
+                   autocomplete="off" placeholder="lowercase, no spaces">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Display Name</label>
+            <input type="text" class="form-control" name="display_name" required
+                   placeholder="e.g. J. Smith">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Role</label>
+            <select class="form-select" name="role">
+              {% for r in roles %}
+              <option value="{{ r }}">{{ r | title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-control" name="password" required
+                   autocomplete="new-password" minlength="8">
+          </div>
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-person-plus me-1"></i>Create User
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Password reset modals -->
+{% for u in users %}
+{% if u.id != user.id %}
+<div class="modal fade" id="resetModal{{ u.id }}" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content bg-dark border-secondary">
+      <div class="modal-header border-secondary">
+        <h6 class="modal-title">Reset Password — {{ u.username }}</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="/users/{{ u.id }}/reset-password">
+        <div class="modal-body">
+          <input type="password" class="form-control" name="new_password"
+                 placeholder="New password" required minlength="8" autocomplete="new-password">
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="submit" class="btn btn-warning btn-sm">Reset</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+{% endblock %}

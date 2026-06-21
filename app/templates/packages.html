@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Signal Packages{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <h4 class="mb-0"><i class="bi bi-box-seam me-2"></i>Signal Packages</h4>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/packages/import" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-upload me-1"></i>Import JSON
+    </a>
+    <a href="/packages/new" class="btn btn-sm btn-success">
+      <i class="bi bi-plus-lg me-1"></i>New Package
+    </a>
+  </div>
+</div>
+
+{% if toast %}
+<div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
+
+{% if packages %}
+<div class="row g-3">
+  {% for pkg in packages %}
+  <div class="col-lg-6">
+    <div class="card border-secondary h-100">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-box-seam text-primary me-1"></i>
+        <span class="fw-semibold">{{ pkg.name }}</span>
+        <span class="badge bg-secondary ms-1">{{ pkg.signals | length }} signal{{ 's' if pkg.signals | length != 1 }}</span>
+        <div class="ms-auto d-flex gap-1">
+          <a href="/packages/{{ pkg.id }}/export" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Export JSON">
+            <i class="bi bi-download"></i>
+          </a>
+          <a href="/packages/{{ pkg.id }}" class="btn btn-sm btn-outline-primary py-0 px-2">
+            <i class="bi bi-pencil"></i>
+          </a>
+          <form method="post" action="/packages/{{ pkg.id }}/delete" class="d-inline"
+                onsubmit="return confirm('Delete package {{ pkg.name | e }}? This cannot be undone.')">
+            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2"><i class="bi bi-trash"></i></button>
+          </form>
+        </div>
+      </div>
+      <div class="card-body py-2">
+        {% if pkg.description %}
+        <p class="text-muted small mb-2">{{ pkg.description }}</p>
+        {% endif %}
+        {% if pkg.signals %}
+        <div class="d-flex flex-wrap gap-1">
+          {% for sig in pkg.signals %}
+          <span class="badge bg-body-secondary border border-secondary text-body-secondary">
+            {{ sig.signal_name }}
+            {% if sig.band %}<span class="text-muted ms-1">{{ sig.band }}</span>{% endif %}
+          </span>
+          {% endfor %}
+        </div>
+        {% else %}
+        <span class="text-muted small fst-italic">No signals yet — <a href="/packages/{{ pkg.id }}">add signals</a></span>
+        {% endif %}
+      </div>
+      <div class="card-footer text-muted small d-flex justify-content-between">
+        <span>Created {{ pkg.created_at.strftime('%d/%m/%Y') }} by {{ pkg.created_by.display_name }}</span>
+        {% if pkg.updated_at %}<span>Updated {{ pkg.updated_at.strftime('%d/%m/%Y %H:%M') }}</span>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-box-seam display-4 d-block mb-3"></i>
+  No signal packages yet.<br>
+  <a href="/packages/new" class="btn btn-success mt-3">Create your first package</a>
+  <span class="text-muted mx-2">or</span>
+  <a href="/packages/import" class="btn btn-outline-secondary mt-3">Import from JSON file</a>
+</div>
+{% endif %}
+{% endblock %}

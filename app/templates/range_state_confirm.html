@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Change Range State{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card border-{% if current_state == 'Live' %}danger{% else %}secondary{% endif %}">
+      <div class="card-header">
+        <i class="bi bi-arrow-left-right me-1"></i>Change Range State
+      </div>
+      <div class="card-body">
+        <div class="mb-4">
+          <div class="text-muted small mb-1">Current State</div>
+          <div class="fs-4 fw-bold
+            {% if current_state == 'Live' %}text-danger{% elif current_state == 'Closed Loop' %}text-info{% else %}text-secondary{% endif %}">
+            {{ current_state }}
+          </div>
+        </div>
+
+        <form method="post" action="/range-state/change" onsubmit="return confirmChange()">
+          <div class="mb-3">
+            <label class="form-label">New State</label>
+            <select class="form-select" name="new_state" id="newStateSelect" onchange="updateWarning()">
+              {% for s in valid_states %}
+              <option value="{{ s }}" {% if target_state == s %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div id="liveWarning" class="alert alert-danger d-none">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>Warning:</strong> Changing to <strong>Live</strong> means RF will be considered
+            active on the range. Ensure all personnel are clear and all safety procedures are followed.
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Reason / Comment <span class="text-danger">*</span></label>
+            <textarea class="form-control" name="reason" rows="3"
+                      placeholder="e.g. Starting live trial with customer X" required></textarea>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-warning flex-grow-1">
+              <i class="bi bi-check2-circle me-1"></i>Confirm State Change
+            </button>
+            <a href="/" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateWarning() {
+  const sel = document.getElementById('newStateSelect');
+  const warn = document.getElementById('liveWarning');
+  warn.classList.toggle('d-none', sel.value !== 'Live');
+}
+
+function confirmChange() {
+  const sel = document.getElementById('newStateSelect');
+  if (sel.value === 'Live') {
+    return confirm('Confirm: Change range state to LIVE? RF is considered active on range.');
+  }
+  return true;
+}
+
+updateWarning();
+</script>
+{% endblock %}

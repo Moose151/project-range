@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+{% block title %}RF Frequency Calculator{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <h4 class="mb-0"><i class="bi bi-broadcast me-2"></i>RF Frequency Calculator</h4>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/calculator/power" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-lightning-charge me-1"></i>Power
+    </a>
+    <a href="/calculator/eirp" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-broadcast-pin me-1"></i>EIRP
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Calculator form -->
+  <div class="col-lg-5">
+    <div class="card border-secondary">
+      <div class="card-header"><i class="bi bi-broadcast me-1"></i>RF Frequency Calculator</div>
+      <div class="card-body">
+
+        {% if freq_templates %}
+        <div class="mb-3">
+          <label class="form-label small text-muted">Load Template</label>
+          <select class="form-select form-select-sm" id="templateSelect" onchange="loadTemplate(this)">
+            <option value="">— Select a template —</option>
+            {% for t in freq_templates %}
+            <option value="{{ t.id }}"
+              data-buc="{{ t.buc }}" data-lo="{{ t.lo }}" data-ttf="{{ t.ttf }}"
+              data-dir="{{ t.ttf_direction }}" data-unit="{{ t.default_unit }}" data-band="{{ t.band }}">
+              {{ t.name }} {% if t.band %}({{ t.band }}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <hr class="border-secondary">
+        {% endif %}
+
+        <form method="post" action="/calculator/rf">
+          <div class="mb-3">
+            <label class="form-label">Known Frequency</label>
+            <div class="input-group">
+              <select class="form-select" name="known_freq" style="max-width:110px">
+                {% for f in ["TxIF", "TxRF", "RxRF", "RxIF"] %}
+                <option value="{{ f }}" {% if form.known_freq == f %}selected{% endif %}>{{ f }}</option>
+                {% endfor %}
+              </select>
+              <input type="number" class="form-control" name="known_value" step="any"
+                     value="{{ form.known_value or '' }}" placeholder="Value" required>
+              <select class="form-select" name="input_unit" style="max-width:90px" id="inputUnit">
+                {% for u in ["MHz", "GHz"] %}
+                <option value="{{ u }}" {% if form.input_unit == u %}selected{% endif %}>{{ u }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label">BUC
+                <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                   title="Block Up Converter frequency (same unit as input)"></i>
+              </label>
+              <input type="number" class="form-control" name="buc" id="buc"
+                     step="any" value="{{ form.buc or '' }}" placeholder="BUC" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label">LO
+                <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                   title="Local Oscillator frequency (same unit as input)"></i>
+              </label>
+              <input type="number" class="form-control" name="lo" id="lo"
+                     step="any" value="{{ form.lo or '' }}" placeholder="LO" required>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">TTF (Transponder Translation Frequency)
+              <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                 title="TxRF ± TTF = RxRF"></i>
+            </label>
+            <div class="input-group">
+              <select class="form-select" name="ttf_direction" style="max-width:70px" id="ttfDir">
+                <option value="+" {% if form.ttf_direction != '-' %}selected{% endif %}>+</option>
+                <option value="-" {% if form.ttf_direction == '-' %}selected{% endif %}>−</option>
+              </select>
+              <input type="number" class="form-control" name="ttf" id="ttf"
+                     step="any" value="{{ form.ttf or '' }}" placeholder="TTF" required>
+            </div>
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label">Band</label>
+              <select class="form-select" name="band" id="band">
+                <option value="">— None —</option>
+                {% for b in bands %}
+                <option value="{{ b }}" {% if form.band == b %}selected{% endif %}>{{ b }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Output Unit</label>
+              <select class="form-select" name="output_unit">
+                {% for u in ["MHz", "GHz"] %}
+                <option value="{{ u }}" {% if form.output_unit == u %}selected{% endif %}>{{ u }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-calculator me-1"></i>Calculate
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="col-lg-7">
+    {% if error %}
+    <div class="alert alert-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>{{ error }}</div>
+    {% endif %}
+
+    <div id="bandWarnings" class="{% if not result or not result.warnings %}d-none{% endif %}">
+      {% if result and result.warnings %}
+      <div class="alert alert-warning">
+        <strong><i class="bi bi-exclamation-triangle-fill me-1"></i>Band Warning</strong>
+        <ul class="mb-0 mt-1" id="warningList">
+          {% for w in result.warnings %}<li>{{ w }}</li>{% endfor %}
+        </ul>
+      </div>
+      {% else %}
+      <div class="alert alert-warning"><ul class="mb-0" id="warningList"></ul></div>
+      {% endif %}
+    </div>
+
+    <div class="card border-secondary mb-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-broadcast me-1 text-success"></i>Frequencies
+          <span class="text-muted small fw-normal ms-1">— edit any field to recalculate</span>
+        </span>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-secondary small" id="liveCalcBadge">
+            {% if result %}calculated{% else %}waiting{% endif %}
+          </span>
+          <a href="#" id="createLogBtn" class="btn btn-sm btn-success d-none" title="Open New Log Entry with these frequencies pre-filled">
+            <i class="bi bi-plus-circle me-1"></i>Create Log Entry
+          </a>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          {% set fields = [
+            ('tx_if', 'TxIF', 'Transmit IF', result.tx_if if result else ''),
+            ('tx_rf', 'TxRF', 'Transmit RF', result.tx_rf if result else ''),
+            ('rx_rf', 'RxRF', 'Receive RF',  result.rx_rf if result else ''),
+            ('rx_if', 'RxIF', 'Receive IF',  result.rx_if if result else ''),
+          ] %}
+          {% for id, label, title, val in fields %}
+          <div class="col-6 col-md-3">
+            <label class="form-label small text-muted">{{ label }}</label>
+            <input type="number" step="any"
+                   class="form-control form-control-lg text-center fw-bold freq-result-field"
+                   id="result_{{ id }}" data-field="{{ id }}"
+                   value="{{ val }}"
+                   placeholder="—"
+                   title="{{ title }} — edit to recalculate others">
+            <div class="text-muted text-center small mt-1" id="unit_{{ id }}">
+              {{ result.unit if result else '' }}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-secondary">
+      <div class="card-header small text-muted">Formula Reference</div>
+      <div class="card-body">
+        <code class="small" id="formulaRef">
+          TxIF + BUC = TxRF<br>
+          TxRF <span id="ttfDirDisplay">{{ form.ttf_direction if form.ttf_direction else '+' }}</span> TTF = RxRF<br>
+          RxRF − LO = RxIF
+        </code>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Power Calculator nav -->
+<div class="mt-3">
+  <a href="/calculator/power" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-lightning me-1"></i>Go to Power Calculator
+  </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+
+// ── Template loader ────────────────────────────────────────────────────────────
+function loadTemplate(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt.value) return;
+  document.getElementById('buc').value = opt.dataset.buc || '';
+  document.getElementById('lo').value  = opt.dataset.lo  || '';
+  document.getElementById('ttf').value = opt.dataset.ttf || '';
+  document.getElementById('ttfDir').value   = opt.dataset.dir  || '+';
+  document.getElementById('band').value     = opt.dataset.band || '';
+  document.getElementById('inputUnit').value = opt.dataset.unit || 'MHz';
+  recalculate('TxIF');   // rerun with current known field
+}
+
+// ── Live RF calculation ────────────────────────────────────────────────────────
+function toMHz(v, unit) { return unit === 'GHz' ? v * 1000 : v; }
+function fromMHz(v, unit) { return unit === 'GHz' ? v / 1000 : v; }
+
+function calcAll(known, valueMHz, bucMHz, loMHz, ttfMHz, sign) {
+  let tx_if, tx_rf, rx_rf, rx_if;
+  if (known === 'TxIF') {
+    tx_if = valueMHz; tx_rf = tx_if + bucMHz;
+    rx_rf = tx_rf + sign * ttfMHz; rx_if = rx_rf - loMHz;
+  } else if (known === 'TxRF') {
+    tx_rf = valueMHz; tx_if = tx_rf - bucMHz;
+    rx_rf = tx_rf + sign * ttfMHz; rx_if = rx_rf - loMHz;
+  } else if (known === 'RxRF') {
+    rx_rf = valueMHz; tx_rf = rx_rf - sign * ttfMHz;
+    tx_if = tx_rf - bucMHz; rx_if = rx_rf - loMHz;
+  } else { // RxIF
+    rx_if = valueMHz; rx_rf = rx_if + loMHz;
+    tx_rf = rx_rf - sign * ttfMHz; tx_if = tx_rf - bucMHz;
+  }
+  return { tx_if, tx_rf, rx_rf, rx_if };
+}
+
+const BANDS = {{ config_bands | tojson if config_bands is defined else '{}' }};
+
+function getBandWarnings(txRfMHz, rxRfMHz, band) {
+  const warnings = [];
+  const b = BANDS[band];
+  if (!b) return warnings;
+  const txGHz = txRfMHz / 1000, rxGHz = rxRfMHz / 1000;
+  if (txGHz < b.tx_min || txGHz > b.tx_max)
+    warnings.push(`TxRF ${txGHz.toFixed(4)} GHz is outside ${band}-band Tx range (${b.tx_min}–${b.tx_max} GHz).`);
+  if (rxGHz < b.rx_min || rxGHz > b.rx_max)
+    warnings.push(`RxRF ${rxGHz.toFixed(4)} GHz is outside ${band}-band Rx range (${b.rx_min}–${b.rx_max} GHz).`);
+  return warnings;
+}
+
+function recalculate(knownOverride) {
+  const bucRaw  = parseFloat(document.getElementById('buc').value);
+  const loRaw   = parseFloat(document.getElementById('lo').value);
+  const ttfRaw  = parseFloat(document.getElementById('ttf').value);
+  const inUnit  = document.getElementById('inputUnit').value;
+  const outUnit = document.querySelector('[name="output_unit"]').value;
+  const sign    = document.getElementById('ttfDir').value === '+' ? 1 : -1;
+  const band    = document.getElementById('band').value;
+
+  if (isNaN(bucRaw) || isNaN(loRaw) || isNaN(ttfRaw)) return;
+
+  const buc = toMHz(bucRaw, inUnit);
+  const lo  = toMHz(loRaw,  inUnit);
+  const ttf = toMHz(ttfRaw, inUnit);
+
+  // Determine which field is the known one
+  const known = knownOverride || document.querySelector('[name="known_freq"]').value;
+
+  // Get the value of the known field
+  const knownFieldId = { TxIF: 'tx_if', TxRF: 'tx_rf', RxRF: 'rx_rf', RxIF: 'rx_if' }[known];
+  const knownInput = document.getElementById('result_' + knownFieldId);
+  const knownRaw   = parseFloat(knownInput?.value);
+
+  // Also accept the main input field if result fields are empty
+  let valueMHz;
+  if (!isNaN(knownRaw)) {
+    valueMHz = toMHz(knownRaw, outUnit);
+  } else {
+    const mainVal = parseFloat(document.querySelector('[name="known_value"]').value);
+    if (isNaN(mainVal)) return;
+    valueMHz = toMHz(mainVal, inUnit);
+  }
+
+  const res = calcAll(known, valueMHz, buc, lo, ttf, sign);
+
+  // Update display
+  const map = { tx_if: res.tx_if, tx_rf: res.tx_rf, rx_rf: res.rx_rf, rx_if: res.rx_if };
+  Object.entries(map).forEach(([id, mhzVal]) => {
+    const el = document.getElementById('result_' + id);
+    const unitEl = document.getElementById('unit_' + id);
+    if (el && id !== knownFieldId) {
+      el.value = parseFloat(fromMHz(mhzVal, outUnit).toFixed(6));
+    }
+    if (unitEl) unitEl.textContent = outUnit;
+  });
+
+  document.getElementById('liveCalcBadge').textContent = 'calculated';
+  document.getElementById('liveCalcBadge').className = 'badge bg-success small';
+  document.getElementById('ttfDirDisplay').textContent = sign > 0 ? '+' : '−';
+
+  // Update "Create Log Entry" button with pre-filled freq values
+  const logBtn = document.getElementById('createLogBtn');
+  if (logBtn) {
+    const p = new URLSearchParams({
+      tx_if: parseFloat(fromMHz(res.tx_if, outUnit).toFixed(6)),
+      tx_rf: parseFloat(fromMHz(res.tx_rf, outUnit).toFixed(6)),
+      rx_rf: parseFloat(fromMHz(res.rx_rf, outUnit).toFixed(6)),
+      rx_if: parseFloat(fromMHz(res.rx_if, outUnit).toFixed(6)),
+      freq_unit: outUnit,
+      band: band,
+    });
+    logBtn.href = '/logs/new?' + p.toString();
+    logBtn.classList.remove('d-none');
+  }
+
+  // Band warnings
+  const warnings = getBandWarnings(res.tx_rf, res.rx_rf, band);
+  const warningDiv = document.getElementById('bandWarnings');
+  const warningList = document.getElementById('warningList');
+  if (warnings.length) {
+    warningList.innerHTML = warnings.map(w => `<li>${w}</li>`).join('');
+    warningDiv.classList.remove('d-none');
+  } else {
+    warningDiv.classList.add('d-none');
+  }
+
+  // Sync the hidden form fields so server submit still works
+  document.querySelector('[name="known_freq"]').value = known;
+  const knownMainInput = document.querySelector('[name="known_value"]');
+  if (!isNaN(knownRaw)) knownMainInput.value = fromMHz(valueMHz, inUnit);
+}
+
+// ── Event wiring ───────────────────────────────────────────────────────────────
+['buc','lo','ttf'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', () => recalculate());
+});
+document.getElementById('ttfDir')?.addEventListener('change', () => recalculate());
+document.getElementById('inputUnit')?.addEventListener('change', () => recalculate());
+document.querySelector('[name="output_unit"]')?.addEventListener('change', () => recalculate());
+document.getElementById('band')?.addEventListener('change', () => recalculate());
+
+// When the user edits a result field, treat that field as the new known frequency
+document.querySelectorAll('.freq-result-field').forEach(el => {
+  el.addEventListener('input', () => {
+    const fieldMap = { tx_if: 'TxIF', tx_rf: 'TxRF', rx_rf: 'RxRF', rx_if: 'RxIF' };
+    const known = fieldMap[el.dataset.field];
+    if (known) recalculate(known);
+  });
+});
+
+// Run once on load if we already have results from a server-side calculation
+if (document.getElementById('result_tx_if')?.value) recalculate();
+
+</script>
+{% endblock %}
