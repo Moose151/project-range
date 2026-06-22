@@ -19,22 +19,9 @@
 <!-- OOB swap: keeps the buzzer alert in sync with table refreshes -->
 <div id="buzzerAlert" hx-swap-oob="true">
   {% if buzzer_active %}
-  <div class="alert alert-danger d-flex align-items-center gap-3 mb-3 buzzer-alert">
-    <i class="bi bi-volume-up-fill fs-3 blink-icon"></i>
-    <div>
-      <strong class="fs-5">BUZZER ON — Signals Active</strong><br>
-      <span class="small">One or more signals are currently <strong>Up</strong> on a live range.
-      {% if range_state == 'Live' %}RF is transmitting. Ensure all safety procedures are followed.{% endif %}
-      </span>
-    </div>
-  </div>
-  {% elif range_state != 'Standby/Off' %}
-  <div class="alert alert-secondary d-flex align-items-center gap-3 mb-3">
-    <i class="bi bi-volume-mute-fill fs-3"></i>
-    <div>
-      <strong>BUZZER OFF — No Signals Active</strong><br>
-      <span class="small text-muted">No signals are currently Up.</span>
-    </div>
+  <div class="alert alert-danger buzzer-bar d-flex align-items-center gap-2 py-1 px-3 mb-3">
+    <i class="bi bi-volume-up-fill"></i>
+    <span class="small"><strong>Buzzer on</strong> — signal(s) Up{% if range_state == 'Live' %}, RF transmitting{% endif %}.</span>
   </div>
   {% endif %}
 </div>

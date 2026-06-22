@@ -15,24 +15,11 @@
   </div>
 </div>
 
-<!-- Global buzzer alert -->
+<!-- Global buzzer indicator (compact) -->
 {% if buzzer_active %}
-<div class="alert alert-danger d-flex align-items-center gap-3 mb-3 buzzer-alert" id="buzzerAlert">
-  <i class="bi bi-volume-up-fill fs-3 blink-icon"></i>
-  <div>
-    <strong class="fs-5">BUZZER ON — Signals Active</strong><br>
-    <span class="small">One or more signals are currently <strong>Up</strong> on a live range.
-    {% if range_state == 'Live' %}RF is transmitting. Ensure all safety procedures are followed.{% endif %}
-    </span>
-  </div>
-</div>
-{% elif range_state != 'Standby/Off' %}
-<div class="alert alert-secondary d-flex align-items-center gap-3 mb-3" id="buzzerAlert">
-  <i class="bi bi-volume-mute-fill fs-3"></i>
-  <div>
-    <strong>BUZZER OFF — No Signals Active</strong><br>
-    <span class="small text-muted">No signals are currently Up.</span>
-  </div>
+<div class="alert alert-danger buzzer-bar d-flex align-items-center gap-2 py-1 px-3 mb-3" id="buzzerAlert">
+  <i class="bi bi-volume-up-fill"></i>
+  <span class="small"><strong>Buzzer on</strong> — signal(s) Up{% if range_state == 'Live' %}, RF transmitting{% endif %}.</span>
 </div>
 {% else %}
 <div id="buzzerAlert"></div>
@@ -57,7 +44,7 @@
       <div class="card-body">
         <div class="text-muted small mb-1">
           Active Signals
-          {% if buzzer_active %}<i class="bi bi-volume-up-fill text-danger blink-icon ms-1"></i>{% endif %}
+          {% if buzzer_active %}<i class="bi bi-volume-up-fill text-danger ms-1"></i>{% endif %}
         </div>
         <div class="fw-bold fs-5 {% if buzzer_active %}text-danger{% else %}text-success{% endif %}">
           {{ signals | selectattr("signal_status", "equalto", "Up") | list | length }}
@@ -130,6 +117,8 @@
         </div>
         <div class="serial-group-controls d-flex gap-1 align-items-center"></div>
         <div class="serial-actions ms-auto d-flex gap-1 align-items-center"></div>
+        <button type="button" class="widget-collapse-btn btn btn-sm btn-link link-secondary p-0 ms-1"
+                title="Minimise / expand" onclick="toggleCollapse(this)"><i class="bi bi-chevron-up"></i></button>
       </div>
       <div class="serial-bodies">
         <div class="serial-body-wrap" data-serial-body="{{ sval }}" data-serial-title="{{ serial.title if serial else 'All Signals' }}">
@@ -138,7 +127,7 @@
             {% if serial %}
             <span class="text-muted small me-1">Started {{ serial.opened_at.strftime('%H:%M %d/%m') }}</span>
             <span class="htmx-indicator spinner-border spinner-border-sm text-secondary me-1" role="status" style="width:0.7rem;height:0.7rem"></span>
-            {% if w_buzzer %}<span class="badge bg-danger blink-icon">BUZZER</span>{% endif %}
+            {% if w_buzzer %}<span class="badge bg-danger">BUZZER</span>{% endif %}
             <a href="/logs/new?serial_id={{ serial.id }}" class="btn btn-sm btn-outline-success py-0 px-2" title="Add signal log"><i class="bi bi-plus-lg"></i></a>
             <a href="/logs?serial_id={{ serial.id }}" class="btn btn-sm btn-outline-secondary py-0 px-2" title="View logs"><i class="bi bi-journal-text"></i></a>
             <form method="post" action="/serials/{{ serial.id }}/end" class="d-inline"
@@ -202,6 +191,7 @@ function saveLayout() {
       type: tabs.length > 1 ? 'tabbed' : 'standalone',
       serials: ids,
       activeTab: g.dataset.activeTab || ids[0],
+      collapsed: g.classList.contains('collapsed'),
     });
   });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(groups));
@@ -301,6 +291,8 @@ function splitSerialOut(serialId) {
         <div class="serial-tabbar d-flex gap-1 flex-wrap align-items-center"></div>
         <div class="serial-group-controls d-flex gap-1 align-items-center"></div>
         <div class="serial-actions ms-auto d-flex gap-1 align-items-center"></div>
+        <button type="button" class="widget-collapse-btn btn btn-sm btn-link link-secondary p-0 ms-1"
+                title="Minimise / expand" onclick="toggleCollapse(this)"><i class="bi bi-chevron-up"></i></button>
       </div>
       <div class="serial-bodies"></div>
     </div>`;
@@ -370,6 +362,14 @@ function splitActive(groupId) {
   if (group) splitSerialOut(group.dataset.activeTab);
 }
 
+// ── Minimise / expand a widget ──────────────────────────────────────────────
+function toggleCollapse(btn) {
+  const group = btn.closest('.serial-widget-group');
+  if (!group) return;
+  group.classList.toggle('collapsed');
+  saveLayout();
+}
+
 // ── Restore saved layout on page load ────────────────────────────────────
 // Container background is the "split out" drop target (group drops stopPropagation).
 (function () {
@@ -407,13 +407,15 @@ function restoreLayout() {
     if (g.activeTab) setActiveTab(targetGroup, g.activeTab);
   }
 
-  // Pass 2: restore widget order
+  // Pass 2: restore widget order + collapsed state
   const container = document.getElementById('serialWidgetsContainer');
   if (!container) return;
   for (const g of groups) {
     const firstId = g.serials && g.serials[0];
     const el = firstId ? groupOf(firstId) : null;
-    if (el && el.parentElement === container) container.appendChild(el);
+    if (!el) continue;
+    if (el.parentElement === container) container.appendChild(el);
+    el.classList.toggle('collapsed', !!g.collapsed);
   }
 }
 
