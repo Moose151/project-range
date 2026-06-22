@@ -363,10 +363,18 @@ function splitActive(groupId) {
 }
 
 // ── Minimise / expand a widget ──────────────────────────────────────────────
+// Sets display directly (not only via CSS) so it works even if app.css is cached.
+function setCollapsed(group, collapsed) {
+  group.classList.toggle('collapsed', collapsed);
+  const bodies = group.querySelector('.serial-bodies');
+  if (bodies) bodies.style.display = collapsed ? 'none' : '';
+  const icon = group.querySelector('.widget-collapse-btn .bi');
+  if (icon) { icon.classList.toggle('bi-chevron-up', !collapsed); icon.classList.toggle('bi-chevron-down', collapsed); }
+}
 function toggleCollapse(btn) {
   const group = btn.closest('.serial-widget-group');
   if (!group) return;
-  group.classList.toggle('collapsed');
+  setCollapsed(group, !group.classList.contains('collapsed'));
   saveLayout();
 }
 
@@ -415,7 +423,7 @@ function restoreLayout() {
     const el = firstId ? groupOf(firstId) : null;
     if (!el) continue;
     if (el.parentElement === container) container.appendChild(el);
-    el.classList.toggle('collapsed', !!g.collapsed);
+    setCollapsed(el, !!g.collapsed);
   }
 }
 
