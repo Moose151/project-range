@@ -6,6 +6,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-in-production-please")
 DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{BASE_DIR}/range.db")
 SESSION_TIMEOUT_MINUTES = int(os.environ.get("SESSION_TIMEOUT_MINUTES", "480"))
+# Cookie lifetime. Normal sessions still expire after SESSION_TIMEOUT_MINUTES of
+# inactivity (enforced server-side); "remember this terminal" sessions skip that
+# inactivity check and persist up to this cookie lifetime.
+SESSION_MAX_AGE_DAYS = int(os.environ.get("SESSION_MAX_AGE_DAYS", "30"))
 APP_VERSION = "MVP / Beta"
 
 FREQUENCY_BANDS = {

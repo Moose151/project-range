@@ -279,7 +279,7 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 - [ ] Device ping / network status checks
 - [x] Shift handover module (print/PDF summary of signals and state at shift change) — see Implemented Features
 - [ ] Active Directory / SSO authentication
-- [ ] Session: "remember this terminal" option for thin clients
+- [x] Session: "remember this terminal" option for thin clients — checkbox on the login page; when set, `session["remember"]` makes `session_is_expired()` skip the inactivity timeout, so a fixed terminal stays signed in up to the cookie lifetime (`SESSION_MAX_AGE_DAYS`, default 30). Normal logins still expire after `SESSION_TIMEOUT_MINUTES` of inactivity.
 - [ ] More detailed permissions model beyond operator/supervisor
 - [ ] Backup and restore tooling
 - [ ] Windows Server deployment packaging (Waitress/NSSM service)
@@ -326,7 +326,8 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 |---|---|---|
 | `SECRET_KEY` | `dev-secret-change-in-production-please` | Session signing key |
 | `DATABASE_URL` | `sqlite:///range.db` | SQLAlchemy DB connection |
-| `SESSION_TIMEOUT_MINUTES` | `480` (8 hours) | Auto-logout after inactivity |
+| `SESSION_TIMEOUT_MINUTES` | `480` (8 hours) | Auto-logout after inactivity (skipped for "remember this terminal" sessions) |
+| `SESSION_MAX_AGE_DAYS` | `30` | Session cookie lifetime; the ceiling for "remember this terminal" sessions |
 
 ---
 
