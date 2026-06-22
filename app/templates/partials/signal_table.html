@@ -22,23 +22,23 @@
   <thead class="table-secondary">
     <tr>
       <th></th>
-      <th>Signal</th>
-      <th>Source</th>
-      <th>Status</th>
-      <th>TxIF</th>
-      <th>TxRF</th>
-      <th>RxRF</th>
-      <th>RxIF</th>
-      <th>Unit</th>
-      <th>Band</th>
-      <th>Mod</th>
-      <th>Sym Rate</th>
-      <th>FEC</th>
-      <th>Antenna</th>
-      <th>Power</th>
-      <th>Eb/No</th>
-      <th>Updated</th>
-      <th>Warn</th>
+      <th data-col="signal">Signal</th>
+      <th data-col="source">Source</th>
+      <th data-col="status">Status</th>
+      <th data-col="tx_if">TxIF</th>
+      <th data-col="tx_rf">TxRF</th>
+      <th data-col="rx_rf">RxRF</th>
+      <th data-col="rx_if">RxIF</th>
+      <th data-col="unit">Unit</th>
+      <th data-col="band">Band</th>
+      <th data-col="mod">Mod</th>
+      <th data-col="sym">Sym Rate</th>
+      <th data-col="fec">FEC</th>
+      <th data-col="antenna">Antenna</th>
+      <th data-col="power">Power</th>
+      <th data-col="ebno">Eb/No</th>
+      <th data-col="updated">Updated</th>
+      <th data-col="warn">Warn</th>
     </tr>
   </thead>
   <tbody>
@@ -62,9 +62,9 @@
           <i class="bi bi-pencil-square"></i>
         </button>
       </td>
-      <td class="fw-semibold"><a href="/logs?signal_name={{ log.signal_name }}" class="text-reset text-decoration-none" title="View history for {{ log.signal_name }}">{{ log.signal_name }}</a></td>
-      <td class="text-muted small">{{ log.source or '—' }}</td>
-      <td style="min-width:150px">
+      <td data-col="signal" class="fw-semibold"><a href="/logs?signal_name={{ log.signal_name }}" class="text-reset text-decoration-none" title="View history for {{ log.signal_name }}">{{ log.signal_name }}</a></td>
+      <td data-col="source" class="text-muted small">{{ log.source or '—' }}</td>
+      <td data-col="status" style="min-width:150px">
         <div class="d-flex align-items-center gap-2">
           <div class="form-check form-switch mb-0" title="Toggle Up / Down">
             <input class="form-check-input" type="checkbox" role="switch"
@@ -80,17 +80,17 @@
           </span>
         </div>
       </td>
-      <td>{{ log.tx_if if log.tx_if is not none else '—' }}</td>
-      <td>{{ log.tx_rf if log.tx_rf is not none else '—' }}</td>
-      <td>{{ log.rx_rf if log.rx_rf is not none else '—' }}</td>
-      <td>{{ log.rx_if if log.rx_if is not none else '—' }}</td>
-      <td class="text-muted">{{ log.freq_unit }}</td>
-      <td>{{ log.band or '—' }}</td>
-      <td>{{ log.modulation or '—' }}</td>
-      <td>{{ log.symbol_rate or '—' }}</td>
-      <td>{{ log.fec or '—' }}</td>
-      <td class="text-muted small">{{ log.antenna or '—' }}</td>
-      <td style="min-width:160px">
+      <td data-col="tx_if">{{ log.tx_if if log.tx_if is not none else '—' }}</td>
+      <td data-col="tx_rf">{{ log.tx_rf if log.tx_rf is not none else '—' }}</td>
+      <td data-col="rx_rf">{{ log.rx_rf if log.rx_rf is not none else '—' }}</td>
+      <td data-col="rx_if">{{ log.rx_if if log.rx_if is not none else '—' }}</td>
+      <td data-col="unit" class="text-muted">{{ log.freq_unit }}</td>
+      <td data-col="band">{{ log.band or '—' }}</td>
+      <td data-col="mod">{{ log.modulation or '—' }}</td>
+      <td data-col="sym">{{ log.symbol_rate or '—' }}</td>
+      <td data-col="fec">{{ log.fec or '—' }}</td>
+      <td data-col="antenna" class="text-muted small">{{ log.antenna or '—' }}</td>
+      <td data-col="power" style="min-width:160px">
         <div class="input-group input-group-sm flex-nowrap" style="width:160px">
           <button type="button" class="btn btn-outline-secondary px-1" title="Decrease power by 1"
                   onclick="stepQuickPower('{{ row_id }}', -1)"><i class="bi bi-dash-lg"></i></button>
@@ -104,9 +104,9 @@
           <span class="input-group-text px-1">{{ log.power_unit }}</span>
         </div>
       </td>
-      <td>{{ log.eb_no if log.eb_no is not none else '—' }}</td>
-      <td class="text-muted small">{{ log.timestamp.strftime('%H:%M %d/%m') }}</td>
-      <td>
+      <td data-col="ebno">{{ log.eb_no if log.eb_no is not none else '—' }}</td>
+      <td data-col="updated" class="text-muted small">{{ log.timestamp.strftime('%H:%M %d/%m') }}</td>
+      <td data-col="warn">
         {% if log.warning_flags %}
           <span class="text-warning" title="{{ log.warning_flags }}"><i class="bi bi-exclamation-triangle-fill"></i></span>
         {% endif %}

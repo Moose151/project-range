@@ -6,6 +6,13 @@
   <h4 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Live Range Dashboard</h4>
   <div class="d-flex gap-2 align-items-center">
     <span class="text-muted small" id="lastRefresh">Auto-refreshing every 10s</span>
+    <div class="dropdown">
+      <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+              data-bs-toggle="dropdown" data-bs-auto-close="outside" title="Show / hide table columns">
+        <i class="bi bi-layout-three-columns me-1"></i>Columns
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end p-2" id="columnMenu" style="max-height:60vh;overflow:auto"></ul>
+    </div>
     <a href="/logs/note" class="btn btn-sm btn-outline-warning">
       <i class="bi bi-sticky me-1"></i>Note
     </a>
@@ -313,6 +320,42 @@ function splitActive(groupId) {
   if (group) splitSerialOut(group.dataset.activeTab);
 }
 
+// ── Column show/hide (applies to every signal table, persisted) ─────────────
+const COL_DEFS = [
+  ['signal','Signal'],['source','Source'],['status','Status'],['tx_if','TxIF'],
+  ['tx_rf','TxRF'],['rx_rf','RxRF'],['rx_if','RxIF'],['unit','Unit'],['band','Band'],
+  ['mod','Mod'],['sym','Sym Rate'],['fec','FEC'],['antenna','Antenna'],['power','Power'],
+  ['ebno','Eb/No'],['updated','Updated'],['warn','Warn'],
+];
+const COLS_KEY = 'dashboardHiddenCols';
+function getHiddenCols() {
+  try { return new Set(JSON.parse(localStorage.getItem(COLS_KEY) || '[]')); } catch (e) { return new Set(); }
+}
+function applyColumnVisibility() {
+  const hidden = getHiddenCols();
+  document.querySelectorAll('.signal-table [data-col]').forEach(el => {
+    el.style.display = hidden.has(el.dataset.col) ? 'none' : '';
+  });
+}
+function onColToggle(cb) {
+  const hidden = getHiddenCols();
+  if (cb.checked) hidden.delete(cb.value); else hidden.add(cb.value);
+  localStorage.setItem(COLS_KEY, JSON.stringify([...hidden]));
+  applyColumnVisibility();
+}
+function buildColumnMenu() {
+  const menu = document.getElementById('columnMenu');
+  if (!menu) return;
+  const hidden = getHiddenCols();
+  menu.innerHTML = COL_DEFS.map(([k, label]) =>
+    `<li><label class="dropdown-item d-flex gap-2 align-items-center mb-0" style="cursor:pointer">
+       <input type="checkbox" class="form-check-input mt-0" value="${k}" ${hidden.has(k) ? '' : 'checked'} onchange="onColToggle(this)">
+       ${label}
+     </label></li>`).join('');
+}
+// Re-apply after every HTMX swap (the 10s poll rebuilds the table rows).
+document.body.addEventListener('htmx:afterSwap', applyColumnVisibility);
+
 // ── Minimise / expand a widget ──────────────────────────────────────────────
 // Sets display directly (not only via CSS) so it works even if app.css is cached.
 function setCollapsed(group, collapsed) {
@@ -347,6 +390,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.serial-widget-group').forEach(g => { registerGroupDnD(g); initGroup(g); });
   restoreLayout();
   refreshAllControls();
+  buildColumnMenu();
+  applyColumnVisibility();
 });
 
 function restoreLayout() {
