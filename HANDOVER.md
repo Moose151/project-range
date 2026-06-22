@@ -50,6 +50,9 @@ project-range/
 │   │   │                    #   signal registry, frequency templates
 │   │   ├── audit.py         # GET /audit — audit log viewer (supervisor only)
 │   │   ├── sessions.py      # LEGACY — kept for old data; no UI link (sessions replaced by serials)
+│   │   ├── docs.py              # GET/POST /docs, /docs/new, /docs/{slug}, /docs/{slug}/edit,
+│   │   │                    #   /docs/{slug}/history, /docs/{slug}/print, /docs/proposals,
+│   │   │                    #   /docs/versions/{id}/approve|reject|restore
 │   │   └── users.py         # GET/POST /users, /users/new, /users/{id}/toggle, /users/{id}/reset-password
 │   ├── templates/
 │   │   ├── base.html                    # Shared layout: nav, range state banner (HTMX serial badge),
@@ -117,12 +120,28 @@ project-range/
 | `SignalSource` | Supervisor-managed list of signal sources (modems, signal generators) |
 | `AntennaType` | Supervisor-managed list of transmit antennas |
 | `FrequencyTemplate` | Saved BUC/LO/TTF plans for the RF calculator (managed via Config page) |
+| `DocPage` | Documentation wiki page (title, slug, Markdown content, published status) |
+| `DocVersion` | Version history for a doc page (content snapshot, approval status, created/approved by) |
 | `LogSession` | **LEGACY** — old named sessions; kept for old data compatibility, no active UI |
-| `SignalPackage` | Named collection of pre-configured signal definitions (saved as JSON, importable) |
+| `SignalPackage` | Named collection of pre-configured signal definitions (saved as JSON, importable). Now includes package-level RF config: band, antenna, BUC, LO, TTF, TTF direction, freq unit |
 | `SignalPackageEntry` | One signal definition within a package (all params: name, band, freq, power, mod, etc.) |
 | `Serial` | An operational run: has a title, assigned packages, open/close times, log entries |
 | `SerialPackage` | Junction: which packages are assigned to which serial |
 | `AuditLog` | System audit trail (login, edits, state changes, etc.) |
+
+### Package-level RF Configuration (IMPORTANT)
+
+`SignalPackage` stores band, antenna, BUC, LO, TTF, TTF direction, and freq unit at the package level — these are shared by **all signals** in the package (all signals go on the same satellite antenna and use the same transponder plan).
+
+**On log form (`/logs/new`)**: when a serial is selected, `GET /serials/{id}/rf-config` is called (JSON) and the response pre-fills BUC/LO/TTF/band/antenna. The operator only needs to enter one known frequency; the other three resolve automatically via the existing embedded calculator JS.
+
+**On serial start**: `serial_start` copies `pkg.band` and `pkg.antenna` into the initial `SerialStart` log entries for each signal. Existing per-signal freq values (`tx_if` etc.) on `SignalPackageEntry` are still respected when present.
+
+**On dashboard quick-edit**: the fragment endpoint passes `pkg_rf` to the `signal_table.html` partial; the Antenna select defaults to the package antenna when the log row has no antenna set.
+
+Per-signal band and antenna fields are removed from the package signal add/edit form (but the DB columns remain for backward compatibility). Band and Antenna are now set at the package level only.
+
+---
 
 ### Signal Package → Serial → SignalLog data flow (IMPORTANT)
 
@@ -234,6 +253,8 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 - [x] **Log form pre-selects serial via query param**: `GET /logs/new?serial_id=N` pre-selects serial N in the Serial dropdown (without the param, the first active serial is auto-selected).
 - [x] **Drop-merge-target visual**: `drop-merge-target` CSS class added; buzzer alert has a pulsing box-shadow animation.
 - [x] **HTMX loading spinner**: per-serial widget header shows a spinner while the 10s poll is in flight.
+- [x] **Documentation / Wiki module** (`/docs`): Markdown pages with version history, supervisor direct edit, operator edit proposals, approval queue, printable view. 7 seed pages covering core procedures. Nav link visible to all users; pending-proposal badge for supervisors.
+- [x] **Package-level RF configuration**: `SignalPackage` now stores band, antenna, BUC, LO, TTF, TTF direction, and freq unit shared by all signals in the package. When a serial's log entry is created, BUC/LO/TTF/band/antenna are auto-populated from the package — operators only enter one known frequency and the rest resolve automatically. Dashboard quick-edit defaults the Antenna select from the package config. Serial start log entries inherit package-level band and antenna.
 
 ---
 
@@ -246,7 +267,6 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 ### Features
 
 - [ ] PostgreSQL migration (switch DATABASE_URL env var, test thoroughly)
-- [ ] Documentation / wiki module (pages, version history, operator proposals, supervisor approval)
 - [ ] Power warning thresholds per-signal or per-template
 - [ ] Formal range report export (PDF or structured XLSX)
 - [ ] Device ping / network status checks
@@ -266,7 +286,7 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 - [x] Log list: column sort — `sort` + `sort_dir` query params; sortable columns: timestamp, signal_name, signal_status, band; icon shows current sort direction
 - [x] Keyboard shortcut `N` → `/logs/new` (suppressed when focus is in input/textarea/select)
 - [x] Calculator: "Create Log Entry" button appears in RF calculator results header after a calculation; links to `/logs/new?tx_if=…&tx_rf=…&rx_rf=…&rx_if=…&freq_unit=…&band=…` which pre-fills the frequency fields on the form
-- [ ] Power chain: save/load named templates
+- [ ] Power chain: save/load named templates (model stub ready — `PowerChainTemplate` not yet wired to UI)
 - [x] Favicon: SVG signal-arcs icon (`/static/favicon.svg`), served via `<link rel="icon" type="image/svg+xml">`
 - [ ] Mobile/tablet responsive polish (currently desktop-first but not broken)
 - [x] Loading indicator during HTMX poll refresh (spinner in widget header)

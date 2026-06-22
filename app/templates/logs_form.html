@@ -62,10 +62,14 @@
             </div>
             <div class="col-md-2">
               <label class="form-label">Band</label>
-              <select class="form-select" name="band">
+              <select class="form-select" name="band" id="field_band">
                 <option value="">—</option>
                 {% for b in bands %}
-                <option value="{{ b }}" {% if log_entry and log_entry.band == b %}selected{% elif not log_entry and prefill and prefill.band == b %}selected{% endif %}>{{ b }}</option>
+                <option value="{{ b }}"
+                  {% if log_entry and log_entry.band == b %}selected
+                  {% elif not log_entry and prefill and prefill.band == b %}selected
+                  {% elif not log_entry and not prefill and pkg_rf and pkg_rf.band == b %}selected
+                  {% endif %}>{{ b }}</option>
                 {% endfor %}
               </select>
             </div>
@@ -108,9 +112,12 @@
             <div class="col-12 mb-1">
               <span class="small text-muted fw-semibold">
                 <i class="bi bi-sliders me-1"></i>Conversion Values
-                {% if last_calc and last_calc.buc %}
+                {% if pkg_rf %}
+                <span class="badge bg-info text-dark ms-1">from package</span>
+                {% elif last_calc and last_calc.buc %}
                 <span class="badge bg-secondary ms-1">from last calculation</span>
                 {% endif %}
+                <span id="rfConfigSource" class="badge bg-info text-dark ms-1" style="display:none">from package</span>
               </span>
             </div>
             <div class="col-6 col-sm-3 col-lg-2">
@@ -223,10 +230,13 @@
             </div>
             <div class="col-6">
               <label class="form-label">Antenna</label>
-              <select class="form-select" name="antenna">
+              <select class="form-select" name="antenna" id="field_antenna">
                 <option value="">— Not specified —</option>
                 {% for a in antenna_types %}
-                <option value="{{ a }}" {% if log_entry and log_entry.antenna == a %}selected{% endif %}>{{ a }}</option>
+                <option value="{{ a }}"
+                  {% if log_entry and log_entry.antenna == a %}selected
+                  {% elif not log_entry and pkg_rf and pkg_rf.antenna == a %}selected
+                  {% endif %}>{{ a }}</option>
                 {% endfor %}
               </select>
             </div>
@@ -380,5 +390,52 @@ document.querySelectorAll('.log-freq-field').forEach(el => {
     if (filled) recalcLogFreqs(filled);
   });
 });
+
+// ── Auto-load package RF config when serial changes ─────────────────────────
+function applyRFConfig(cfg) {
+  if (!cfg) return;
+  const setValue = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val === null || val === undefined ? '' : val;
+  };
+
+  setValue('fc_buc', cfg.buc);
+  setValue('fc_lo', cfg.lo);
+  setValue('fc_ttf', cfg.ttf);
+  setValue('fc_ttf_dir', cfg.ttf_direction || '+');
+  setValue('fc_unit', cfg.freq_unit || 'MHz');
+  setValue('field_band', cfg.band);
+  setValue('field_antenna', cfg.antenna);
+
+  const hasCfg = cfg.buc !== null || cfg.lo !== null || cfg.ttf !== null;
+  const badge = document.getElementById('rfConfigSource');
+  if (badge) badge.style.display = hasCfg ? 'inline-block' : 'none';
+
+  // Recalculate if a freq field already has a value
+  const fields = ['tx_if','tx_rf','rx_rf','rx_if'];
+  const filled = fields.find(f => document.getElementById('lf_' + f)?.value !== '');
+  if (filled) recalcLogFreqs(filled);
+}
+
+const serialSelect = document.querySelector('select[name="serial_id"]');
+const signalNameInput = document.querySelector('[name="signal_name"]');
+function loadSerialRFConfig() {
+  const sid = serialSelect?.value;
+  if (!sid) {
+    applyRFConfig({buc:null, lo:null, ttf:null, ttf_direction:'+', freq_unit:'MHz', band:null, antenna:null});
+    return;
+  }
+  const params = new URLSearchParams();
+  if (signalNameInput?.value) params.set('signal_name', signalNameInput.value);
+  const query = params.toString();
+  fetch(`/serials/${sid}/rf-config${query ? '?' + query : ''}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(cfg => { if (cfg) applyRFConfig(cfg); })
+    .catch(() => {});
+}
+if (serialSelect) {
+  serialSelect.addEventListener('change', loadSerialRFConfig);
+}
+signalNameInput?.addEventListener('change', loadSerialRFConfig);
 </script>
 {% endblock %}

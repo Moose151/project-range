@@ -92,6 +92,15 @@ class SignalPackage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    # Package-level RF configuration — shared by all signals in this package
+    band: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    antenna: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    buc: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lo: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ttf: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ttf_direction: Mapped[str] = mapped_column(String(4), default="+")
+    freq_unit: Mapped[str] = mapped_column(String(4), default="MHz")
+
     created_by: Mapped[User] = relationship("User", foreign_keys="SignalPackage.created_by_id")
     signals: Mapped[list["SignalPackageEntry"]] = relationship(
         "SignalPackageEntry", back_populates="package",

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials
 from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial
+from app.rf_config import serial_package_rf_config
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -117,6 +118,7 @@ def _dashboard_ctx(db: Session) -> dict:
                 "serial": serial,
                 "signals": signals,
                 "buzzer_active": buzzer,
+                "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial.id, signals),
             })
     else:
         # No serials running — show all logs (legacy / no-serial mode)
@@ -170,6 +172,19 @@ async def dashboard_fragment_legacy(
     })
 
 
+def _pkg_rf_for_serial(db: Session, serial_id: int) -> dict | None:
+    """Return the first configured package-level RF plan for a serial."""
+    return serial_package_rf_config(db, serial_id)
+
+
+def _pkg_rf_by_signal(db: Session, serial_id: int, signals: list[SignalLog]) -> dict:
+    """Map each displayed signal to the RF plan of its assigned package."""
+    return {
+        log.signal_name: serial_package_rf_config(db, serial_id, log.signal_name)
+        for log in signals
+    }
+
+
 @router.get("/dashboard/fragment/{serial_id}", response_class=HTMLResponse)
 async def dashboard_fragment(
     serial_id: int,
@@ -186,6 +201,8 @@ async def dashboard_fragment(
         "signals": signals,
         "buzzer_active": _buzzer_active(signals, range_state),
         "serial_id": serial_id,
+        "pkg_rf": _pkg_rf_for_serial(db, serial_id),
+        "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial_id, signals),
     })
 
 
@@ -210,12 +227,12 @@ async def dashboard_quick_update(
     range_state = get_current_range_state(db)
 
     # Copy freq/band data from the latest existing entry for this signal
-    latest = (
-        db.query(SignalLog)
-        .filter(SignalLog.signal_name == signal_name, SignalLog.is_deleted == False)
-        .order_by(SignalLog.timestamp.desc())
-        .first()
+    latest_query = db.query(SignalLog).filter(
+        SignalLog.signal_name == signal_name, SignalLog.is_deleted == False,
     )
+    if serial_id is not None:
+        latest_query = latest_query.filter(SignalLog.serial_id == serial_id)
+    latest = latest_query.order_by(SignalLog.timestamp.desc()).first()
 
     # Exclusivity group enforcement: if setting to Up, auto-down others in the same group
     if signal_status == "Up":
@@ -230,12 +247,12 @@ async def dashboard_quick_update(
                 .all()
             )
             for sib in siblings:
-                sib_latest = (
-                    db.query(SignalLog)
-                    .filter(SignalLog.signal_name == sib.name, SignalLog.is_deleted == False)
-                    .order_by(SignalLog.timestamp.desc())
-                    .first()
+                sib_query = db.query(SignalLog).filter(
+                    SignalLog.signal_name == sib.name, SignalLog.is_deleted == False,
                 )
+                if serial_id is not None:
+                    sib_query = sib_query.filter(SignalLog.serial_id == serial_id)
+                sib_latest = sib_query.order_by(SignalLog.timestamp.desc()).first()
                 if sib_latest and sib_latest.signal_status == "Up":
                     db.add(SignalLog(
                         operator_id=current_user.id,
@@ -254,9 +271,12 @@ async def dashboard_quick_update(
                         power=sib_latest.power,
                         power_unit=sib_latest.power_unit,
                         eb_no=sib_latest.eb_no,
+                        source=sib_latest.source,
+                        antenna=sib_latest.antenna,
                         notes=f"Auto-downed: {signal_name} came Up (group: {sig_reg.exclusivity_group})",
                         entry_type="Automatic",
                         updated_by_id=current_user.id,
+                        serial_id=serial_id,
                     ))
 
     new_entry = SignalLog(
@@ -302,6 +322,10 @@ async def dashboard_quick_update(
         "signals": signals,
         "buzzer_active": ctx["buzzer_active"],  # global buzzer for OOB swap
         "serial_id": effective_serial_id,
+        "pkg_rf": _pkg_rf_for_serial(db, effective_serial_id) if effective_serial_id else None,
+        "pkg_rf_by_signal": (
+            _pkg_rf_by_signal(db, effective_serial_id, signals) if effective_serial_id else {}
+        ),
     })
 
 

@@ -190,8 +190,10 @@
                 <select class="form-select form-select-sm" name="antenna" style="width:110px">
                   <option value="">—</option>
                   {% if antenna_types is defined %}
+                  {% set signal_pkg_rf = pkg_rf_by_signal.get(log.signal_name) if pkg_rf_by_signal is defined else none %}
+                  {% set default_ant = log.antenna or (signal_pkg_rf.antenna if signal_pkg_rf else (pkg_rf.antenna if pkg_rf is defined and pkg_rf else none)) %}
                   {% for a in antenna_types %}
-                  <option value="{{ a }}" {% if log.antenna == a %}selected{% endif %}>{{ a }}</option>
+                  <option value="{{ a }}" {% if default_ant == a %}selected{% endif %}>{{ a }}</option>
                   {% endfor %}
                   {% endif %}
                 </select>

@@ -11,6 +11,7 @@ import openpyxl
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials
 from app.models import User, SignalLog, Signal, AuditLog, SignalStatus, Role, ModulationType, FecType, SignalSource, AntennaType, LogSession, Serial
+from app.rf_config import serial_package_rf_config
 
 router = APIRouter(prefix="/logs")
 templates = Jinja2Templates(directory="app/templates")
@@ -177,10 +178,18 @@ async def log_new(
     active_serials = get_active_serials(db)
     all_serials = db.query(Serial).filter(Serial.closed_at == None).order_by(Serial.opened_at.desc()).all()
     preselect_serial_id = serial_id if serial_id else (active_serials[0].id if active_serials else None)
+
+    # Look up the package RF config for the preselected serial so it can pre-fill BUC/LO/TTF
+    pkg_rf = serial_package_rf_config(db, preselect_serial_id) if preselect_serial_id else None
+    if pkg_rf:
+        # Package RF config takes priority over the user's last calculator values.
+        last_calc = {**last_calc, **{k: v for k, v in pkg_rf.items() if v is not None}}
+
     # Freq values from calculator query params override last_calc and log_entry defaults
     prefill = {
         "tx_if": tx_if, "tx_rf": tx_rf, "rx_rf": rx_rf, "rx_if": rx_if,
-        "freq_unit": freq_unit or "MHz", "band": band,
+        "freq_unit": freq_unit or (pkg_rf.get("freq_unit") if pkg_rf else "MHz"),
+        "band": band or (pkg_rf.get("band") if pkg_rf else ""),
     } if any([tx_if, tx_rf, rx_rf, rx_if]) else None
     return templates.TemplateResponse(request, "logs_form.html", {
         "user": current_user,
@@ -200,6 +209,7 @@ async def log_new(
         "bands": BANDS,
         "last_calc": last_calc,
         "prefill": prefill,
+        "pkg_rf": pkg_rf,
         "page_name": "logs",
     })
 

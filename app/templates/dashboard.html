@@ -157,7 +157,7 @@
            hx-trigger="every 10s"
            hx-swap="innerHTML"
            hx-on::after-request="updateRefreshTime()">
-        {% with signals=w_signals, buzzer_active=w_buzzer, serial_id=(serial.id if serial else none) %}
+        {% with signals=w_signals, buzzer_active=w_buzzer, serial_id=(serial.id if serial else none), pkg_rf_by_signal=(item.pkg_rf_by_signal if serial else {}) %}
         {% include "partials/signal_table.html" %}
         {% endwith %}
       </div>
