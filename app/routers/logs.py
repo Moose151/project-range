@@ -12,6 +12,7 @@ from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials
 from app.models import User, SignalLog, Signal, AuditLog, SignalStatus, Role, ModulationType, FecType, SignalSource, AntennaType, LogSession, Serial
 from app.rf_config import serial_package_rf_config
+from app.signal_warnings import warning_flags_for
 
 router = APIRouter(prefix="/logs")
 templates = Jinja2Templates(directory="app/templates")
@@ -263,6 +264,7 @@ async def log_create(
         activity_ref=activity_ref.strip() or None,
         notes=notes.strip() or None,
         entry_type="Manual",
+        warning_flags=warning_flags_for(db, signal_name.strip(), power, power_unit),
     )
     db.add(entry)
     db.flush()
@@ -361,6 +363,7 @@ async def log_update(
     log_entry.eb_no = eb_no
     log_entry.activity_ref = activity_ref.strip() or None
     log_entry.notes = notes.strip() or None
+    log_entry.warning_flags = warning_flags_for(db, log_entry.signal_name, power, power_unit)
     log_entry.updated_at = datetime.utcnow()
     log_entry.updated_by_id = current_user.id
 

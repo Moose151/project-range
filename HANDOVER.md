@@ -116,7 +116,7 @@ project-range/
 | Model | Purpose |
 |---|---|
 | `User` | Auth, roles (operator/supervisor), active flag |
-| `Signal` | Signal registry: named signals with defaults and exclusivity groups |
+| `Signal` | Signal registry: named signals with defaults, exclusivity groups, optional `max_power_dbm` ceiling |
 | `SignalLog` | Timestamped log of every signal state change (the audit trail + current state source of truth) |
 | `RangeStateLog` | Timestamped record of every range state change |
 | `ModulationType` | Supervisor-managed list of modulation types shown in dropdowns |
@@ -273,7 +273,7 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 ### Features
 
 - [ ] PostgreSQL migration (switch DATABASE_URL env var, test thoroughly)
-- [ ] Power warning thresholds per-signal or per-template
+- [x] Power warning thresholds per-signal — `Signal.max_power_dbm` (set on the Config → Signal Registry tab). When a log entry records a power above the ceiling (converted to dBm), `SignalLog.warning_flags` is populated and shown in the dashboard "Warn" column. Computed in `app/signal_warnings.py`, wired into manual log create/edit and dashboard quick-update.
 - [x] Formal range report export — structured multi-sheet XLSX via `/handover/report.xlsx` (Summary / Signals / State Changes / Notes), downloadable from the Handover page. PDF still available via the Handover print view (browser "Save as PDF").
 - [ ] Device ping / network status checks
 - [x] Shift handover module (print/PDF summary of signals and state at shift change) — see Implemented Features

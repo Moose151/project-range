@@ -7,6 +7,7 @@ from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials
 from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial
 from app.rf_config import serial_package_rf_config
+from app.signal_warnings import warning_flags_for
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -307,6 +308,10 @@ async def dashboard_quick_update(
         entry_type="Dashboard",
         updated_by_id=current_user.id,
         serial_id=serial_id if serial_id is not None else (latest.serial_id if latest else None),
+        warning_flags=warning_flags_for(
+            db, signal_name, power if power is not None else (latest.power if latest else None),
+            power_unit,
+        ),
     )
     db.add(new_entry)
     db.flush()

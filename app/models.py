@@ -74,6 +74,8 @@ class Signal(Base):
     default_modulation: Mapped[str | None] = mapped_column(String(64), nullable=True)
     default_symbol_rate: Mapped[str | None] = mapped_column(String(32), nullable=True)
     default_fec: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Optional safe-power ceiling (dBm); logged power above this raises a warning
+    max_power_dbm: Mapped[float | None] = mapped_column(Float, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

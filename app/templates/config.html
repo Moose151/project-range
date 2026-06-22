@@ -531,6 +531,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         {% for g in groups %}<option value="{{ g }}">{% endfor %}
                       </datalist>
                     </div>
+                    <div>
+                      <label class="form-label small mb-1">Max Power (dBm)</label>
+                      <input type="number" step="any" class="form-control form-control-sm" name="max_power_dbm"
+                             value="{{ sig.max_power_dbm if sig.max_power_dbm is not none else '' }}"
+                             placeholder="ceiling" style="width:110px" title="Warn when logged power exceeds this">
+                    </div>
                     <div class="d-flex gap-1">
                       <button type="submit" class="btn btn-sm btn-primary">Save</button>
                       <button type="button" class="btn btn-sm btn-outline-secondary"
@@ -563,6 +569,11 @@ document.addEventListener('DOMContentLoaded', () => {
             <datalist id="groupListAdd">
               {% for g in groups %}<option value="{{ g }}">{% endfor %}
             </datalist>
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-1">Max Power dBm (optional)</label>
+            <input type="number" step="any" class="form-control form-control-sm" name="max_power_dbm"
+                   placeholder="ceiling" style="width:110px" title="Warn when logged power exceeds this">
           </div>
           <div class="col-auto">
             <button type="submit" class="btn btn-sm btn-primary">
