@@ -283,6 +283,8 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 - [ ] Windows Server deployment packaging (Waitress/NSSM service)
 - [ ] HTTPS/TLS support
 - [ ] Dashboard: "Add signal" form directly on dashboard (currently requires /logs/new)
+- [x] **Dashboard inline on/off + power controls**: per-signal-row toggle button to set Up/Down and +/− stepper buttons to adjust power, with Submit/Cancel; a log entry is only written on Submit. Replaces needing the pencil→Status-dropdown path for the common on/off + power changes (full edit panel still available for other fields).
+- [ ] **Dashboard drag tabbing UX**: make it easier to drag one serial widget onto another to merge them into a tabbed card, and drag a tab back off to restore it as its own standalone widget.
 
 ---
 

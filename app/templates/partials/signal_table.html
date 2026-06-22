@@ -66,8 +66,15 @@
   </thead>
   <tbody>
     {% for log in signals %}
-    {% set row_id = "sig-" ~ loop.index %}
-    <tr class="{% if log.signal_status == 'Faulted' %}table-danger{% elif log.signal_status == 'Standby' %}table-warning{% elif log.signal_status == 'Up' %}table-success{% elif log.signal_status == 'Down' %}table-secondary{% endif %}">
+    {% set row_id = "sig-" ~ (serial_id if serial_id is not none else 'legacy') ~ "-" ~ loop.index %}
+    <tr id="{{ row_id }}-row"
+        data-row="{{ row_id }}"
+        data-signal-name="{{ log.signal_name }}"
+        data-serial-id="{{ serial_id if serial_id is not none else '' }}"
+        data-orig-status="{{ log.signal_status }}"
+        data-orig-power="{{ log.power if log.power is not none else '' }}"
+        data-power-unit="{{ log.power_unit }}"
+        class="signal-row {% if log.signal_status == 'Faulted' %}table-danger{% elif log.signal_status == 'Standby' %}table-warning{% elif log.signal_status == 'Up' %}table-success{% elif log.signal_status == 'Down' %}table-secondary{% endif %}">
       <td class="ps-2 pe-1" style="width:30px">
         <button type="button"
                 class="btn btn-sm btn-outline-secondary border-0 py-0 px-1 dashboard-edit-btn"
@@ -80,7 +87,22 @@
       </td>
       <td class="fw-semibold"><a href="/logs?signal_name={{ log.signal_name }}" class="text-reset text-decoration-none" title="View history for {{ log.signal_name }}">{{ log.signal_name }}</a></td>
       <td class="text-muted small">{{ log.source or '—' }}</td>
-      <td>{{ status_badge(log.signal_status) }}</td>
+      <td style="min-width:150px">
+        <div class="d-flex align-items-center gap-2">
+          <div class="form-check form-switch mb-0" title="Toggle Up / Down">
+            <input class="form-check-input" type="checkbox" role="switch"
+                   id="tog-{{ row_id }}" {% if log.signal_status == 'Up' %}checked{% endif %}
+                   onchange="onQuickToggle('{{ row_id }}')">
+          </div>
+          <span id="status-badge-{{ row_id }}">{{ status_badge(log.signal_status) }}</span>
+          <span class="row-dirty-controls" id="dirty-{{ row_id }}" style="display:none">
+            <button type="button" class="btn btn-success btn-sm py-0 px-1" title="Submit — writes a log entry"
+                    onclick="submitQuickRow('{{ row_id }}')"><i class="bi bi-check-lg"></i></button>
+            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Cancel"
+                    onclick="cancelQuickRow('{{ row_id }}')"><i class="bi bi-x-lg"></i></button>
+          </span>
+        </div>
+      </td>
       <td>{{ log.tx_if if log.tx_if is not none else '—' }}</td>
       <td>{{ log.tx_rf if log.tx_rf is not none else '—' }}</td>
       <td>{{ log.rx_rf if log.rx_rf is not none else '—' }}</td>
@@ -91,8 +113,17 @@
       <td>{{ log.symbol_rate or '—' }}</td>
       <td>{{ log.fec or '—' }}</td>
       <td class="text-muted small">{{ log.antenna or '—' }}</td>
-      <td>
-        {% if log.power is not none %}{{ log.power }} {{ log.power_unit }}{% else %}—{% endif %}
+      <td style="min-width:140px">
+        <div class="d-flex align-items-center gap-1">
+          <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Decrease power"
+                  onclick="stepQuickPower('{{ row_id }}', -0.5)"><i class="bi bi-dash-lg"></i></button>
+          <span class="text-nowrap" style="min-width:54px;text-align:center">
+            <span id="power-val-{{ row_id }}">{% if log.power is not none %}{{ log.power }}{% else %}—{% endif %}</span>
+            <span class="text-muted small">{{ log.power_unit }}</span>
+          </span>
+          <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Increase power"
+                  onclick="stepQuickPower('{{ row_id }}', 0.5)"><i class="bi bi-plus-lg"></i></button>
+        </div>
       </td>
       <td>{{ log.eb_no if log.eb_no is not none else '—' }}</td>
       <td class="text-muted small">{{ log.timestamp.strftime('%H:%M %d/%m') }}</td>

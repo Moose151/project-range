@@ -346,5 +346,97 @@ function restoreLayout() {
     }
   }
 }
+
+// ── Inline quick on/off + power controls ─────────────────────────────────────
+// Changes are staged in the row's dataset and only written (as a log entry) on
+// Submit. While any row is dirty, the 10s poll is paused (see app.js) so staged
+// edits aren't wiped by a refresh.
+function quickRow(rowId) { return document.querySelector(`tr[data-row="${rowId}"]`); }
+
+function statusBadgeHtml(status) {
+  const map = {
+    Up: 'bg-success', Down: 'bg-secondary', Configured: 'bg-primary',
+    Standby: 'bg-warning text-dark', Faulted: 'bg-danger', Planned: 'bg-info text-dark',
+  };
+  return `<span class="badge ${map[status] || 'bg-secondary'}">${status}</span>`;
+}
+
+function quickRowState(row) {
+  return {
+    status: row.dataset.stageStatus ?? row.dataset.origStatus,
+    power: row.dataset.stagePower ?? row.dataset.origPower,
+  };
+}
+
+function refreshQuickDirty(rowId) {
+  const row = quickRow(rowId);
+  if (!row) return;
+  const s = quickRowState(row);
+  const dirty = (s.status !== row.dataset.origStatus) || ((s.power || '') !== (row.dataset.origPower || ''));
+  row.classList.toggle('signal-row-dirty', dirty);
+  const ctl = document.getElementById('dirty-' + rowId);
+  if (ctl) ctl.style.display = dirty ? 'inline-block' : 'none';
+}
+
+function applyRowStatusVisual(row, status) {
+  row.classList.remove('table-danger', 'table-warning', 'table-success', 'table-secondary');
+  if (status === 'Faulted') row.classList.add('table-danger');
+  else if (status === 'Standby') row.classList.add('table-warning');
+  else if (status === 'Up') row.classList.add('table-success');
+  else if (status === 'Down') row.classList.add('table-secondary');
+  const badge = document.getElementById('status-badge-' + row.dataset.row);
+  if (badge) badge.innerHTML = statusBadgeHtml(status);
+}
+
+function onQuickToggle(rowId) {
+  const row = quickRow(rowId);
+  if (!row) return;
+  const checked = document.getElementById('tog-' + rowId)?.checked;
+  row.dataset.stageStatus = checked ? 'Up' : 'Down';
+  applyRowStatusVisual(row, row.dataset.stageStatus);
+  refreshQuickDirty(rowId);
+}
+
+function stepQuickPower(rowId, delta) {
+  const row = quickRow(rowId);
+  if (!row) return;
+  const cur = parseFloat(row.dataset.stagePower ?? row.dataset.origPower);
+  const next = Math.round(((isNaN(cur) ? 0 : cur) + delta) * 100) / 100;
+  row.dataset.stagePower = String(next);
+  const el = document.getElementById('power-val-' + rowId);
+  if (el) el.textContent = next;
+  refreshQuickDirty(rowId);
+}
+
+function cancelQuickRow(rowId) {
+  const row = quickRow(rowId);
+  if (!row) return;
+  delete row.dataset.stageStatus;
+  delete row.dataset.stagePower;
+  const tog = document.getElementById('tog-' + rowId);
+  if (tog) tog.checked = row.dataset.origStatus === 'Up';
+  applyRowStatusVisual(row, row.dataset.origStatus);
+  const pv = document.getElementById('power-val-' + rowId);
+  if (pv) pv.textContent = row.dataset.origPower !== '' ? row.dataset.origPower : '—';
+  refreshQuickDirty(rowId);
+}
+
+function submitQuickRow(rowId) {
+  const row = quickRow(rowId);
+  if (!row) return;
+  const s = quickRowState(row);
+  const sid = row.dataset.serialId;
+  const containerId = 'signalTableContainer-' + (sid || 'legacy');
+  const values = {
+    signal_name: row.dataset.signalName,
+    signal_status: s.status,
+    power_unit: row.dataset.powerUnit || 'dBm',
+  };
+  if (s.power !== undefined && s.power !== '' && !isNaN(parseFloat(s.power))) values.power = s.power;
+  if (sid) values.serial_id = sid;
+  htmx.ajax('POST', '/dashboard/quick-update', {
+    target: '#' + containerId, swap: 'innerHTML', values,
+  }).then(() => showToast(row.dataset.signalName + ' updated', 'success'));
+}
 </script>
 {% endblock %}
