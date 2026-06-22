@@ -45,7 +45,8 @@ project-range/
 │   │   │                    #   /serials/{id}/start, /serials/{id}/end, /serials/{id}/packages/add
 │   │   ├── history.py       # Closed serial history: GET /history, /history/{id},
 │   │   │                    #   /history/{id}/export/csv, /history/{id}/export/xlsx
-│   │   ├── handover.py      # GET /handover (on-screen shift summary), /handover/print (printable)
+│   │   ├── handover.py      # GET /handover (on-screen shift summary), /handover/print (printable),
+│   │   │                    #   /handover/report.xlsx (structured multi-sheet range report)
 │   │   ├── range_state.py   # GET/POST /range-state/change
 │   │   ├── config.py        # GET/POST /config — mod types, FEC types, signal sources, antennas,
 │   │   │                    #   signal registry, frequency templates
@@ -273,7 +274,7 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 
 - [ ] PostgreSQL migration (switch DATABASE_URL env var, test thoroughly)
 - [ ] Power warning thresholds per-signal or per-template
-- [ ] Formal range report export (PDF or structured XLSX)
+- [x] Formal range report export — structured multi-sheet XLSX via `/handover/report.xlsx` (Summary / Signals / State Changes / Notes), downloadable from the Handover page. PDF still available via the Handover print view (browser "Save as PDF").
 - [ ] Device ping / network status checks
 - [x] Shift handover module (print/PDF summary of signals and state at shift change) — see Implemented Features
 - [ ] Active Directory / SSO authentication
@@ -295,7 +296,8 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 - [x] Calculator: "Create Log Entry" button appears in RF calculator results header after a calculation; links to `/logs/new?tx_if=…&tx_rf=…&rx_rf=…&rx_if=…&freq_unit=…&band=…` which pre-fills the frequency fields on the form
 - [ ] Power chain: save/load named templates (model stub ready — `PowerChainTemplate` not yet wired to UI)
 - [x] Favicon: SVG signal-arcs icon (`/static/favicon.svg`), served via `<link rel="icon" type="image/svg+xml">`
-- [ ] Mobile/tablet responsive polish (currently desktop-first but not broken)
+- [ ] Mobile/tablet responsive polish (currently desktop-first but not broken) — **VERY LOW priority**: this app is almost never used on mobile, so deprioritise mobile/tablet work.
+- [ ] **UI refinement pass (raised 2026-06-22)**: the interface is starting to feel clunky as features accumulate and needs a consolidation/refinement pass (spacing, density, grouping of controls). Also the dark colour scheme makes some text hard to read — audit contrast (muted text on dark, badges, `table-secondary`/`table-warning` row text, input-group text) and fix low-contrast cases.
 - [x] Loading indicator during HTMX poll refresh (spinner in widget header)
 - [x] Dashboard quick-edit: exclusivity group warning — "Auto-downs: X, Y" shown below Status select, visible only when "Up" is chosen (JS show/hide)
 - [x] Config drag-to-reorder: SortableJS on all four lists (mod types, FEC, sources, antennas); grip handle column; `fetch` POST to `/config/{type}/reorder` on drop; toast on success. Reorder endpoints added for FEC, sources, antennas (mod already existed).

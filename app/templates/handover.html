@@ -4,7 +4,10 @@
 <div class="d-flex align-items-center mb-3">
   <h4 class="mb-0"><i class="bi bi-arrow-left-right me-2"></i>Shift Handover</h4>
   <span class="text-muted small ms-3">Snapshot generated {{ generated_at.strftime('%H:%M:%S %d/%m/%Y') }} UTC by {{ user.display_name }}</span>
-  <div class="ms-auto">
+  <div class="ms-auto d-flex gap-2">
+    <a href="/handover/report.xlsx" class="btn btn-sm btn-outline-light">
+      <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export XLSX
+    </a>
     <a href="/handover/print" target="_blank" class="btn btn-sm btn-outline-light">
       <i class="bi bi-printer me-1"></i>Print / PDF
     </a>
