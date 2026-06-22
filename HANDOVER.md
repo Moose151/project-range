@@ -283,8 +283,8 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 - [ ] Windows Server deployment packaging (Waitress/NSSM service)
 - [ ] HTTPS/TLS support
 - [ ] Dashboard: "Add signal" form directly on dashboard (currently requires /logs/new)
-- [x] **Dashboard inline on/off + power controls**: per-signal-row toggle button to set Up/Down and +/− stepper buttons to adjust power, with Submit/Cancel; a log entry is only written on Submit. Replaces needing the pencil→Status-dropdown path for the common on/off + power changes (full edit panel still available for other fields).
-- [ ] **Dashboard drag tabbing UX**: make it easier to drag one serial widget onto another to merge them into a tabbed card, and drag a tab back off to restore it as its own standalone widget.
+- [x] **Dashboard inline on/off + power controls**: per-signal-row switch to set Up/Down, and −/+ stepper buttons (step 1) plus an editable number field to set power directly, with Submit/Cancel; a log entry is only written on Submit. The 10s poll pauses while any row has unsubmitted changes. Replaces needing the pencil→Status-dropdown path for the common on/off + power changes (full edit panel still available for other fields).
+- [x] **Dashboard drag tabbing UX**: each serial's body + header actions live together in a `.serial-body-wrap`; dragging a serial's tab onto another widget combines them into one tabbed card, and dragging a tab to empty dashboard space splits it back into its own standalone widget. Grip icon still reorders widgets (SortableJS). Layout persisted in `localStorage.dashboardLayout_v2`.
 
 ---
 

@@ -108,58 +108,55 @@
   {% set serial = sd.serial %}
   {% set w_signals = sd.signals %}
   {% set w_buzzer = sd.buzzer_active %}
+  {% set sval = (serial.id if serial else 'legacy') %}
   <div class="serial-widget-group"
-       data-group-id="group-{{ serial.id if serial else 'legacy' }}"
-       data-serial-ids="{{ serial.id if serial else '' }}">
-    <!-- A group starts as a single serial; JS may merge multiple into tabs -->
+       data-group-id="group-{{ sval }}"
+       data-serial-ids="{{ serial.id if serial else '' }}"
+       data-active-tab="{{ sval }}">
+    <!-- A group starts as a single serial; drag a tab onto another widget to combine. -->
     <div class="serial-widget card border-{% if w_buzzer %}danger{% elif serial %}success{% else %}secondary{% endif %}"
          data-serial-id="{{ serial.id if serial else '' }}">
-      <div class="card-header d-flex align-items-center gap-2 widget-drag-handle" style="cursor:grab">
-        <i class="bi bi-grip-vertical text-muted"></i>
-        {% if serial %}
-        <span class="fw-semibold">{{ serial.title }}</span>
-        <span class="badge bg-success ms-1 small">Active</span>
-        {% if w_buzzer %}<span class="badge bg-danger blink-icon ms-1">BUZZER</span>{% endif %}
-        <div class="ms-auto d-flex gap-1 align-items-center">
-          <span class="text-muted small me-2">
-          Started {{ serial.opened_at.strftime('%H:%M %d/%m') }}
-          <span class="htmx-indicator spinner-border spinner-border-sm text-secondary ms-1" role="status" style="width:0.7rem;height:0.7rem"></span>
-        </span>
-          <a href="/logs/new?serial_id={{ serial.id }}" class="btn btn-sm btn-outline-success py-0 px-2" title="Add signal log">
-            <i class="bi bi-plus-lg"></i>
-          </a>
-          <a href="/logs?serial_id={{ serial.id }}" class="btn btn-sm btn-outline-secondary py-0 px-2" title="View logs">
-            <i class="bi bi-journal-text"></i>
-          </a>
-          <form method="post" action="/serials/{{ serial.id }}/end" class="d-inline"
-                onsubmit="return confirm('End serial {{ serial.title | e }}? It will be moved to history.')">
-            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="End serial">
-              <i class="bi bi-stop-circle"></i>
-            </button>
-          </form>
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-grip-vertical text-muted widget-drag-handle" style="cursor:grab"
+           title="Drag to reorder widgets"></i>
+        <div class="serial-tabbar d-flex gap-1 flex-wrap align-items-center">
+          {% if serial %}
+          <button type="button" class="serial-tab-btn btn btn-sm btn-primary" data-serial-tab="{{ serial.id }}"
+                  draggable="true" onclick="switchTab(this)"
+                  title="{{ serial.title }} — drag onto another widget to tab them, or drag to empty space to split out">{{ serial.title }}</button>
+          {% else %}
+          <span class="fw-semibold text-muted">All Signals (no active serial)</span>
+          {% endif %}
         </div>
-        {% else %}
-        <span class="fw-semibold text-muted">All Signals (no active serial)</span>
-        <div class="ms-auto">
-          <a href="/serials" class="btn btn-sm btn-outline-success py-0 px-2">
-            <i class="bi bi-play-circle me-1"></i>Start Serial
-          </a>
-        </div>
-        {% endif %}
+        <div class="serial-actions ms-auto d-flex gap-1 align-items-center"></div>
       </div>
-      <div class="card-body p-0 overflow-auto serial-table-body"
-           id="signalTableContainer-{{ serial.id if serial else 'legacy' }}"
-           {% if serial %}
-           hx-get="/dashboard/fragment/{{ serial.id }}"
-           {% else %}
-           hx-get="/dashboard/fragment"
-           {% endif %}
-           hx-trigger="every 10s"
-           hx-swap="innerHTML"
-           hx-on::after-request="updateRefreshTime()">
-        {% with signals=w_signals, buzzer_active=w_buzzer, serial_id=(serial.id if serial else none), pkg_rf_by_signal=(sd.pkg_rf_by_signal if serial else {}) %}
-        {% include "partials/signal_table.html" %}
-        {% endwith %}
+      <div class="serial-bodies">
+        <div class="serial-body-wrap" data-serial-body="{{ sval }}" data-serial-title="{{ serial.title if serial else 'All Signals' }}">
+          <!-- Per-serial header actions; cloned into .serial-actions for the active tab. -->
+          <div class="serial-actions-store d-none">
+            {% if serial %}
+            <span class="text-muted small me-1">Started {{ serial.opened_at.strftime('%H:%M %d/%m') }}</span>
+            <span class="htmx-indicator spinner-border spinner-border-sm text-secondary me-1" role="status" style="width:0.7rem;height:0.7rem"></span>
+            {% if w_buzzer %}<span class="badge bg-danger blink-icon">BUZZER</span>{% endif %}
+            <a href="/logs/new?serial_id={{ serial.id }}" class="btn btn-sm btn-outline-success py-0 px-2" title="Add signal log"><i class="bi bi-plus-lg"></i></a>
+            <a href="/logs?serial_id={{ serial.id }}" class="btn btn-sm btn-outline-secondary py-0 px-2" title="View logs"><i class="bi bi-journal-text"></i></a>
+            <form method="post" action="/serials/{{ serial.id }}/end" class="d-inline"
+                  onsubmit="return confirm('End serial {{ serial.title | e }}? It will be moved to history.')">
+              <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="End serial"><i class="bi bi-stop-circle"></i></button>
+            </form>
+            {% else %}
+            <a href="/serials" class="btn btn-sm btn-outline-success py-0 px-2"><i class="bi bi-play-circle me-1"></i>Start Serial</a>
+            {% endif %}
+          </div>
+          <div class="card-body p-0 overflow-auto serial-table-body"
+               id="signalTableContainer-{{ sval }}"
+               {% if serial %}hx-get="/dashboard/fragment/{{ serial.id }}"{% else %}hx-get="/dashboard/fragment"{% endif %}
+               hx-trigger="every 10s" hx-swap="innerHTML" hx-on::after-request="updateRefreshTime()">
+            {% with signals=w_signals, buzzer_active=w_buzzer, serial_id=(serial.id if serial else none), pkg_rf_by_signal=(sd.pkg_rf_by_signal if serial else {}) %}
+            {% include "partials/signal_table.html" %}
+            {% endwith %}
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -209,103 +206,156 @@ function saveLayout() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(groups));
 }
 
-// ── Drag-onto-widget to merge as tabs ────────────────────────────────────
-// Widgets become "merge targets" when another widget is being dragged.
-let dragSourceId = null;
+// ── Tab drag: merge widgets & split tabs ─────────────────────────────────
+// Each serial's body + header-actions live together in a .serial-body-wrap.
+// Dragging a serial's TAB onto another widget combines them into one tabbed
+// card; dragging a tab to empty dashboard space splits it back into its own
+// widget. The grip icon still reorders standalone widgets (SortableJS).
+let draggedTab = null;  // { serialId, sourceGroupId }
 
-document.querySelectorAll('.serial-widget').forEach(widget => {
-  const handle = widget.querySelector('.widget-drag-handle');
-  if (!handle) return;
+function groupOf(serialId) {
+  const wrap = document.querySelector(`.serial-body-wrap[data-serial-body="${serialId}"]`);
+  return wrap ? wrap.closest('.serial-widget-group') : null;
+}
+function groupSerialIds(group) {
+  return Array.from(group.querySelectorAll('.serial-body-wrap')).map(w => w.dataset.serialBody);
+}
+function tabbarOf(group) { return group.querySelector('.serial-tabbar'); }
 
-  handle.addEventListener('mousedown', () => {
-    dragSourceId = widget.dataset.serialId;
-  });
-});
-
-document.querySelectorAll('.serial-widget-group').forEach(group => {
-  group.addEventListener('dragenter', (e) => {
-    const targetId = group.querySelector('.serial-widget')?.dataset.serialId;
-    if (dragSourceId && targetId && dragSourceId !== targetId) {
-      group.classList.add('drop-merge-target');
-    }
-  });
-  group.addEventListener('dragleave', () => {
-    group.classList.remove('drop-merge-target');
-  });
-  group.addEventListener('drop', (e) => {
-    group.classList.remove('drop-merge-target');
-    const targetId = group.querySelector('.serial-widget')?.dataset.serialId;
-    if (dragSourceId && targetId && dragSourceId !== targetId) {
-      mergeWidgets(dragSourceId, targetId);
-    }
-  });
-});
-
-function mergeWidgets(sourceId, targetId) {
-  const sourceGroup = document.querySelector(`[data-serial-id="${sourceId}"]`)?.closest('.serial-widget-group');
-  const targetGroup = document.querySelector(`[data-serial-id="${targetId}"]`)?.closest('.serial-widget-group');
-  if (!sourceGroup || !targetGroup || sourceGroup === targetGroup) return;
-
-  // Collect all serial IDs in both groups
-  const allIds = [
-    ...targetGroup.dataset.serialIds.split(',').filter(Boolean),
-    ...sourceGroup.dataset.serialIds.split(',').filter(Boolean),
-  ];
-  targetGroup.dataset.serialIds = allIds.join(',');
-
-  // Build tabbed UI
-  buildTabbedWidget(targetGroup, allIds, targetId);
-
-  // Remove source group from DOM
-  sourceGroup.remove();
-  saveLayout();
+function makeTabBtn(serialId, title, active) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'serial-tab-btn btn btn-sm ' + (active ? 'btn-primary' : 'btn-outline-secondary');
+  b.dataset.serialTab = serialId;
+  b.draggable = true;
+  b.textContent = title;
+  b.title = title + ' — drag onto another widget to tab them, or drag to empty space to split out';
+  b.addEventListener('click', () => switchTab(b));
+  return b;
 }
 
-function buildTabbedWidget(group, serialIds, activeId) {
-  const card = group.querySelector('.serial-widget');
-  if (!card) return;
-
-  // Build tab nav in header
-  const header = card.querySelector('.card-header');
-  const tabsHtml = serialIds.map(id => {
-    const widget = document.querySelector(`[data-serial-id="${id}"]`);
-    const title = widget?.querySelector('.fw-semibold')?.textContent?.trim() || id;
-    return `<button type="button" class="serial-tab-btn btn btn-sm ${id === activeId ? 'btn-primary' : 'btn-outline-secondary'}"
-              data-serial-tab="${id}" onclick="switchTab(this)">${title}</button>`;
-  }).join('');
-  header.innerHTML = `<i class="bi bi-grip-vertical text-muted"></i>
-    <div class="d-flex gap-1 flex-wrap">${tabsHtml}</div>
-    <div class="ms-auto"></div>`;
-
-  // Show only active body, hide others
-  card.querySelectorAll('.serial-table-body').forEach(body => {
-    body.style.display = body.id.includes(activeId) ? '' : 'none';
+function setActiveTab(group, serialId) {
+  const ids = groupSerialIds(group);
+  if (!ids.includes(serialId)) serialId = ids[0];
+  group.dataset.activeTab = serialId;
+  group.querySelectorAll('.serial-tab-btn').forEach(b => {
+    b.className = 'serial-tab-btn btn btn-sm ' + (b.dataset.serialTab === serialId ? 'btn-primary' : 'btn-outline-secondary');
   });
-  group.dataset.activeTab = activeId;
+  group.querySelectorAll('.serial-body-wrap').forEach(w => {
+    w.style.display = w.dataset.serialBody === serialId ? '' : 'none';
+  });
+  // Mirror the active serial's stored header actions into the card header
+  const actions = group.querySelector('.serial-actions');
+  const store = group.querySelector(`.serial-body-wrap[data-serial-body="${serialId}"] .serial-actions-store`);
+  if (actions) actions.innerHTML = store ? store.innerHTML : '';
 }
 
 function switchTab(btn) {
-  const tabId = btn.dataset.serialTab;
   const group = btn.closest('.serial-widget-group');
-  if (!group) return;
+  if (group) { setActiveTab(group, btn.dataset.serialTab); saveLayout(); }
+}
 
-  group.querySelectorAll('.serial-tab-btn').forEach(b => {
-    b.className = b.dataset.serialTab === tabId
-      ? 'serial-tab-btn btn btn-sm btn-primary'
-      : 'serial-tab-btn btn btn-sm btn-outline-secondary';
-  });
+function initGroup(group) {
+  group.querySelectorAll('.serial-tab-btn').forEach(b => { b.draggable = true; });
+  setActiveTab(group, group.dataset.activeTab || groupSerialIds(group)[0]);
+}
 
-  group.querySelectorAll('.serial-table-body').forEach(body => {
-    body.style.display = body.id.includes(tabId) ? '' : 'none';
-  });
-
-  group.dataset.activeTab = tabId;
+function mergeSerialIntoGroup(serialId, targetGroup) {
+  const sourceGroup = groupOf(serialId);
+  if (!sourceGroup || !targetGroup || sourceGroup === targetGroup) return;
+  const wrap = sourceGroup.querySelector(`.serial-body-wrap[data-serial-body="${serialId}"]`);
+  if (!wrap) return;
+  let tab = sourceGroup.querySelector(`.serial-tab-btn[data-serial-tab="${serialId}"]`);
+  targetGroup.querySelector('.serial-bodies').appendChild(wrap);
+  tabbarOf(targetGroup).appendChild(tab || makeTabBtn(serialId, wrap.dataset.serialTitle || serialId, false));
+  targetGroup.dataset.serialIds = groupSerialIds(targetGroup).join(',');
+  if (groupSerialIds(sourceGroup).length === 0) {
+    sourceGroup.remove();
+  } else {
+    sourceGroup.dataset.serialIds = groupSerialIds(sourceGroup).join(',');
+    initGroup(sourceGroup);
+  }
+  initGroup(targetGroup);
+  setActiveTab(targetGroup, serialId);
   saveLayout();
 }
 
+function splitSerialOut(serialId) {
+  const sourceGroup = groupOf(serialId);
+  if (!sourceGroup || groupSerialIds(sourceGroup).length < 2) return;  // already standalone
+  const wrap = sourceGroup.querySelector(`.serial-body-wrap[data-serial-body="${serialId}"]`);
+  const tab = sourceGroup.querySelector(`.serial-tab-btn[data-serial-tab="${serialId}"]`);
+  const title = wrap.dataset.serialTitle || serialId;
+  const group = document.createElement('div');
+  group.className = 'serial-widget-group';
+  group.dataset.groupId = 'group-' + serialId;
+  group.dataset.serialIds = serialId;
+  group.dataset.activeTab = serialId;
+  group.innerHTML = `
+    <div class="serial-widget card border-secondary" data-serial-id="${serialId}">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-grip-vertical text-muted widget-drag-handle" style="cursor:grab" title="Drag to reorder widgets"></i>
+        <div class="serial-tabbar d-flex gap-1 flex-wrap align-items-center"></div>
+        <div class="serial-actions ms-auto d-flex gap-1 align-items-center"></div>
+      </div>
+      <div class="serial-bodies"></div>
+    </div>`;
+  tabbarOf(group).appendChild(makeTabBtn(serialId, title, true));
+  group.querySelector('.serial-bodies').appendChild(wrap);
+  if (tab) tab.remove();
+  document.getElementById('serialWidgetsContainer').appendChild(group);
+  sourceGroup.dataset.serialIds = groupSerialIds(sourceGroup).join(',');
+  initGroup(sourceGroup);
+  registerGroupDnD(group);
+  initGroup(group);
+  saveLayout();
+}
+
+// ── Native drag wiring ───────────────────────────────────────────────────
+function registerGroupDnD(group) {
+  group.addEventListener('dragover', (e) => {
+    if (!draggedTab || groupOf(draggedTab.serialId) === group) return;
+    e.preventDefault();
+    group.classList.add('drop-merge-target');
+  });
+  group.addEventListener('dragleave', () => group.classList.remove('drop-merge-target'));
+  group.addEventListener('drop', (e) => {
+    if (!draggedTab) return;
+    e.preventDefault();
+    e.stopPropagation();   // a group drop is a merge, never a split
+    group.classList.remove('drop-merge-target');
+    if (groupOf(draggedTab.serialId) !== group) mergeSerialIntoGroup(draggedTab.serialId, group);
+  });
+}
+
+document.addEventListener('dragstart', (e) => {
+  const tab = e.target.closest?.('.serial-tab-btn');
+  if (!tab) return;
+  draggedTab = { serialId: tab.dataset.serialTab, sourceGroupId: tab.closest('.serial-widget-group')?.dataset.groupId };
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', tab.dataset.serialTab);  // Firefox requires data
+});
+document.addEventListener('dragend', () => {
+  draggedTab = null;
+  document.querySelectorAll('.drop-merge-target').forEach(g => g.classList.remove('drop-merge-target'));
+});
+
 // ── Restore saved layout on page load ────────────────────────────────────
+// Container background is the "split out" drop target (group drops stopPropagation).
+(function () {
+  const cont = document.getElementById('serialWidgetsContainer');
+  if (!cont) return;
+  cont.addEventListener('dragover', (e) => { if (draggedTab) e.preventDefault(); });
+  cont.addEventListener('drop', (e) => {
+    if (!draggedTab) return;
+    e.preventDefault();
+    splitSerialOut(draggedTab.serialId);
+  });
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
   {% if toast %}showToast({{ toast | tojson }}, 'success');{% endif %}
+  document.querySelectorAll('.serial-widget-group').forEach(g => { registerGroupDnD(g); initGroup(g); });
   restoreLayout();
 });
 
@@ -315,35 +365,24 @@ function restoreLayout() {
   let groups;
   try { groups = JSON.parse(saved); } catch (e) { return; }
 
-  // Pass 1: merge groups that were tabbed
-  for (const group of groups) {
-    if (group.type !== 'tabbed' || !group.serials || group.serials.length < 2) continue;
-    const [targetId, ...sourceIds] = group.serials;
-    const targetEl = document.querySelector(`[data-serial-id="${targetId}"]`);
-    if (!targetEl) continue;
-    for (const sourceId of sourceIds) {
-      const sourceEl = document.querySelector(`[data-serial-id="${sourceId}"]`);
-      if (sourceEl && sourceEl !== targetEl) {
-        mergeWidgets(sourceId, targetId);
-      }
+  // Pass 1: rebuild tab merges
+  for (const g of groups) {
+    if (g.type !== 'tabbed' || !g.serials || g.serials.length < 2) continue;
+    const targetGroup = groupOf(g.serials[0]);
+    if (!targetGroup) continue;
+    for (const sid of g.serials.slice(1)) {
+      if (groupOf(sid)) mergeSerialIntoGroup(sid, targetGroup);
     }
-    // Restore active tab
-    if (group.activeTab) {
-      const btn = document.querySelector(`.serial-tab-btn[data-serial-tab="${group.activeTab}"]`);
-      if (btn) switchTab(btn);
-    }
+    if (g.activeTab) setActiveTab(targetGroup, g.activeTab);
   }
 
-  // Pass 2: restore drag order by re-appending groups in saved order
+  // Pass 2: restore widget order
   const container = document.getElementById('serialWidgetsContainer');
   if (!container) return;
-  for (const group of groups) {
-    const firstId = group.serials && group.serials[0];
-    if (!firstId) continue;
-    const widgetEl = document.querySelector(`[data-serial-id="${firstId}"]`)?.closest('.serial-widget-group');
-    if (widgetEl && widgetEl.parentElement === container) {
-      container.appendChild(widgetEl);
-    }
+  for (const g of groups) {
+    const firstId = g.serials && g.serials[0];
+    const el = firstId ? groupOf(firstId) : null;
+    if (el && el.parentElement === container) container.appendChild(el);
   }
 }
 
@@ -399,12 +438,20 @@ function onQuickToggle(rowId) {
 
 function stepQuickPower(rowId, delta) {
   const row = quickRow(rowId);
-  if (!row) return;
-  const cur = parseFloat(row.dataset.stagePower ?? row.dataset.origPower);
+  const input = document.getElementById('power-val-' + rowId);
+  if (!row || !input) return;
+  const cur = parseFloat(input.value);
   const next = Math.round(((isNaN(cur) ? 0 : cur) + delta) * 100) / 100;
+  input.value = next;
   row.dataset.stagePower = String(next);
-  const el = document.getElementById('power-val-' + rowId);
-  if (el) el.textContent = next;
+  refreshQuickDirty(rowId);
+}
+
+function onQuickPowerInput(rowId) {
+  const row = quickRow(rowId);
+  const input = document.getElementById('power-val-' + rowId);
+  if (!row || !input) return;
+  row.dataset.stagePower = input.value;
   refreshQuickDirty(rowId);
 }
 
@@ -417,7 +464,7 @@ function cancelQuickRow(rowId) {
   if (tog) tog.checked = row.dataset.origStatus === 'Up';
   applyRowStatusVisual(row, row.dataset.origStatus);
   const pv = document.getElementById('power-val-' + rowId);
-  if (pv) pv.textContent = row.dataset.origPower !== '' ? row.dataset.origPower : '—';
+  if (pv) pv.value = row.dataset.origPower;
   refreshQuickDirty(rowId);
 }
 

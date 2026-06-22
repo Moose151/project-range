@@ -113,16 +113,18 @@
       <td>{{ log.symbol_rate or '—' }}</td>
       <td>{{ log.fec or '—' }}</td>
       <td class="text-muted small">{{ log.antenna or '—' }}</td>
-      <td style="min-width:140px">
-        <div class="d-flex align-items-center gap-1">
-          <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Decrease power"
-                  onclick="stepQuickPower('{{ row_id }}', -0.5)"><i class="bi bi-dash-lg"></i></button>
-          <span class="text-nowrap" style="min-width:54px;text-align:center">
-            <span id="power-val-{{ row_id }}">{% if log.power is not none %}{{ log.power }}{% else %}—{% endif %}</span>
-            <span class="text-muted small">{{ log.power_unit }}</span>
-          </span>
-          <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Increase power"
-                  onclick="stepQuickPower('{{ row_id }}', 0.5)"><i class="bi bi-plus-lg"></i></button>
+      <td style="min-width:160px">
+        <div class="input-group input-group-sm flex-nowrap" style="width:160px">
+          <button type="button" class="btn btn-outline-secondary px-1" title="Decrease power by 1"
+                  onclick="stepQuickPower('{{ row_id }}', -1)"><i class="bi bi-dash-lg"></i></button>
+          <input type="number" step="any" inputmode="decimal"
+                 class="form-control form-control-sm text-center px-1" id="power-val-{{ row_id }}"
+                 value="{{ log.power if log.power is not none else '' }}"
+                 title="Type a power value, or use −/+"
+                 oninput="onQuickPowerInput('{{ row_id }}')">
+          <button type="button" class="btn btn-outline-secondary px-1" title="Increase power by 1"
+                  onclick="stepQuickPower('{{ row_id }}', 1)"><i class="bi bi-plus-lg"></i></button>
+          <span class="input-group-text px-1">{{ log.power_unit }}</span>
         </div>
       </td>
       <td>{{ log.eb_no if log.eb_no is not none else '—' }}</td>
