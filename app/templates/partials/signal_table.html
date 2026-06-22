@@ -51,7 +51,7 @@
         data-orig-status="{{ log.signal_status }}"
         data-orig-power="{{ log.power if log.power is not none else '' }}"
         data-power-unit="{{ log.power_unit }}"
-        class="signal-row {% if log.signal_status == 'Faulted' %}table-danger{% elif log.signal_status == 'Standby' %}table-warning{% elif log.signal_status == 'Up' %}table-success{% elif log.signal_status == 'Down' %}table-secondary{% endif %}">
+        class="signal-row{% if log.signal_status == 'Faulted' %} status-faulted{% elif log.signal_status == 'Standby' %} status-standby{% elif log.signal_status == 'Up' %} status-up{% elif log.signal_status == 'Down' %} status-down{% endif %}">
       <td class="ps-2 pe-1" style="width:30px">
         <button type="button"
                 class="btn btn-sm btn-outline-secondary border-0 py-0 px-1 dashboard-edit-btn"

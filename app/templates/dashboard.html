@@ -410,11 +410,11 @@ function refreshQuickDirty(rowId) {
 }
 
 function applyRowStatusVisual(row, status) {
-  row.classList.remove('table-danger', 'table-warning', 'table-success', 'table-secondary');
-  if (status === 'Faulted') row.classList.add('table-danger');
-  else if (status === 'Standby') row.classList.add('table-warning');
-  else if (status === 'Up') row.classList.add('table-success');
-  else if (status === 'Down') row.classList.add('table-secondary');
+  row.classList.remove('status-faulted', 'status-standby', 'status-up', 'status-down');
+  if (status === 'Faulted') row.classList.add('status-faulted');
+  else if (status === 'Standby') row.classList.add('status-standby');
+  else if (status === 'Up') row.classList.add('status-up');
+  else if (status === 'Down') row.classList.add('status-down');
   const badge = document.getElementById('status-badge-' + row.dataset.row);
   if (badge) badge.innerHTML = statusBadgeHtml(status);
 }

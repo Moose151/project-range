@@ -42,6 +42,30 @@
   border: 1px solid #343a40;
 }
 
+/* ── Signal status rows (dashboard) ─────────────────────────────
+   Subtle dark tints via --bs-table-bg instead of Bootstrap's loud light
+   contextual backgrounds, so the light text + inline controls stay readable. */
+.signal-table tbody tr.status-up      { --bs-table-bg: rgba(25, 135, 84, 0.16); }
+.signal-table tbody tr.status-faulted { --bs-table-bg: rgba(220, 53, 69, 0.20); }
+.signal-table tbody tr.status-standby { --bs-table-bg: rgba(255, 193, 7, 0.14); }
+.signal-table tbody tr.status-down    { --bs-table-bg: rgba(108, 117, 125, 0.12); }
+
+/* Keep muted/secondary text legible inside light Bootstrap contextual rows
+   (read-only tables such as the log list and serial history). */
+.table > :not(caption) > tr.table-success,
+.table > :not(caption) > tr.table-danger,
+.table > :not(caption) > tr.table-warning,
+.table > :not(caption) > tr.table-info,
+.table > :not(caption) > tr.table-secondary,
+.table tbody tr.table-success,
+.table tbody tr.table-danger,
+.table tbody tr.table-warning,
+.table tbody tr.table-info,
+.table tbody tr.table-secondary {
+  --bs-secondary-color: rgba(33, 37, 41, 0.72);
+  --bs-tertiary-color: rgba(33, 37, 41, 0.55);
+}
+
 /* ── Table tweaks ───────────────────────────────────────────── */
 .table th {
   white-space: nowrap;
