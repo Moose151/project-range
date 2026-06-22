@@ -274,6 +274,7 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 
 - [ ] PostgreSQL migration (switch DATABASE_URL env var, test thoroughly)
 - [x] Power warning thresholds per-signal — `Signal.max_power_dbm` (set on the Config → Signal Registry tab). When a log entry records a power above the ceiling (converted to dBm), `SignalLog.warning_flags` is populated and shown in the dashboard "Warn" column. Computed in `app/signal_warnings.py`, wired into manual log create/edit and dashboard quick-update.
+- [x] **Band/frequency validation warnings** — the same `warning_flags_for` engine also flags TxRF/RxRF outside the configured `FREQUENCY_BANDS` range for the entry's band (reuses the calculator's `band_warnings`). Power and band warnings are combined into one ` · `-joined `warning_flags` string. Stored on log create/edit and dashboard quick-update (warnings are advisory; they never block saving).
 - [x] Formal range report export — structured multi-sheet XLSX via `/handover/report.xlsx` (Summary / Signals / State Changes / Notes), downloadable from the Handover page. PDF still available via the Handover print view (browser "Save as PDF").
 - [ ] Device ping / network status checks
 - [x] Shift handover module (print/PDF summary of signals and state at shift change) — see Implemented Features

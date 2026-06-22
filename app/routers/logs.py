@@ -264,7 +264,10 @@ async def log_create(
         activity_ref=activity_ref.strip() or None,
         notes=notes.strip() or None,
         entry_type="Manual",
-        warning_flags=warning_flags_for(db, signal_name.strip(), power, power_unit),
+        warning_flags=warning_flags_for(
+            db, signal_name.strip(), power, power_unit,
+            tx_rf=tx_rf, rx_rf=rx_rf, freq_unit=freq_unit, band=band,
+        ),
     )
     db.add(entry)
     db.flush()
@@ -363,7 +366,10 @@ async def log_update(
     log_entry.eb_no = eb_no
     log_entry.activity_ref = activity_ref.strip() or None
     log_entry.notes = notes.strip() or None
-    log_entry.warning_flags = warning_flags_for(db, log_entry.signal_name, power, power_unit)
+    log_entry.warning_flags = warning_flags_for(
+        db, log_entry.signal_name, power, power_unit,
+        tx_rf=tx_rf, rx_rf=rx_rf, freq_unit=freq_unit, band=band,
+    )
     log_entry.updated_at = datetime.utcnow()
     log_entry.updated_by_id = current_user.id
 

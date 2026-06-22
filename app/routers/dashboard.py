@@ -311,6 +311,10 @@ async def dashboard_quick_update(
         warning_flags=warning_flags_for(
             db, signal_name, power if power is not None else (latest.power if latest else None),
             power_unit,
+            tx_rf=latest.tx_rf if latest else None,
+            rx_rf=latest.rx_rf if latest else None,
+            freq_unit=latest.freq_unit if latest else "MHz",
+            band=latest.band if latest else None,
         ),
     )
     db.add(new_entry)
