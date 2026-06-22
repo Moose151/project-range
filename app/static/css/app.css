@@ -84,6 +84,20 @@
   padding: 0.5rem 0.875rem;
 }
 
+/* ── Forms: tighter, calmer vertical rhythm ─────────────────── */
+.form-label {
+  margin-bottom: 0.2rem;
+  font-weight: 500;
+}
+.form-text {
+  margin-top: 0.15rem;
+}
+/* Page title spacing: consistent gap under the main heading on every page */
+main > h4:first-child,
+main > .d-flex:first-child h4 {
+  letter-spacing: 0.01em;
+}
+
 /* ── Navbar ─────────────────────────────────────────────────── */
 .navbar-brand {
   font-size: 1.1rem;
