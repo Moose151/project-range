@@ -169,7 +169,7 @@
           </td>
         </tr>
         {% else %}
-        <tr class="{% if log.is_deleted %}text-muted opacity-50{% elif log.signal_status == 'Faulted' %}table-danger{% elif log.signal_status == 'Up' %}table-success{% endif %}">
+        <tr class="{% if log.is_deleted %}text-muted opacity-50{% elif log.signal_status == 'Faulted' %}status-faulted{% elif log.signal_status == 'Up' %}status-up{% endif %}">
           <td class="text-nowrap small">{{ log.timestamp.strftime('%d/%m/%y %H:%M') }}</td>
           <td class="small">{{ log.operator.username if log.operator else '—' }}</td>
           <td class="small text-muted" style="max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"

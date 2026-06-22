@@ -42,13 +42,21 @@
   border: 1px solid #343a40;
 }
 
-/* ── Signal status rows (dashboard) ─────────────────────────────
+/* ── Signal status rows ─────────────────────────────────────────
    Subtle dark tints via --bs-table-bg instead of Bootstrap's loud light
-   contextual backgrounds, so the light text + inline controls stay readable. */
-.signal-table tbody tr.status-up      { --bs-table-bg: rgba(25, 135, 84, 0.16); }
-.signal-table tbody tr.status-faulted { --bs-table-bg: rgba(220, 53, 69, 0.20); }
-.signal-table tbody tr.status-standby { --bs-table-bg: rgba(255, 193, 7, 0.14); }
-.signal-table tbody tr.status-down    { --bs-table-bg: rgba(108, 117, 125, 0.12); }
+   contextual backgrounds, so the light text + inline controls stay readable.
+   Used by the dashboard signal table and the log list / serial history. */
+tr.status-up      { --bs-table-bg: rgba(25, 135, 84, 0.16); }
+tr.status-faulted { --bs-table-bg: rgba(220, 53, 69, 0.20); }
+tr.status-standby { --bs-table-bg: rgba(255, 193, 7, 0.14); }
+tr.status-down    { --bs-table-bg: rgba(108, 117, 125, 0.12); }
+
+/* Darker grey secondary badges — the default #6c757d is ~3.4:1 with white
+   text (below AA); this lifts it to a readable level. */
+.badge.bg-secondary,
+.badge.text-bg-secondary {
+  background-color: #565e64 !important;
+}
 
 /* Keep muted/secondary text legible inside light Bootstrap contextual rows
    (read-only tables such as the log list and serial history). */
