@@ -126,11 +126,16 @@ def _dashboard_ctx(db: Session) -> dict:
         all_buzzer = _buzzer_active(signals, range_state)
         serial_data = [{"serial": None, "signals": signals, "buzzer_active": all_buzzer}]
 
+    global_signals = [s for sd in serial_data for s in sd["signals"]]
     return {
         "serial_data": serial_data,
         "active_serials": active_serials,
         # Flat signals list kept for the OOB buzzer swap (any signal across all serials)
-        "signals": [s for sd in serial_data for s in sd["signals"]],
+        "signals": global_signals,
+        # Global aggregates for the summary cards (kept fresh on every poll via OOB)
+        "up_count": sum(1 for s in global_signals if s.signal_status == "Up"),
+        "faulted_count": sum(1 for s in global_signals if s.signal_status == "Faulted"),
+        "any_buzzer": all_buzzer,
         "range_state": range_state,
         "buzzer_active": all_buzzer,
         "mod_types": mod_types,
@@ -164,7 +169,7 @@ async def dashboard_fragment_legacy(
     ctx = _dashboard_ctx(db)
     signals = _latest_signal_status(db)
     range_state = ctx["range_state"]
-    return templates.TemplateResponse(request, "partials/signal_table.html", {
+    return templates.TemplateResponse(request, "partials/dashboard_fragment.html", {
         **ctx,
         "signals": signals,
         "buzzer_active": _buzzer_active(signals, range_state),
@@ -192,11 +197,11 @@ async def dashboard_fragment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """HTMX polling endpoint — returns the signal table for one serial."""
+    """HTMX polling endpoint — returns the serial's table + OOB summary/buzzer."""
     ctx = _dashboard_ctx(db)
     signals = _latest_signal_status(db, serial_id=serial_id)
     range_state = ctx["range_state"]
-    return templates.TemplateResponse(request, "partials/signal_table.html", {
+    return templates.TemplateResponse(request, "partials/dashboard_fragment.html", {
         **ctx,
         "signals": signals,
         "buzzer_active": _buzzer_active(signals, range_state),
@@ -317,10 +322,10 @@ async def dashboard_quick_update(
     ctx = _dashboard_ctx(db)
     effective_serial_id = serial_id if serial_id is not None else None
     signals = _latest_signal_status(db, serial_id=effective_serial_id)
-    return templates.TemplateResponse(request, "partials/signal_table.html", {
+    return templates.TemplateResponse(request, "partials/dashboard_fragment.html", {
         **ctx,
         "signals": signals,
-        "buzzer_active": ctx["buzzer_active"],  # global buzzer for OOB swap
+        "buzzer_active": _buzzer_active(signals, ctx["range_state"]),  # this widget's badge
         "serial_id": effective_serial_id,
         "pkg_rf": _pkg_rf_for_serial(db, effective_serial_id) if effective_serial_id else None,
         "pkg_rf_by_signal": (

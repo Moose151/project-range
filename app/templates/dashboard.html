@@ -16,7 +16,7 @@
 </div>
 
 <!-- Global buzzer indicator (compact) -->
-{% if buzzer_active %}
+{% if any_buzzer %}
 <div class="alert alert-danger buzzer-bar d-flex align-items-center gap-2 py-1 px-3 mb-3" id="buzzerAlert">
   <i class="bi bi-volume-up-fill"></i>
   <span class="small"><strong>Buzzer on</strong> — signal(s) Up{% if range_state == 'Live' %}, RF transmitting{% endif %}.</span>
@@ -25,57 +25,8 @@
 <div id="buzzerAlert"></div>
 {% endif %}
 
-<!-- Summary cards -->
-<div class="row g-3 mb-3">
-  <div class="col-sm-6 col-lg-3">
-    <div class="card border-secondary h-100">
-      <div class="card-body">
-        <div class="text-muted small mb-1">Range State</div>
-        <div class="fw-bold fs-5
-          {% if range_state == 'Live' %}text-danger{% elif range_state == 'Closed Loop' %}text-info{% else %}text-secondary{% endif %}">
-          <i class="bi bi-{% if range_state == 'Live' %}broadcast-pin blink-icon{% elif range_state == 'Closed Loop' %}arrow-repeat{% else %}power{% endif %} me-1"></i>
-          {{ range_state }}
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="col-sm-6 col-lg-3">
-    <div class="card {% if buzzer_active %}border-danger{% else %}border-secondary{% endif %} h-100">
-      <div class="card-body">
-        <div class="text-muted small mb-1">
-          Active Signals
-          {% if buzzer_active %}<i class="bi bi-volume-up-fill text-danger ms-1"></i>{% endif %}
-        </div>
-        <div class="fw-bold fs-5 {% if buzzer_active %}text-danger{% else %}text-success{% endif %}">
-          {{ signals | selectattr("signal_status", "equalto", "Up") | list | length }}
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="col-sm-6 col-lg-3">
-    <div class="card border-secondary h-100">
-      <div class="card-body">
-        <div class="text-muted small mb-1">Faulted</div>
-        <div class="fw-bold fs-5 {% if signals | selectattr('signal_status', 'equalto', 'Faulted') | list | length > 0 %}text-danger{% else %}text-secondary{% endif %}">
-          {{ signals | selectattr("signal_status", "equalto", "Faulted") | list | length }}
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="col-sm-6 col-lg-3">
-    <div class="card border-secondary h-100">
-      <div class="card-body">
-        <div class="text-muted small mb-1">Last State Change</div>
-        {% if last_state_change %}
-        <div class="fw-semibold text-primary" style="font-size:0.95rem">{{ last_state_change.timestamp.strftime('%H:%M %d/%m/%y') }}</div>
-        <div class="text-muted small">by {{ last_state_change.changed_by_user.display_name }}</div>
-        {% else %}
-        <div class="text-secondary">—</div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-</div>
+<!-- Summary cards (kept fresh on every poll via OOB swap) -->
+{% include "partials/dashboard_summary.html" %}
 
 {% if not active_serials %}
 <!-- No active serials notice -->
@@ -127,7 +78,7 @@
             {% if serial %}
             <span class="text-muted small me-1">Started {{ serial.opened_at.strftime('%H:%M %d/%m') }}</span>
             <span class="htmx-indicator spinner-border spinner-border-sm text-secondary me-1" role="status" style="width:0.7rem;height:0.7rem"></span>
-            {% if w_buzzer %}<span class="badge bg-danger">BUZZER</span>{% endif %}
+            <span id="widgetBuzzer-{{ serial.id }}">{% if w_buzzer %}<span class="badge bg-danger">BUZZER</span>{% endif %}</span>
             <a href="/logs/new?serial_id={{ serial.id }}" class="btn btn-sm btn-outline-success py-0 px-2" title="Add signal log"><i class="bi bi-plus-lg"></i></a>
             <a href="/logs?serial_id={{ serial.id }}" class="btn btn-sm btn-outline-secondary py-0 px-2" title="View logs"><i class="bi bi-journal-text"></i></a>
             <form method="post" action="/serials/{{ serial.id }}/end" class="d-inline"
