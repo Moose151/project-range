@@ -60,10 +60,22 @@
   padding: 0.5rem 0.875rem;
 }
 
-/* ── Navbar brand ───────────────────────────────────────────── */
+/* ── Navbar ─────────────────────────────────────────────────── */
 .navbar-brand {
   font-size: 1.1rem;
   letter-spacing: 0.04em;
+}
+.navbar {
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+}
+.navbar-nav .nav-link {
+  padding-left: 0.7rem;
+  padding-right: 0.7rem;
+}
+.navbar-nav .dropdown-item .bi {
+  width: 1.1em;
+  text-align: center;
 }
 
 /* ── Scrollable overflow table containers ───────────────────── */
