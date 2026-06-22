@@ -213,6 +213,7 @@ function saveLayout() {
 // card; dragging a tab to empty dashboard space splits it back into its own
 // widget. The grip icon still reorders standalone widgets (SortableJS).
 let draggedTab = null;  // { serialId, sourceGroupId }
+let splitSeq = 0;       // monotonic counter for unique split-group ids
 
 function groupOf(serialId) {
   const wrap = document.querySelector(`.serial-body-wrap[data-serial-body="${serialId}"]`);
