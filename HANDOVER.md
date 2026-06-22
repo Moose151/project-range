@@ -45,6 +45,7 @@ project-range/
 │   │   │                    #   /serials/{id}/start, /serials/{id}/end, /serials/{id}/packages/add
 │   │   ├── history.py       # Closed serial history: GET /history, /history/{id},
 │   │   │                    #   /history/{id}/export/csv, /history/{id}/export/xlsx
+│   │   ├── handover.py      # GET /handover (on-screen shift summary), /handover/print (printable)
 │   │   ├── range_state.py   # GET/POST /range-state/change
 │   │   ├── config.py        # GET/POST /config — mod types, FEC types, signal sources, antennas,
 │   │   │                    #   signal registry, frequency templates
@@ -71,6 +72,8 @@ project-range/
 │   │   ├── package_import.html          # Import package from JSON file
 │   │   ├── serials.html                 # Active serials list + create-new form + add-package form
 │   │   ├── serial_start.html            # Confirm/preview page before starting a serial
+│   │   ├── handover.html                # On-screen shift handover snapshot (summary + per-serial signals)
+│   │   ├── handover_print.html          # Printable/PDF shift handover sheet with sign-off lines
 │   │   ├── history.html                 # Paginated searchable list of closed serials
 │   │   ├── history_detail.html          # All logs for one closed serial, with export
 │   │   ├── config.html                  # Supervisor: mod types, FEC, sources, antennas, registry, freq templates
@@ -255,6 +258,8 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 - [x] **HTMX loading spinner**: per-serial widget header shows a spinner while the 10s poll is in flight.
 - [x] **Documentation / Wiki module** (`/docs`): Markdown pages with version history, supervisor direct edit, operator edit proposals, approval queue, printable view. 7 seed pages covering core procedures. Nav link visible to all users; pending-proposal badge for supervisors.
 - [x] **Package-level RF configuration**: `SignalPackage` now stores band, antenna, BUC, LO, TTF, TTF direction, and freq unit shared by all signals in the package. When a serial's log entry is created, BUC/LO/TTF/band/antenna are auto-populated from the package — operators only enter one known frequency and the rest resolve automatically. Dashboard quick-edit defaults the Antenna select from the package config. Serial start log entries inherit package-level band and antenna.
+- [x] **Package signal form real-time RF calc**: on the package signal add/edit form, entering any one frequency (TxIF/TxRF/RxRF/RxIF) auto-calculates the other three from the package's BUC/LO/TTF (read live from the form, before saving). Package and signal freq units are converted independently.
+- [x] **Shift Handover module** (`/handover`): point-in-time snapshot of range state, signals-up count, buzzer, and per-serial signal status tables, plus recent range-state changes and notes. `/handover/print` renders a printable/PDF sheet with off-going/on-coming sign-off lines (auto-opens print dialog). Nav link visible to all users.
 
 ---
 
@@ -270,7 +275,7 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 - [ ] Power warning thresholds per-signal or per-template
 - [ ] Formal range report export (PDF or structured XLSX)
 - [ ] Device ping / network status checks
-- [ ] Shift handover module (print/PDF summary of signals and state at shift change)
+- [x] Shift handover module (print/PDF summary of signals and state at shift change) — see Implemented Features
 - [ ] Active Directory / SSO authentication
 - [ ] Session: "remember this terminal" option for thin clients
 - [ ] More detailed permissions model beyond operator/supervisor

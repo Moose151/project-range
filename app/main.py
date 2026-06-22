@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from app.config import SECRET_KEY, APP_VERSION
-from app.routers import auth, dashboard, calculator, logs, range_state, users, config, audit, sessions, packages, serials, history, docs
+from app.routers import auth, dashboard, calculator, logs, range_state, users, config, audit, sessions, packages, serials, history, docs, handover
 
 app = FastAPI(title="Project Range", version=APP_VERSION, docs_url=None, redoc_url=None)
 
@@ -25,6 +25,7 @@ app.include_router(packages.router)
 app.include_router(serials.router)
 app.include_router(history.router)
 app.include_router(docs.router)
+app.include_router(handover.router)
 
 
 @app.exception_handler(302)
