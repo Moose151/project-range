@@ -123,11 +123,12 @@
           {% if serial %}
           <button type="button" class="serial-tab-btn btn btn-sm btn-primary" data-serial-tab="{{ serial.id }}"
                   draggable="true" onclick="switchTab(this)"
-                  title="{{ serial.title }} — drag onto another widget to tab them, or drag to empty space to split out">{{ serial.title }}</button>
+                  title="{{ serial.title }} — drag onto another widget to tab them together">{{ serial.title }}</button>
           {% else %}
           <span class="fw-semibold text-muted">All Signals (no active serial)</span>
           {% endif %}
         </div>
+        <div class="serial-group-controls d-flex gap-1 align-items-center"></div>
         <div class="serial-actions ms-auto d-flex gap-1 align-items-center"></div>
       </div>
       <div class="serial-bodies">
@@ -277,6 +278,7 @@ function mergeSerialIntoGroup(serialId, targetGroup) {
   }
   initGroup(targetGroup);
   setActiveTab(targetGroup, serialId);
+  refreshAllControls();
   saveLayout();
 }
 
@@ -288,7 +290,7 @@ function splitSerialOut(serialId) {
   const title = wrap.dataset.serialTitle || serialId;
   const group = document.createElement('div');
   group.className = 'serial-widget-group';
-  group.dataset.groupId = 'group-' + serialId;
+  group.dataset.groupId = 'group-' + serialId + '-s' + (++splitSeq);  // unique to avoid id collisions
   group.dataset.serialIds = serialId;
   group.dataset.activeTab = serialId;
   group.innerHTML = `
@@ -296,6 +298,7 @@ function splitSerialOut(serialId) {
       <div class="card-header d-flex align-items-center gap-2">
         <i class="bi bi-grip-vertical text-muted widget-drag-handle" style="cursor:grab" title="Drag to reorder widgets"></i>
         <div class="serial-tabbar d-flex gap-1 flex-wrap align-items-center"></div>
+        <div class="serial-group-controls d-flex gap-1 align-items-center"></div>
         <div class="serial-actions ms-auto d-flex gap-1 align-items-center"></div>
       </div>
       <div class="serial-bodies"></div>
@@ -308,6 +311,7 @@ function splitSerialOut(serialId) {
   initGroup(sourceGroup);
   registerGroupDnD(group);
   initGroup(group);
+  refreshAllControls();
   saveLayout();
 }
 
@@ -340,6 +344,31 @@ document.addEventListener('dragend', () => {
   document.querySelectorAll('.drop-merge-target').forEach(g => g.classList.remove('drop-merge-target'));
 });
 
+// ── Pop-out (split) control ──────────────────────────────────────────────────
+// Merging is done by dragging a serial's tab onto another widget; this button
+// reliably splits the active tab back into its own widget (drag-to-empty also
+// works but is easy to miss when widgets fill the screen).
+function isLegacyGroup(group) {
+  const ids = groupSerialIds(group);
+  return ids.length === 1 && ids[0] === 'legacy';
+}
+function renderGroupControls(group) {
+  const ctl = group.querySelector('.serial-group-controls');
+  if (!ctl) return;
+  // Pop-out (split) button — only meaningful once a group holds more than one tab.
+  if (isLegacyGroup(group) || groupSerialIds(group).length < 2) { ctl.innerHTML = ''; return; }
+  ctl.innerHTML = `<button type="button" class="btn btn-sm btn-outline-info py-0 px-1"
+    title="Pop the active tab out into its own widget" onclick="splitActive('${group.dataset.groupId}')">
+    <i class="bi bi-box-arrow-up-right"></i> Pop out</button>`;
+}
+function refreshAllControls() {
+  document.querySelectorAll('.serial-widget-group').forEach(renderGroupControls);
+}
+function splitActive(groupId) {
+  const group = document.querySelector(`.serial-widget-group[data-group-id="${groupId}"]`);
+  if (group) splitSerialOut(group.dataset.activeTab);
+}
+
 // ── Restore saved layout on page load ────────────────────────────────────
 // Container background is the "split out" drop target (group drops stopPropagation).
 (function () {
@@ -357,6 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
   {% if toast %}showToast({{ toast | tojson }}, 'success');{% endif %}
   document.querySelectorAll('.serial-widget-group').forEach(g => { registerGroupDnD(g); initGroup(g); });
   restoreLayout();
+  refreshAllControls();
 });
 
 function restoreLayout() {

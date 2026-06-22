@@ -284,7 +284,7 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 - [ ] HTTPS/TLS support
 - [ ] Dashboard: "Add signal" form directly on dashboard (currently requires /logs/new)
 - [x] **Dashboard inline on/off + power controls**: per-signal-row switch to set Up/Down, and −/+ stepper buttons (step 1) plus an editable number field to set power directly, with Submit/Cancel; a log entry is only written on Submit. The 10s poll pauses while any row has unsubmitted changes. Replaces needing the pencil→Status-dropdown path for the common on/off + power changes (full edit panel still available for other fields).
-- [x] **Dashboard drag tabbing UX**: each serial's body + header actions live together in a `.serial-body-wrap`; dragging a serial's tab onto another widget combines them into one tabbed card, and dragging a tab to empty dashboard space splits it back into its own standalone widget. Grip icon still reorders widgets (SortableJS). Layout persisted in `localStorage.dashboardLayout_v2`.
+- [x] **Dashboard drag tabbing UX**: each serial's body + header actions live together in a `.serial-body-wrap`. **Merge** = drag a serial's tab onto another widget to combine them into one tabbed card. **Split** = a "Pop out" button in the tabbed card header pops the active tab back into its own standalone widget (dragging a tab to empty space also splits, but the button is the reliable path when widgets fill the screen). Grip icon still reorders widgets (SortableJS). Layout persisted in `localStorage.dashboardLayout_v2`.
 
 ---
 
