@@ -68,6 +68,16 @@ See the **Security hardening** section below for the security items shipped in 0
 - [~] **PostgreSQL option** — **deferred** (your call — no infra to stand up yet). Support Postgres via `DATABASE_URL` with a real migration tool (Alembic).
 - [~] **HTTPS/TLS** — **deferred** (your call). Reverse-proxy/self-signed setup for the range network. Session cookies are already `SameSite=Strict` + ready for `Secure` (`SESSION_HTTPS_ONLY=1`).
 
+## 0.10.0 — Dashboard widgets & Settings UX (pre-1.0)
+
+Theme: discoverability and at-a-glance ops info. *(User-requested.)*
+
+- [ ] **Settings area** — a clear, discoverable **Settings** entry (nav item / gear menu) that consolidates configuration in one place:
+  - **Per-user (Preferences):** theme + light/dark, default units, time zone (below). *(These live on the existing `/preferences` page today, reached only via the user's name in the navbar — surface it as "Settings".)*
+  - **Admin (Config):** the supervisor-only `/config` page (modulation/FEC/sources/antennas/registry/freq templates).
+  - Likely a tabbed Settings page (Preferences | Admin) or a Settings dropdown grouping both, so "where do I change X?" is obvious.
+- [ ] **Dashboard clock widget** — a **Zulu (UTC) time** clock plus **local time**, where local time follows a **time-zone chosen in Settings** (IANA tz dropdown, stored per user like default units). Implement as a **dashboard widget that can be added and dragged/arranged like the serial widgets** (reuse the existing dashboard widget drag/merge/pop-out system). Updates live (client-side tick; Zulu always shown).
+
 ## 1.0.0 — Operational release
 
 Theme: blessed for use. Gate criteria:
