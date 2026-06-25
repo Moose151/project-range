@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Incidents{% endblock %}
+
+{% set sev_class = {'low':'bg-secondary','medium':'bg-info text-dark','high':'bg-warning text-dark','critical':'bg-danger'} %}
+{% set status_class = {'open':'bg-danger','investigating':'bg-warning text-dark','resolved':'bg-success','closed':'bg-secondary'} %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <h4 class="mb-0"><i class="bi bi-exclamation-octagon me-2"></i>Incidents &amp; Faults</h4>
+  {% if open_count %}<span class="badge bg-danger">{{ open_count }} open</span>{% endif %}
+  <div class="ms-auto d-flex gap-2">
+    <a href="/incidents/export.csv" class="btn btn-sm btn-outline-secondary"><i class="bi bi-download me-1"></i>Export CSV</a>
+  </div>
+</div>
+
+{% if toast %}
+<div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
+
+<!-- Log a new incident -->
+<div class="card border-secondary mb-3">
+  <div class="card-header"><i class="bi bi-plus-lg me-1"></i>Log an Incident / Fault</div>
+  <div class="card-body">
+    <form method="post" action="/incidents/new" class="row g-2">
+      <div class="col-md-5">
+        <label class="form-label small mb-0">Title</label>
+        <input type="text" class="form-control form-control-sm" name="title" required placeholder="e.g. HPA 2 tripped during uplink">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">Severity</label>
+        <select class="form-select form-select-sm" name="severity">
+          {% for s in severities %}<option value="{{ s }}" {% if s == 'medium' %}selected{% endif %}>{{ s|capitalize }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">Affected</label>
+        <input type="text" class="form-control form-control-sm" name="affected" placeholder="signal / device">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">Serial (optional)</label>
+        <select class="form-select form-select-sm" name="serial_id">
+          <option value="">—</option>
+          {% for s in serials %}<option value="{{ s.id }}">{{ s.title }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-12">
+        <label class="form-label small mb-0">Description</label>
+        <textarea class="form-control form-control-sm" name="description" rows="2" placeholder="What happened, when, what was done"></textarea>
+      </div>
+      <div class="col-12">
+        <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check2 me-1"></i>Log Incident</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Filter -->
+<div class="mb-2">
+  <a href="/incidents" class="btn btn-xs btn-sm py-0 {% if not filter_status %}btn-secondary{% else %}btn-outline-secondary{% endif %}">All</a>
+  {% for s in statuses %}
+  <a href="/incidents?status={{ s }}" class="btn btn-xs btn-sm py-0 {% if filter_status == s %}btn-secondary{% else %}btn-outline-secondary{% endif %}">{{ s|capitalize }}</a>
+  {% endfor %}
+</div>
+
+<!-- List -->
+<div class="card border-secondary">
+  <div class="card-body p-0 overflow-auto">
+    <table class="table table-dark table-sm align-middle mb-0">
+      <thead class="table-secondary">
+        <tr><th>When</th><th>Severity</th><th>Status</th><th>Title</th><th>Affected</th><th>Reported by</th><th style="width:280px">Update</th></tr>
+      </thead>
+      <tbody>
+        {% for i in incidents %}
+        <tr>
+          <td class="text-muted small text-nowrap">{{ i.created_at.strftime('%d/%m %H:%M') if i.created_at else '' }}</td>
+          <td><span class="badge {{ sev_class.get(i.severity, 'bg-secondary') }}">{{ i.severity|capitalize }}</span></td>
+          <td><span class="badge {{ status_class.get(i.status, 'bg-secondary') }}">{{ i.status|capitalize }}</span></td>
+          <td class="fw-semibold">{{ i.title }}
+            {% if i.description %}<div class="text-muted small">{{ i.description }}</div>{% endif %}
+            {% if i.resolution %}<div class="small text-success"><i class="bi bi-check2-circle me-1"></i>{{ i.resolution }}</div>{% endif %}
+          </td>
+          <td class="small">{{ i.affected or '—' }}</td>
+          <td class="small text-muted">{{ i.reported_by.display_name if i.reported_by else '' }}</td>
+          <td>
+            <form method="post" action="/incidents/{{ i.id }}/update" class="d-flex gap-1 align-items-center">
+              <select name="status" class="form-select form-select-sm py-0" style="max-width:130px">
+                {% for s in statuses %}<option value="{{ s }}" {% if i.status == s %}selected{% endif %}>{{ s|capitalize }}</option>{% endfor %}
+              </select>
+              <input type="text" name="resolution" class="form-control form-control-sm py-0" placeholder="resolution note" value="{{ i.resolution or '' }}">
+              <button type="submit" class="btn btn-sm btn-outline-primary py-0 px-1" title="Save"><i class="bi bi-check2"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-3">No incidents logged.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

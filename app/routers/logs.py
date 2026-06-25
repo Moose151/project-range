@@ -427,6 +427,31 @@ async def log_restore(
     return RedirectResponse("/logs?show_deleted=1&toast=Log+entry+restored", status_code=302)
 
 
+@router.post("/{log_id}/hard-delete")
+async def log_hard_delete(
+    log_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Permanently delete a log entry. Supervisor only, and only on already
+    soft-deleted entries (so it's a deliberate two-step action)."""
+    if current_user.role != Role.SUPERVISOR:
+        return RedirectResponse("/logs", status_code=302)
+    log_entry = db.query(SignalLog).filter(SignalLog.id == log_id).first()
+    if log_entry and log_entry.is_deleted:
+        db.add(AuditLog(
+            user_id=current_user.id,
+            action_type="LOG_HARD_DELETE",
+            entity_type="SignalLog",
+            entity_id=log_id,
+            previous_value=log_entry.signal_name,
+        ))
+        db.delete(log_entry)
+        db.commit()
+    return RedirectResponse("/logs?show_deleted=1&toast=Log+entry+permanently+deleted", status_code=302)
+
+
 @router.get("/note", response_class=HTMLResponse)
 async def log_note_page(
     request: Request,

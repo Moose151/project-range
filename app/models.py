@@ -414,3 +414,24 @@ class DevicePort(Base):
     routed_from: Mapped[int | None] = mapped_column(Integer, nullable=True)  # input idx feeding an output
 
     device: Mapped["RFDevice"] = relationship("RFDevice", back_populates="ports")
+
+
+class Incident(Base):
+    """A fault / incident report. Logging + awareness only (no hardware control)."""
+    __tablename__ = "incidents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    severity: Mapped[str] = mapped_column(String(16), default="medium")   # low|medium|high|critical
+    status: Mapped[str] = mapped_column(String(16), default="open")       # open|investigating|resolved|closed
+    affected: Mapped[str | None] = mapped_column(String(200), nullable=True)  # signal/device/area
+    serial_id: Mapped[int | None] = mapped_column(ForeignKey("serials.id"), nullable=True)
+    reported_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    resolution: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolved_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    reported_by: Mapped["User"] = relationship("User", foreign_keys="Incident.reported_by_id")
+    resolved_by: Mapped["User | None"] = relationship("User", foreign_keys="Incident.resolved_by_id")

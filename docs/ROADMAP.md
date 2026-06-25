@@ -38,7 +38,17 @@ Core of the MVP scope is in place:
 Theme: make it look and feel like an operations tool. *(User-requested batch.)*
 
 - [x] **Range logo** — SEW Range eagle badge added to the navbar brand, login page, and favicon; app re-branded "SEW Range". A light gold accent (brand text, navbar underline, version badge) was applied from the logo.
-- [ ] **Full palette adoption from the logo** *(follow-up)* — extend the logo colours (gold `#e0a52e`, eye-amber `#f2a81c`, silver `#c9ced6`, ink `#0e0f12`) across the interface: primary buttons, links, active nav, badges and focus rings, in both light and dark themes. Brand CSS variables are already defined in `app.css` (`--range-gold`, etc.); this is the deliberate restyle on top of them.
+- [ ] **Selectable named themes** *(follow-up)* — turn the palette work into a proper **theme system** chosen on the Preferences/Settings page. **Two independent axes:**
+  1. **Theme** (colour/accent identity) — picked in settings, remembered per terminal.
+  2. **Light / dark mode** — the existing navbar toggle stays, and **every theme provides both a light and a dark variant**. Switching mode keeps the chosen theme; switching theme keeps the chosen mode.
+
+  Named themes to ship (each with a light + dark variant), keeping the current look as one option:
+  - **Classic** — today's Bootstrap blue accent (default).
+  - **SEW Gold** — the logo palette (gold `#e0a52e`, eye-amber `#f2a81c`, silver `#c9ced6`, ink `#0e0f12`).
+  - **Night Ops** — low red/amber accent for a darkened ops room (its dark variant preserves night vision; light variant is a warm high-contrast day mode).
+  - **Spectrum** — cool blue/teal accent.
+
+  Implementation note: drive it off two attributes — `data-bs-theme` (light|dark, already wired + applied pre-paint to avoid flash) and a new `data-theme` (palette) — with one CSS variable set per (theme × mode). Brand vars like `--range-gold` already exist in `app.css`. Settings writes both `rangeTheme`/mode to localStorage; the pre-paint script applies both.
 - [x] **Navbar / UI tidy** — grouped right-side controls (preferences link, theme toggle, logout); user name now links to preferences.
 - [x] **Light / dark mode** — toggle in the navbar (Bootstrap 5.3 `data-bs-theme`), remembered per terminal via localStorage, applied pre-paint to avoid flash; default dark; works on login too.
 - [x] **User-selected default units** (MHz/GHz, dBm/dBW) — stored per user, set on the Preferences page, applied to the RF and Power calculators. Scope §12.5.
@@ -52,16 +62,17 @@ Theme: visibility of the physical signal path. *(User-requested splitter page + 
 - [x] **Basic device status checks** — live up/down/no-check badges via a non-blocking concurrent TCP reachability probe (`/devices/status`, polled every 15s); no hardware control. Scope §11.9.
 - [x] **Device registry** (name, type, host/IP, check port, location, port counts) — supervisor-managed CRUD, audited; underpins both of the above. New "Devices" nav entry.
 
-## 0.9.0 — Operational hardening
+## 0.9.0 — Operational hardening ✅ (security + features shipped; infra deferred)
 
 Theme: ready to trust with real operations. *(Scope §13, Phase 4.)*
+See the **Security hardening** section below for the security items shipped in 0.9.0.
 
-- [ ] **PostgreSQL option** — support Postgres via `DATABASE_URL` for multi-user concurrency (replace SQLite-specific migration with a proper migration tool, e.g. Alembic).
-- [ ] **HTTPS/TLS** — optional reverse-proxy/self-signed setup for the range network.
-- [ ] **Backups** — scheduled DB backup/restore procedure (documented + scripted).
-- [ ] **Soft / hard log delete** — soft delete (recoverable) for operators, hard delete for supervisors. Scope §4.10.
-- [ ] **Supervisor approval for going Live** + optional two-person confirmation for high-risk actions. Scope §12.2.
-- [ ] **Incident / fault reporting** — capture, list, and export faults. Scope §12.2.
+- [x] **Soft / hard log delete** — soft delete (recoverable) for everyone; supervisor-only restore and permanent hard-delete (two-step: only on already soft-deleted entries). Audited. Scope §4.10.
+- [x] **Supervisor approval for going Live** — going Live requires a safety acknowledgment, and a supervisor must authorise (operators supply a supervisor's credentials = two-person). Approver recorded in the state log + audit. Scope §12.2.
+- [x] **Incident / fault reporting** — log incidents (severity/status/affected/serial), update status with resolution, CSV export, audited; new "Incidents" nav with open count. Scope §12.2.
+- [ ] **Backups** — scheduled DB backup/restore procedure (scripted). *(manual `docker compose cp` documented in DEPLOY.md for now.)*
+- [~] **PostgreSQL option** — **deferred** (your call — no infra to stand up yet). Support Postgres via `DATABASE_URL` with a real migration tool (Alembic).
+- [~] **HTTPS/TLS** — **deferred** (your call). Reverse-proxy/self-signed setup for the range network. Session cookies are already `SameSite=Strict` + ready for `Secure` (`SESSION_HTTPS_ONLY=1`).
 
 ## 1.0.0 — Operational release
 
