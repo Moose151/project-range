@@ -218,3 +218,66 @@ code {
 .brand-sew span { color: var(--range-gold); letter-spacing: .04em; }
 .navbar { border-bottom: 2px solid var(--range-gold) !important; }
 .app-version-badge { color: var(--range-gold); }
+
+/* ── Theme palettes ──────────────────────────────────────────
+   Two independent axes:
+     • data-bs-theme = light | dark   (the navbar toggle)
+     • data-theme    = colour palette (chosen in Preferences)
+   Each palette sets an accent applied to Bootstrap "primary" surfaces and
+   works in both light and dark. Brand (logo gold) stays constant. */
+:root, [data-theme="classic"] {
+  --range-accent: #0d6efd; --range-accent-rgb: 13,110,253;
+  --range-accent-hover: #0b5ed7; --range-accent-contrast: #ffffff;
+}
+[data-theme="sew-gold"] {
+  --range-accent: #e0a52e; --range-accent-rgb: 224,165,46;
+  --range-accent-hover: #c88f22; --range-accent-contrast: #1a1300;
+}
+[data-theme="night-ops"] {
+  --range-accent: #e8603a; --range-accent-rgb: 232,96,58;
+  --range-accent-hover: #cf4d2b; --range-accent-contrast: #190a06;
+}
+[data-theme="spectrum"] {
+  --range-accent: #19b8c9; --range-accent-rgb: 25,184,201;
+  --range-accent-hover: #149aa8; --range-accent-contrast: #062225;
+}
+
+/* Map the accent onto Bootstrap's primary surfaces */
+:root {
+  --bs-primary: var(--range-accent);
+  --bs-primary-rgb: var(--range-accent-rgb);
+  --bs-link-color: var(--range-accent);
+  --bs-link-hover-color: var(--range-accent-hover);
+  --bs-link-color-rgb: var(--range-accent-rgb);
+  --bs-focus-ring-color: rgba(var(--range-accent-rgb), .35);
+}
+.btn-primary {
+  --bs-btn-bg: var(--range-accent); --bs-btn-border-color: var(--range-accent);
+  --bs-btn-color: var(--range-accent-contrast);
+  --bs-btn-hover-bg: var(--range-accent-hover); --bs-btn-hover-border-color: var(--range-accent-hover);
+  --bs-btn-hover-color: var(--range-accent-contrast);
+  --bs-btn-active-bg: var(--range-accent-hover); --bs-btn-active-border-color: var(--range-accent-hover);
+  --bs-btn-active-color: var(--range-accent-contrast);
+  --bs-btn-disabled-bg: var(--range-accent); --bs-btn-disabled-border-color: var(--range-accent);
+  --bs-btn-disabled-color: var(--range-accent-contrast);
+}
+.btn-outline-primary {
+  --bs-btn-color: var(--range-accent); --bs-btn-border-color: var(--range-accent);
+  --bs-btn-hover-bg: var(--range-accent); --bs-btn-hover-border-color: var(--range-accent);
+  --bs-btn-hover-color: var(--range-accent-contrast);
+  --bs-btn-active-bg: var(--range-accent); --bs-btn-active-border-color: var(--range-accent);
+  --bs-btn-active-color: var(--range-accent-contrast);
+  --bs-btn-disabled-color: var(--range-accent); --bs-btn-disabled-border-color: var(--range-accent);
+}
+.text-primary { color: var(--range-accent) !important; }
+.bg-primary { background-color: var(--range-accent) !important; color: var(--range-accent-contrast) !important; }
+.navbar .nav-link.active { color: var(--range-accent) !important; }
+.form-check-input:checked { background-color: var(--range-accent); border-color: var(--range-accent); }
+
+/* Distinct canvas tints for the darkened-room palettes (dark mode only) */
+[data-theme="night-ops"][data-bs-theme="dark"] body { background-color: #160a07 !important; }
+[data-theme="spectrum"][data-bs-theme="dark"] body { background-color: #07141a !important; }
+
+/* Theme swatch buttons on the Preferences page */
+.theme-swatch { width: 1.1rem; height: 1.1rem; border-radius: 50%; display: inline-block; vertical-align: -2px; margin-right: .35rem; border: 1px solid rgba(255,255,255,.35); }
+[data-palette-btn].active { outline: 2px solid var(--range-accent); }

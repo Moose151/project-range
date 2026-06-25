@@ -44,10 +44,19 @@
     <div class="card border-secondary">
       <div class="card-header"><i class="bi bi-palette me-1"></i>Appearance</div>
       <div class="card-body">
-        <p class="text-muted small mb-2">
-          The light / dark theme is remembered on this terminal. Use the
-          <i class="bi bi-moon-stars"></i> toggle in the top navigation bar to switch.
-        </p>
+        <label class="form-label small d-block mb-1">Theme</label>
+        <p class="text-muted small mb-2">Colour palette for this terminal. Each theme works in both light and dark mode.</p>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          {% set palettes = [('classic','Classic','#0d6efd'), ('sew-gold','SEW Gold','#e0a52e'), ('night-ops','Night Ops','#e8603a'), ('spectrum','Spectrum','#19b8c9')] %}
+          {% for val, label, swatch in palettes %}
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-palette-btn="{{ val }}" onclick="applyPalette('{{ val }}')">
+            <span class="theme-swatch" style="background:{{ swatch }}"></span>{{ label }}
+          </button>
+          {% endfor %}
+        </div>
+
+        <label class="form-label small d-block mb-1">Mode</label>
+        <p class="text-muted small mb-2">Also toggleable from the <i class="bi bi-moon-stars"></i> button in the top navigation bar.</p>
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleTheme()">
           <i class="bi bi-circle-half me-1"></i>Toggle light / dark
         </button>

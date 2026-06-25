@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en" data-bs-theme="dark" data-theme="classic">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script>(function(){try{var t=localStorage.getItem('rangeTheme')||'dark';document.documentElement.setAttribute('data-bs-theme',t);}catch(e){}})();</script>
+  <script>(function(){try{var d=document.documentElement;d.setAttribute('data-bs-theme',localStorage.getItem('rangeTheme')||'dark');d.setAttribute('data-theme',localStorage.getItem('rangePalette')||'classic');}catch(e){}})();</script>
   <title>Login — SEW Range</title>
   <link rel="icon" type="image/png" href="/static/img/sew-range-logo.png">
   <!-- Vendored locally so the login page styles on LAN devices with no internet -->
   <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="/static/vendor/bootstrap-icons/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=8">
+  <link rel="stylesheet" href="/static/css/app.css?v=10">
 </head>
 <body class="d-flex align-items-center justify-content-center min-vh-100 bg-body">
 <button type="button" class="btn btn-sm btn-outline-secondary position-fixed top-0 end-0 m-3"

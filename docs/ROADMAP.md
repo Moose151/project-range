@@ -38,17 +38,11 @@ Core of the MVP scope is in place:
 Theme: make it look and feel like an operations tool. *(User-requested batch.)*
 
 - [x] **Range logo** — SEW Range eagle badge added to the navbar brand, login page, and favicon; app re-branded "SEW Range". A light gold accent (brand text, navbar underline, version badge) was applied from the logo.
-- [ ] **Selectable named themes** *(follow-up)* — turn the palette work into a proper **theme system** chosen on the Preferences/Settings page. **Two independent axes:**
-  1. **Theme** (colour/accent identity) — picked in settings, remembered per terminal.
-  2. **Light / dark mode** — the existing navbar toggle stays, and **every theme provides both a light and a dark variant**. Switching mode keeps the chosen theme; switching theme keeps the chosen mode.
+- [x] **Selectable named themes** (0.9.1) — a **theme system** with two independent axes, both remembered per terminal and applied pre-paint (no flash):
+  1. **Theme** (`data-theme`) — colour palette chosen on the Preferences page (swatch buttons).
+  2. **Light / dark mode** (`data-bs-theme`) — the existing navbar toggle, working with every theme.
 
-  Named themes to ship (each with a light + dark variant), keeping the current look as one option:
-  - **Classic** — today's Bootstrap blue accent (default).
-  - **SEW Gold** — the logo palette (gold `#e0a52e`, eye-amber `#f2a81c`, silver `#c9ced6`, ink `#0e0f12`).
-  - **Night Ops** — low red/amber accent for a darkened ops room (its dark variant preserves night vision; light variant is a warm high-contrast day mode).
-  - **Spectrum** — cool blue/teal accent.
-
-  Implementation note: drive it off two attributes — `data-bs-theme` (light|dark, already wired + applied pre-paint to avoid flash) and a new `data-theme` (palette) — with one CSS variable set per (theme × mode). Brand vars like `--range-gold` already exist in `app.css`. Settings writes both `rangeTheme`/mode to localStorage; the pre-paint script applies both.
+  Themes shipped, each in light **and** dark: **Classic** (Bootstrap blue, default), **SEW Gold** (logo palette), **Night Ops** (red/amber, dark variant tints the canvas for a darkened ops room), **Spectrum** (blue/teal). The accent maps onto Bootstrap "primary" surfaces (buttons, links, active nav, badges, focus rings, checkboxes); the SEW Range logo/brand stays gold across all themes.
 - [x] **Navbar / UI tidy** — grouped right-side controls (preferences link, theme toggle, logout); user name now links to preferences.
 - [x] **Light / dark mode** — toggle in the navbar (Bootstrap 5.3 `data-bs-theme`), remembered per terminal via localStorage, applied pre-paint to avoid flash; default dark; works on login too.
 - [x] **User-selected default units** (MHz/GHz, dBm/dBW) — stored per user, set on the Preferences page, applied to the RF and Power calculators. Scope §12.5.

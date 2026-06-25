@@ -22,8 +22,20 @@ function toggleTheme() {
   const current = document.documentElement.getAttribute('data-bs-theme') || 'dark';
   applyTheme(current === 'dark' ? 'light' : 'dark');
 }
+
+// ── Colour palette (independent of light/dark) ────────────────────────────────
+const RANGE_PALETTE_KEY = 'rangePalette';
+function applyPalette(name) {
+  document.documentElement.setAttribute('data-theme', name);
+  try { localStorage.setItem(RANGE_PALETTE_KEY, name); } catch (e) {}
+  document.querySelectorAll('[data-palette-btn]').forEach(b =>
+    b.classList.toggle('active', b.dataset.paletteBtn === name));
+}
 document.addEventListener('DOMContentLoaded', () => {
   syncThemeIcon(document.documentElement.getAttribute('data-bs-theme') || 'dark');
+  const pal = document.documentElement.getAttribute('data-theme') || 'classic';
+  document.querySelectorAll('[data-palette-btn]').forEach(b =>
+    b.classList.toggle('active', b.dataset.paletteBtn === pal));
 });
 
 // Show a Bootstrap toast notification
