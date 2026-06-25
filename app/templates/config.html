@@ -37,10 +37,19 @@ document.addEventListener('DOMContentLoaded', () => {
 {% block content %}
 <h4 class="mb-3"><i class="bi bi-gear me-2"></i>System Configuration</h4>
 
-<div class="row g-4">
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cfg-mod" type="button"><i class="bi bi-broadcast me-1"></i>Modulation</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-fec" type="button"><i class="bi bi-code-slash me-1"></i>FEC</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-sources" type="button"><i class="bi bi-hdd-network me-1"></i>Sources</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-antennas" type="button"><i class="bi bi-broadcast-pin me-1"></i>Antennas</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-freq" type="button"><i class="bi bi-diagram-3 me-1"></i>Freq Templates</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-registry" type="button"><i class="bi bi-reception-4 me-1"></i>Signal Registry</button></li>
+</ul>
+
+<div class="tab-content">
 
   <!-- Modulation Types -->
-  <div class="col-lg-6">
+  <div class="tab-pane fade show active" id="cfg-mod" role="tabpanel">
     <div class="card border-secondary">
       <div class="card-header d-flex align-items-center justify-content-between">
         <span><i class="bi bi-broadcast me-1"></i>Modulation Types</span>
@@ -102,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 
   <!-- FEC Types -->
-  <div class="col-lg-6">
+  <div class="tab-pane fade" id="cfg-fec" role="tabpanel">
     <div class="card border-secondary">
       <div class="card-header d-flex align-items-center justify-content-between">
         <span><i class="bi bi-code-slash me-1"></i>FEC / Code Rates</span>
@@ -154,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 
   <!-- Signal Sources -->
-  <div class="col-lg-6">
+  <div class="tab-pane fade" id="cfg-sources" role="tabpanel">
     <div class="card border-secondary">
       <div class="card-header d-flex align-items-center justify-content-between">
         <span><i class="bi bi-hdd-rack me-1"></i>Signal Sources</span>
@@ -215,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 
   <!-- Antenna Types -->
-  <div class="col-lg-6">
+  <div class="tab-pane fade" id="cfg-antennas" role="tabpanel">
     <div class="card border-secondary">
       <div class="card-header d-flex align-items-center justify-content-between">
         <span><i class="bi bi-broadcast me-1"></i>Antennas</span>
@@ -276,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 
   <!-- Frequency Templates -->
-  <div class="col-12">
+  <div class="tab-pane fade" id="cfg-freq" role="tabpanel">
     <div class="card border-secondary">
       <div class="card-header d-flex align-items-center justify-content-between">
         <span><i class="bi bi-calculator me-1"></i>Frequency Templates</span>
@@ -440,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 
   <!-- Signal Registry -->
-  <div class="col-12">
+  <div class="tab-pane fade" id="cfg-registry" role="tabpanel">
     <div class="card border-secondary">
       <div class="card-header d-flex align-items-center justify-content-between">
         <span><i class="bi bi-reception-4 me-1"></i>Signal Registry</span>
@@ -522,6 +531,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         {% for g in groups %}<option value="{{ g }}">{% endfor %}
                       </datalist>
                     </div>
+                    <div>
+                      <label class="form-label small mb-1">Max Power (dBm)</label>
+                      <input type="number" step="any" class="form-control form-control-sm" name="max_power_dbm"
+                             value="{{ sig.max_power_dbm if sig.max_power_dbm is not none else '' }}"
+                             placeholder="ceiling" style="width:110px" title="Warn when logged power exceeds this">
+                    </div>
                     <div class="d-flex gap-1">
                       <button type="submit" class="btn btn-sm btn-primary">Save</button>
                       <button type="button" class="btn btn-sm btn-outline-secondary"
@@ -554,6 +569,11 @@ document.addEventListener('DOMContentLoaded', () => {
             <datalist id="groupListAdd">
               {% for g in groups %}<option value="{{ g }}">{% endfor %}
             </datalist>
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-1">Max Power dBm (optional)</label>
+            <input type="number" step="any" class="form-control form-control-sm" name="max_power_dbm"
+                   placeholder="ceiling" style="width:110px" title="Warn when logged power exceeds this">
           </div>
           <div class="col-auto">
             <button type="submit" class="btn btn-sm btn-primary">

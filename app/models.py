@@ -74,6 +74,8 @@ class Signal(Base):
     default_modulation: Mapped[str | None] = mapped_column(String(64), nullable=True)
     default_symbol_rate: Mapped[str | None] = mapped_column(String(32), nullable=True)
     default_fec: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Optional safe-power ceiling (dBm); logged power above this raises a warning
+    max_power_dbm: Mapped[float | None] = mapped_column(Float, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
@@ -91,6 +93,15 @@ class SignalPackage(Base):
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Package-level RF configuration — shared by all signals in this package
+    band: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    antenna: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    buc: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lo: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ttf: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ttf_direction: Mapped[str] = mapped_column(String(4), default="+")
+    freq_unit: Mapped[str] = mapped_column(String(4), default="MHz")
 
     created_by: Mapped[User] = relationship("User", foreign_keys="SignalPackage.created_by_id")
     signals: Mapped[list["SignalPackageEntry"]] = relationship(

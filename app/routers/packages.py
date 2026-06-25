@@ -43,6 +43,15 @@ def _package_to_dict(pkg: SignalPackage) -> dict:
     return {
         "name": pkg.name,
         "description": pkg.description or "",
+        "rf_config": {
+            "band": pkg.band or "",
+            "antenna": pkg.antenna or "",
+            "buc": pkg.buc,
+            "lo": pkg.lo,
+            "ttf": pkg.ttf,
+            "ttf_direction": pkg.ttf_direction or "+",
+            "freq_unit": pkg.freq_unit or "MHz",
+        },
         "signals": [
             {
                 "name": e.signal_name,
@@ -142,12 +151,26 @@ async def package_create(
     request: Request,
     name: str = Form(...),
     description: str = Form(""),
+    band: str = Form(""),
+    antenna: str = Form(""),
+    buc: Optional[float] = Form(None),
+    lo: Optional[float] = Form(None),
+    ttf: Optional[float] = Form(None),
+    ttf_direction: str = Form("+"),
+    freq_unit: str = Form("MHz"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     pkg = SignalPackage(
         name=name.strip(),
         description=description.strip() or None,
+        band=band or None,
+        antenna=antenna.strip() or None,
+        buc=buc,
+        lo=lo,
+        ttf=ttf,
+        ttf_direction=ttf_direction or "+",
+        freq_unit=freq_unit or "MHz",
         created_by_id=current_user.id,
     )
     db.add(pkg)
@@ -160,7 +183,7 @@ async def package_create(
 
 # ── Edit (add/update/remove signals) ─────────────────────────────────────────
 
-@router.get("/{pkg_id}", response_class=HTMLResponse)
+@router.get("/{pkg_id:int}", response_class=HTMLResponse)
 async def package_detail(
     pkg_id: int,
     request: Request,
@@ -180,11 +203,18 @@ async def package_detail(
     })
 
 
-@router.post("/{pkg_id}/update")
+@router.post("/{pkg_id:int}/update")
 async def package_update_meta(
     pkg_id: int,
     name: str = Form(...),
     description: str = Form(""),
+    band: str = Form(""),
+    antenna: str = Form(""),
+    buc: Optional[float] = Form(None),
+    lo: Optional[float] = Form(None),
+    ttf: Optional[float] = Form(None),
+    ttf_direction: str = Form("+"),
+    freq_unit: str = Form("MHz"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -192,12 +222,19 @@ async def package_update_meta(
     if pkg:
         pkg.name = name.strip() or pkg.name
         pkg.description = description.strip() or None
+        pkg.band = band or None
+        pkg.antenna = antenna.strip() or None
+        pkg.buc = buc
+        pkg.lo = lo
+        pkg.ttf = ttf
+        pkg.ttf_direction = ttf_direction or "+"
+        pkg.freq_unit = freq_unit or "MHz"
         pkg.updated_at = datetime.utcnow()
         db.commit()
     return RedirectResponse(f"/packages/{pkg_id}?toast=Package+updated", status_code=302)
 
 
-@router.post("/{pkg_id}/signals/add")
+@router.post("/{pkg_id:int}/signals/add")
 async def package_signal_add(
     pkg_id: int,
     signal_name: str = Form(...),
@@ -247,7 +284,7 @@ async def package_signal_add(
     return RedirectResponse(f"/packages/{pkg_id}?toast=Signal+added", status_code=302)
 
 
-@router.post("/{pkg_id}/signals/{entry_id}/update")
+@router.post("/{pkg_id:int}/signals/{entry_id:int}/update")
 async def package_signal_update(
     pkg_id: int,
     entry_id: int,
@@ -297,7 +334,7 @@ async def package_signal_update(
     return RedirectResponse(f"/packages/{pkg_id}?toast=Signal+updated", status_code=302)
 
 
-@router.post("/{pkg_id}/signals/{entry_id}/delete")
+@router.post("/{pkg_id:int}/signals/{entry_id:int}/delete")
 async def package_signal_delete(
     pkg_id: int,
     entry_id: int,
@@ -317,7 +354,7 @@ async def package_signal_delete(
     return RedirectResponse(f"/packages/{pkg_id}?toast=Signal+removed", status_code=302)
 
 
-@router.post("/{pkg_id}/duplicate")
+@router.post("/{pkg_id:int}/duplicate")
 async def package_duplicate(
     pkg_id: int,
     db: Session = Depends(get_db),
@@ -329,6 +366,13 @@ async def package_duplicate(
     copy = SignalPackage(
         name=f"{orig.name} (copy)",
         description=orig.description,
+        band=orig.band,
+        antenna=orig.antenna,
+        buc=orig.buc,
+        lo=orig.lo,
+        ttf=orig.ttf,
+        ttf_direction=orig.ttf_direction,
+        freq_unit=orig.freq_unit,
         created_by_id=current_user.id,
     )
     db.add(copy)
@@ -359,7 +403,7 @@ async def package_duplicate(
     return RedirectResponse(f"/packages/{copy.id}?toast=Package+duplicated", status_code=302)
 
 
-@router.post("/{pkg_id}/signals/reorder")
+@router.post("/{pkg_id:int}/signals/reorder")
 async def package_signals_reorder(
     pkg_id: int,
     request: Request,
@@ -383,7 +427,7 @@ async def package_signals_reorder(
     return RedirectResponse(f"/packages/{pkg_id}?toast=Order+saved", status_code=302)
 
 
-@router.post("/{pkg_id}/delete")
+@router.post("/{pkg_id:int}/delete")
 async def package_delete(
     pkg_id: int,
     db: Session = Depends(get_db),
@@ -400,7 +444,7 @@ async def package_delete(
 
 # ── Export / Import ───────────────────────────────────────────────────────────
 
-@router.get("/{pkg_id}/export")
+@router.get("/{pkg_id:int}/export")
 async def package_export(
     pkg_id: int,
     db: Session = Depends(get_db),
@@ -445,9 +489,17 @@ async def package_import_submit(
         data = json.loads(content.decode("utf-8"))
         if not isinstance(data, dict) or "signals" not in data:
             raise ValueError("File must be a JSON object with a 'signals' list.")
+        rf = data.get("rf_config", {}) or {}
         pkg = SignalPackage(
             name=str(data.get("name", file.filename or "Imported Package")).strip(),
             description=str(data.get("description", "")).strip() or None,
+            band=str(rf.get("band", "")).strip() or None,
+            antenna=str(rf.get("antenna", "")).strip() or None,
+            buc=_float_or_none(rf.get("buc")),
+            lo=_float_or_none(rf.get("lo")),
+            ttf=_float_or_none(rf.get("ttf")),
+            ttf_direction=str(rf.get("ttf_direction", "+")) or "+",
+            freq_unit=str(rf.get("freq_unit", "MHz")) or "MHz",
             created_by_id=current_user.id,
         )
         db.add(pkg)

@@ -83,7 +83,7 @@
           <td class="small text-muted">{{ log.entry_type }}</td>
         </tr>
         {% else %}
-        <tr class="{% if log.signal_status == 'Faulted' %}table-danger{% elif log.signal_status == 'Up' %}table-success{% endif %}">
+        <tr class="{% if log.signal_status == 'Faulted' %}status-faulted{% elif log.signal_status == 'Up' %}status-up{% endif %}">
           <td class="text-nowrap small">{{ log.timestamp.strftime('%H:%M:%S') }}</td>
           <td class="small">{{ log.operator.username if log.operator else '—' }}</td>
           <td class="fw-semibold">{{ log.signal_name }}</td>

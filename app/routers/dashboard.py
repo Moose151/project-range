@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials
 from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial
+from app.rf_config import serial_package_rf_config
+from app.signal_warnings import warning_flags_for
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -117,6 +119,7 @@ def _dashboard_ctx(db: Session) -> dict:
                 "serial": serial,
                 "signals": signals,
                 "buzzer_active": buzzer,
+                "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial.id, signals),
             })
     else:
         # No serials running — show all logs (legacy / no-serial mode)
@@ -124,11 +127,16 @@ def _dashboard_ctx(db: Session) -> dict:
         all_buzzer = _buzzer_active(signals, range_state)
         serial_data = [{"serial": None, "signals": signals, "buzzer_active": all_buzzer}]
 
+    global_signals = [s for sd in serial_data for s in sd["signals"]]
     return {
         "serial_data": serial_data,
         "active_serials": active_serials,
         # Flat signals list kept for the OOB buzzer swap (any signal across all serials)
-        "signals": [s for sd in serial_data for s in sd["signals"]],
+        "signals": global_signals,
+        # Global aggregates for the summary cards (kept fresh on every poll via OOB)
+        "up_count": sum(1 for s in global_signals if s.signal_status == "Up"),
+        "faulted_count": sum(1 for s in global_signals if s.signal_status == "Faulted"),
+        "any_buzzer": all_buzzer,
         "range_state": range_state,
         "buzzer_active": all_buzzer,
         "mod_types": mod_types,
@@ -162,12 +170,25 @@ async def dashboard_fragment_legacy(
     ctx = _dashboard_ctx(db)
     signals = _latest_signal_status(db)
     range_state = ctx["range_state"]
-    return templates.TemplateResponse(request, "partials/signal_table.html", {
+    return templates.TemplateResponse(request, "partials/dashboard_fragment.html", {
         **ctx,
         "signals": signals,
         "buzzer_active": _buzzer_active(signals, range_state),
         "serial_id": None,
     })
+
+
+def _pkg_rf_for_serial(db: Session, serial_id: int) -> dict | None:
+    """Return the first configured package-level RF plan for a serial."""
+    return serial_package_rf_config(db, serial_id)
+
+
+def _pkg_rf_by_signal(db: Session, serial_id: int, signals: list[SignalLog]) -> dict:
+    """Map each displayed signal to the RF plan of its assigned package."""
+    return {
+        log.signal_name: serial_package_rf_config(db, serial_id, log.signal_name)
+        for log in signals
+    }
 
 
 @router.get("/dashboard/fragment/{serial_id}", response_class=HTMLResponse)
@@ -177,15 +198,17 @@ async def dashboard_fragment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """HTMX polling endpoint — returns the signal table for one serial."""
+    """HTMX polling endpoint — returns the serial's table + OOB summary/buzzer."""
     ctx = _dashboard_ctx(db)
     signals = _latest_signal_status(db, serial_id=serial_id)
     range_state = ctx["range_state"]
-    return templates.TemplateResponse(request, "partials/signal_table.html", {
+    return templates.TemplateResponse(request, "partials/dashboard_fragment.html", {
         **ctx,
         "signals": signals,
         "buzzer_active": _buzzer_active(signals, range_state),
         "serial_id": serial_id,
+        "pkg_rf": _pkg_rf_for_serial(db, serial_id),
+        "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial_id, signals),
     })
 
 
@@ -210,12 +233,12 @@ async def dashboard_quick_update(
     range_state = get_current_range_state(db)
 
     # Copy freq/band data from the latest existing entry for this signal
-    latest = (
-        db.query(SignalLog)
-        .filter(SignalLog.signal_name == signal_name, SignalLog.is_deleted == False)
-        .order_by(SignalLog.timestamp.desc())
-        .first()
+    latest_query = db.query(SignalLog).filter(
+        SignalLog.signal_name == signal_name, SignalLog.is_deleted == False,
     )
+    if serial_id is not None:
+        latest_query = latest_query.filter(SignalLog.serial_id == serial_id)
+    latest = latest_query.order_by(SignalLog.timestamp.desc()).first()
 
     # Exclusivity group enforcement: if setting to Up, auto-down others in the same group
     if signal_status == "Up":
@@ -230,12 +253,12 @@ async def dashboard_quick_update(
                 .all()
             )
             for sib in siblings:
-                sib_latest = (
-                    db.query(SignalLog)
-                    .filter(SignalLog.signal_name == sib.name, SignalLog.is_deleted == False)
-                    .order_by(SignalLog.timestamp.desc())
-                    .first()
+                sib_query = db.query(SignalLog).filter(
+                    SignalLog.signal_name == sib.name, SignalLog.is_deleted == False,
                 )
+                if serial_id is not None:
+                    sib_query = sib_query.filter(SignalLog.serial_id == serial_id)
+                sib_latest = sib_query.order_by(SignalLog.timestamp.desc()).first()
                 if sib_latest and sib_latest.signal_status == "Up":
                     db.add(SignalLog(
                         operator_id=current_user.id,
@@ -254,9 +277,12 @@ async def dashboard_quick_update(
                         power=sib_latest.power,
                         power_unit=sib_latest.power_unit,
                         eb_no=sib_latest.eb_no,
+                        source=sib_latest.source,
+                        antenna=sib_latest.antenna,
                         notes=f"Auto-downed: {signal_name} came Up (group: {sig_reg.exclusivity_group})",
                         entry_type="Automatic",
                         updated_by_id=current_user.id,
+                        serial_id=serial_id,
                     ))
 
     new_entry = SignalLog(
@@ -282,6 +308,14 @@ async def dashboard_quick_update(
         entry_type="Dashboard",
         updated_by_id=current_user.id,
         serial_id=serial_id if serial_id is not None else (latest.serial_id if latest else None),
+        warning_flags=warning_flags_for(
+            db, signal_name, power if power is not None else (latest.power if latest else None),
+            power_unit,
+            tx_rf=latest.tx_rf if latest else None,
+            rx_rf=latest.rx_rf if latest else None,
+            freq_unit=latest.freq_unit if latest else "MHz",
+            band=latest.band if latest else None,
+        ),
     )
     db.add(new_entry)
     db.flush()
@@ -297,11 +331,15 @@ async def dashboard_quick_update(
     ctx = _dashboard_ctx(db)
     effective_serial_id = serial_id if serial_id is not None else None
     signals = _latest_signal_status(db, serial_id=effective_serial_id)
-    return templates.TemplateResponse(request, "partials/signal_table.html", {
+    return templates.TemplateResponse(request, "partials/dashboard_fragment.html", {
         **ctx,
         "signals": signals,
-        "buzzer_active": ctx["buzzer_active"],  # global buzzer for OOB swap
+        "buzzer_active": _buzzer_active(signals, ctx["range_state"]),  # this widget's badge
         "serial_id": effective_serial_id,
+        "pkg_rf": _pkg_rf_for_serial(db, effective_serial_id) if effective_serial_id else None,
+        "pkg_rf_by_signal": (
+            _pkg_rf_by_signal(db, effective_serial_id, signals) if effective_serial_id else {}
+        ),
     })
 
 

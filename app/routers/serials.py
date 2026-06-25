@@ -1,6 +1,6 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -9,6 +9,7 @@ from app.deps import get_current_user, get_current_range_state, get_active_seria
 from app.models import (
     User, Serial, SerialPackage, SignalPackage, SignalLog, AuditLog,
 )
+from app.rf_config import serial_package_rf_config
 
 router = APIRouter(prefix="/serials")
 templates = Jinja2Templates(directory="app/templates")
@@ -124,7 +125,8 @@ async def serial_start(
     # Initial entries for every signal in assigned packages
     seen_names: set[str] = set()
     for sp in serial.package_links:
-        for entry in sp.package.signals:
+        pkg = sp.package
+        for entry in pkg.signals:
             if entry.signal_name in seen_names:
                 continue
             seen_names.add(entry.signal_name)
@@ -133,12 +135,12 @@ async def serial_start(
                 range_state=range_state,
                 signal_name=entry.signal_name,
                 signal_status="Planned",
-                band=entry.band,
+                band=pkg.band or entry.band,
                 tx_if=entry.tx_if,
                 tx_rf=entry.tx_rf,
                 rx_rf=entry.rx_rf,
                 rx_if=entry.rx_if,
-                freq_unit=entry.freq_unit,
+                freq_unit=pkg.freq_unit or entry.freq_unit or "MHz",
                 modulation=entry.modulation,
                 fec=entry.fec,
                 symbol_rate=entry.symbol_rate,
@@ -146,8 +148,8 @@ async def serial_start(
                 power_unit=entry.power_unit or "dBm",
                 eb_no=entry.eb_no,
                 source=entry.source,
-                antenna=entry.antenna,
-                notes=f"Initial load from package: {sp.package.name}",
+                antenna=pkg.antenna or entry.antenna,
+                notes=f"Initial load from package: {pkg.name}",
                 entry_type="SerialStart",
                 serial_id=serial.id,
             ))
@@ -232,3 +234,24 @@ async def serial_add_package(
             db.add(SerialPackage(serial_id=serial_id, package_id=package_id))
             db.commit()
     return RedirectResponse(f"/serials?toast=Package+added+to+serial", status_code=302)
+
+
+
+@router.get("/{serial_id}/rf-config")
+async def serial_rf_config(
+    serial_id: int,
+    signal_name: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the best matching package RF config assigned to this serial (JSON).
+
+    If signal_name is supplied, its package is preferred. Used by the log form to
+    auto-populate BUC/LO/TTF/band/antenna. Returns nulls when no package has RF config.
+    """
+    config = serial_package_rf_config(db, serial_id, signal_name)
+    if not config:
+        return JSONResponse({"buc": None, "lo": None, "ttf": None,
+                             "ttf_direction": "+", "freq_unit": "MHz",
+                             "band": None, "antenna": None})
+    return JSONResponse(config)

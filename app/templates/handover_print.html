@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shift Handover — Project Range</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 10pt; color: #000; margin: 1.5cm; }
+    h1 { font-size: 16pt; margin: 0 0 0.2em; }
+    h2 { font-size: 12pt; margin: 1.4em 0 0.4em; border-bottom: 1px solid #999; padding-bottom: 2px; }
+    .meta { color: #555; font-size: 9pt; margin-bottom: 1em; }
+    table { border-collapse: collapse; width: 100%; margin: 0.4em 0; }
+    th, td { border: 1px solid #999; padding: 4px 6px; text-align: left; }
+    th { background: #eee; }
+    .summary td { border: none; padding: 2px 14px 2px 0; }
+    .summary .label { color: #555; font-size: 9pt; }
+    .summary .value { font-size: 13pt; font-weight: bold; }
+    .up { color: #1a7d1a; font-weight: bold; }
+    .faulted { color: #c00; font-weight: bold; }
+    .alert { color: #c00; font-weight: bold; }
+    .sign { margin-top: 2.5em; font-size: 9pt; }
+    .sign-row { margin-top: 1.6em; }
+    .sign-line { display: inline-block; border-bottom: 1px solid #000; width: 220px; }
+    @media print { body { margin: 1cm; } }
+  </style>
+</head>
+<body>
+  <h1>Shift Handover Summary</h1>
+  <div class="meta">
+    Project Range · Generated {{ generated_at.strftime('%H:%M:%S %d %B %Y') }} UTC by {{ user.display_name }}
+  </div>
+
+  <table class="summary">
+    <tr>
+      <td><div class="label">Range State</div><div class="value">{{ range_state }}</div></td>
+      <td><div class="label">Signals Up</div><div class="value">{{ total_up }}</div></td>
+      <td><div class="label">Buzzer</div><div class="value {% if any_buzzer %}alert{% endif %}">{{ 'ACTIVE' if any_buzzer else 'Off' }}</div></td>
+      <td><div class="label">Active Serials</div><div class="value">{{ serial_data | length }}</div></td>
+    </tr>
+  </table>
+
+  {% if serial_data %}
+  {% for sd in serial_data %}
+  <h2>{{ sd.serial.title }} <span style="font-weight:normal;font-size:9pt;color:#555">— started {{ sd.serial.opened_at.strftime('%H:%M %d/%m/%Y') }}{% if sd.buzzer_active %} · BUZZER ACTIVE{% endif %}</span></h2>
+  {% if sd.signals %}
+  <table>
+    <thead>
+      <tr>
+        <th>Signal</th><th>Status</th><th>Band</th><th>TxRF</th><th>RxRF</th>
+        <th>Mod/FEC</th><th>Power</th><th>Source</th><th>Antenna</th><th>Last update</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in sd.signals %}
+      <tr>
+        <td>{{ log.signal_name }}</td>
+        <td class="{% if log.signal_status == 'Up' %}up{% elif log.signal_status == 'Faulted' %}faulted{% endif %}">{{ log.signal_status }}</td>
+        <td>{{ log.band or '—' }}</td>
+        <td>{% if log.tx_rf is not none %}{{ log.tx_rf }} {{ log.freq_unit }}{% else %}—{% endif %}</td>
+        <td>{% if log.rx_rf is not none %}{{ log.rx_rf }} {{ log.freq_unit }}{% else %}—{% endif %}</td>
+        <td>{{ log.modulation or '—' }}{% if log.fec %} / {{ log.fec }}{% endif %}</td>
+        <td>{% if log.power is not none %}{{ log.power }} {{ log.power_unit }}{% else %}—{% endif %}</td>
+        <td>{{ log.source or '—' }}</td>
+        <td>{{ log.antenna or '—' }}</td>
+        <td>{{ log.timestamp.strftime('%H:%M %d/%m') }} · {{ log.operator.display_name if log.operator else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#555">No signals logged for this serial yet.</p>
+  {% endif %}
+  {% endfor %}
+  {% else %}
+  <p style="color:#555">No active serials at time of handover.</p>
+  {% endif %}
+
+  <h2>Recent Range State Changes</h2>
+  {% if recent_state_changes %}
+  <table>
+    <thead><tr><th>Time</th><th>Change</th><th>By</th><th>Reason</th></tr></thead>
+    <tbody>
+      {% for rsc in recent_state_changes %}
+      <tr>
+        <td>{{ rsc.timestamp.strftime('%H:%M %d/%m') }}</td>
+        <td>{{ rsc.previous_state or '—' }} → {{ rsc.new_state }}</td>
+        <td>{{ rsc.changed_by_user.display_name if rsc.changed_by_user else '—' }}</td>
+        <td>{{ rsc.reason }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p style="color:#555">None recorded.</p>{% endif %}
+
+  {% if recent_notes %}
+  <h2>Recent Notes</h2>
+  <table>
+    <thead><tr><th>Time</th><th>Note</th><th>By</th></tr></thead>
+    <tbody>
+      {% for note in recent_notes %}
+      <tr>
+        <td>{{ note.timestamp.strftime('%H:%M %d/%m') }}</td>
+        <td>{{ note.notes or '' }}</td>
+        <td>{{ note.operator.display_name if note.operator else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <div class="sign">
+    <div class="sign-row">Off-going operator: <span class="sign-line"></span> &nbsp;&nbsp; Signature: <span class="sign-line"></span> &nbsp;&nbsp; Time: <span class="sign-line" style="width:120px"></span></div>
+    <div class="sign-row">On-coming operator: <span class="sign-line"></span> &nbsp;&nbsp; Signature: <span class="sign-line"></span> &nbsp;&nbsp; Time: <span class="sign-line" style="width:120px"></span></div>
+  </div>
+
+  <script>window.onload = function() { window.print(); }</script>
+</body>
+</html>

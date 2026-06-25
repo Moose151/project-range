@@ -1,3 +1,11 @@
+/* ── Readability / contrast (dark) ──────────────────────────── */
+/* Bootstrap's default muted/secondary text is a little dim on this dark
+   background; nudge it lighter so small "text-muted" labels stay legible. */
+[data-bs-theme="dark"] {
+  --bs-secondary-color: rgba(226, 230, 234, 0.82);
+  --bs-tertiary-color: rgba(226, 230, 234, 0.60);
+}
+
 /* ── Range Banner ───────────────────────────────────────────── */
 .range-banner {
   font-size: 0.85rem;
@@ -16,7 +24,7 @@
 }
 .banner-standby {
   background: #1a1a1a;
-  color: #6c757d;
+  color: #a7afb8;          /* was #6c757d — too dark on near-black */
   border-bottom: 1px solid #343a40;
 }
 
@@ -32,6 +40,38 @@
 /* ── Login card ─────────────────────────────────────────────── */
 .login-card {
   border: 1px solid #343a40;
+}
+
+/* ── Signal status rows ─────────────────────────────────────────
+   Subtle dark tints via --bs-table-bg instead of Bootstrap's loud light
+   contextual backgrounds, so the light text + inline controls stay readable.
+   Used by the dashboard signal table and the log list / serial history. */
+tr.status-up      { --bs-table-bg: rgba(25, 135, 84, 0.16); }
+tr.status-faulted { --bs-table-bg: rgba(220, 53, 69, 0.20); }
+tr.status-standby { --bs-table-bg: rgba(255, 193, 7, 0.14); }
+tr.status-down    { --bs-table-bg: rgba(108, 117, 125, 0.12); }
+
+/* Darker grey secondary badges — the default #6c757d is ~3.4:1 with white
+   text (below AA); this lifts it to a readable level. */
+.badge.bg-secondary,
+.badge.text-bg-secondary {
+  background-color: #565e64 !important;
+}
+
+/* Keep muted/secondary text legible inside light Bootstrap contextual rows
+   (read-only tables such as the log list and serial history). */
+.table > :not(caption) > tr.table-success,
+.table > :not(caption) > tr.table-danger,
+.table > :not(caption) > tr.table-warning,
+.table > :not(caption) > tr.table-info,
+.table > :not(caption) > tr.table-secondary,
+.table tbody tr.table-success,
+.table tbody tr.table-danger,
+.table tbody tr.table-warning,
+.table tbody tr.table-info,
+.table tbody tr.table-secondary {
+  --bs-secondary-color: rgba(33, 37, 41, 0.72);
+  --bs-tertiary-color: rgba(33, 37, 41, 0.55);
 }
 
 /* ── Table tweaks ───────────────────────────────────────────── */
@@ -52,10 +92,36 @@
   padding: 0.5rem 0.875rem;
 }
 
-/* ── Navbar brand ───────────────────────────────────────────── */
+/* ── Forms: tighter, calmer vertical rhythm ─────────────────── */
+.form-label {
+  margin-bottom: 0.2rem;
+  font-weight: 500;
+}
+.form-text {
+  margin-top: 0.15rem;
+}
+/* Page title spacing: consistent gap under the main heading on every page */
+main > h4:first-child,
+main > .d-flex:first-child h4 {
+  letter-spacing: 0.01em;
+}
+
+/* ── Navbar ─────────────────────────────────────────────────── */
 .navbar-brand {
   font-size: 1.1rem;
   letter-spacing: 0.04em;
+}
+.navbar {
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+}
+.navbar-nav .nav-link {
+  padding-left: 0.7rem;
+  padding-right: 0.7rem;
+}
+.navbar-nav .dropdown-item .bi {
+  width: 1.1em;
+  text-align: center;
 }
 
 /* ── Scrollable overflow table containers ───────────────────── */
@@ -110,11 +176,19 @@ code {
 .doc-content p { margin-bottom: 0.75rem; }
 .doc-content hr { border-color: #343a40; margin: 1.5rem 0; }
 
-/* ── Buzzer alert animation ─────────────────────────────────── */
-.buzzer-alert {
-  animation: pulse-border 1.2s ease-in-out infinite;
+/* ── Buzzer bar (compact, calm) ─────────────────────────────── */
+.buzzer-bar {
+  font-size: 0.85rem;
+  border-left: 3px solid #dc3545;
 }
-@keyframes pulse-border {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
-  50%       { box-shadow: 0 0 0 6px rgba(220, 53, 69, 0); }
+
+/* ── Widget minimise / expand ───────────────────────────────── */
+.serial-widget-group.collapsed .serial-bodies {
+  display: none;
+}
+.widget-collapse-btn .bi {
+  transition: transform 0.15s ease;
+}
+.serial-widget-group.collapsed .widget-collapse-btn .bi {
+  transform: rotate(180deg);
 }

@@ -25,6 +25,7 @@ async def login_submit(
     request: Request,
     username: str = Form(...),
     password: str = Form(...),
+    remember: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = authenticate_user(db, username, password)
@@ -38,6 +39,7 @@ async def login_submit(
     request.session["display_name"] = user.display_name
     request.session["role"] = user.role
     request.session["logged_in_at"] = datetime.utcnow().isoformat()
+    request.session["remember"] = bool(remember)
     return RedirectResponse("/", status_code=302)
 
 

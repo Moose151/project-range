@@ -43,8 +43,74 @@
           </div>
           <div class="mb-3">
             <label class="form-label">Description <span class="text-muted small">(optional)</span></label>
-            <textarea class="form-control" name="description" rows="3">{{ package.description or '' }}</textarea>
+            <textarea class="form-control" name="description" rows="2">{{ package.description or '' }}</textarea>
           </div>
+
+          <!-- RF Configuration (shared across all signals in this package) -->
+          <hr class="border-secondary my-3">
+          <div class="text-muted small fw-semibold mb-2">
+            <i class="bi bi-broadcast me-1"></i>RF Configuration
+            <span class="fw-normal text-muted ms-1">— shared by all signals in this package</span>
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label small">Band</label>
+              <select class="form-select form-select-sm" name="band">
+                <option value="">—</option>
+                {% for b in bands %}
+                <option value="{{ b }}" {% if package and package.band == b %}selected{% endif %}>{{ b }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small">Freq Unit</label>
+              <select class="form-select form-select-sm" name="freq_unit" id="pkg_freq_unit">
+                {% for u in freq_units %}
+                <option value="{{ u }}" {% if package and package.freq_unit == u %}selected{% elif not package and u == 'MHz' %}selected{% endif %}>{{ u }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small">BUC</label>
+              <input type="number" class="form-control form-control-sm" name="buc" id="pkg_buc" step="any"
+                     value="{{ package.buc if package and package.buc is not none else '' }}" placeholder="e.g. 9750">
+            </div>
+            <div class="col-6">
+              <label class="form-label small">LO</label>
+              <input type="number" class="form-control form-control-sm" name="lo" id="pkg_lo" step="any"
+                     value="{{ package.lo if package and package.lo is not none else '' }}" placeholder="e.g. 10750">
+            </div>
+            <div class="col-12">
+              <label class="form-label small">TTF</label>
+              <div class="input-group input-group-sm">
+                <select class="form-select" name="ttf_direction" id="pkg_ttf_dir" style="max-width:60px">
+                  <option value="+" {% if not package or package.ttf_direction != '-' %}selected{% endif %}>+</option>
+                  <option value="-" {% if package and package.ttf_direction == '-' %}selected{% endif %}>−</option>
+                </select>
+                <input type="number" class="form-control" name="ttf" id="pkg_ttf" step="any"
+                       value="{{ package.ttf if package and package.ttf is not none else '' }}" placeholder="TTF">
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label small">Antenna</label>
+              <select class="form-select form-select-sm" name="antenna">
+                <option value="">—</option>
+                {% for a in antenna_types %}
+                <option value="{{ a }}" {% if package and package.antenna == a %}selected{% endif %}>{{ a }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          {% if package and (package.buc or package.lo or package.ttf) %}
+          <div class="text-muted small mb-2">
+            <i class="bi bi-calculator me-1"></i>
+            TxIF + {{ package.buc or '?' }} = TxRF &nbsp;·&nbsp;
+            TxRF {{ package.ttf_direction or '+' }} {{ package.ttf or '?' }} = RxRF &nbsp;·&nbsp;
+            RxRF − {{ package.lo or '?' }} = RxIF
+            <span class="ms-1">({{ package.freq_unit or 'MHz' }})</span>
+          </div>
+          {% endif %}
+
           <button type="submit" class="btn btn-primary w-100">
             {% if package %}<i class="bi bi-check2 me-1"></i>Save Details{% else %}<i class="bi bi-plus-lg me-1"></i>Create Package{% endif %}
           </button>
@@ -94,7 +160,6 @@
             <tr>
               <th style="width:28px"></th>
               <th>Name</th>
-              <th>Band</th>
               <th>TxIF</th>
               <th>TxRF</th>
               <th>RxRF</th>
@@ -104,7 +169,6 @@
               <th>FEC</th>
               <th>Power</th>
               <th>Source</th>
-              <th>Antenna</th>
               <th></th>
             </tr>
           </thead>
@@ -113,7 +177,6 @@
             <tr data-id="{{ entry.id }}">
               <td class="drag-handle text-muted ps-2" style="cursor:grab"><i class="bi bi-grip-vertical"></i></td>
               <td class="fw-semibold">{{ entry.signal_name }}</td>
-              <td>{{ entry.band or '—' }}</td>
               <td>{{ entry.tx_if or '—' }}</td>
               <td>{{ entry.tx_rf or '—' }}</td>
               <td>{{ entry.rx_rf or '—' }}</td>
@@ -123,14 +186,12 @@
               <td class="small">{{ entry.fec or '—' }}</td>
               <td class="small">{% if entry.power is not none %}{{ entry.power }} {{ entry.power_unit }}{% else %}—{% endif %}</td>
               <td class="small text-muted">{{ entry.source or '—' }}</td>
-              <td class="small text-muted">{{ entry.antenna or '—' }}</td>
               <td class="text-nowrap">
                 <button type="button" class="btn btn-xs btn-outline-secondary btn-sm py-0 px-1"
                         onclick="editSignal({{ {
                           'id': entry.id,
                           'signal_name': entry.signal_name,
                           'description': entry.description or '',
-                          'band': entry.band or '',
                           'tx_if': entry.tx_if,
                           'tx_rf': entry.tx_rf,
                           'rx_rf': entry.rx_rf,
@@ -143,7 +204,6 @@
                           'power_unit': entry.power_unit or 'dBm',
                           'eb_no': entry.eb_no,
                           'source': entry.source or '',
-                          'antenna': entry.antenna or '',
                           'notes': entry.notes or '',
                         } | tojson }})" title="Edit">
                   <i class="bi bi-pencil"></i>
@@ -168,26 +228,24 @@
         <form method="post" id="signalForm" action="/packages/{{ package.id }}/signals/add">
           <input type="hidden" name="_entry_id" id="editEntryId">
           <div class="row g-2">
-            <div class="col-sm-4">
+            <div class="col-sm-5">
               <label class="form-label small">Signal Name <span class="text-danger">*</span></label>
               <input type="text" class="form-control form-control-sm" name="signal_name" id="f_signal_name" required>
             </div>
-            <div class="col-sm-4">
+            <div class="col-sm-5">
               <label class="form-label small">Description</label>
               <input type="text" class="form-control form-control-sm" name="description" id="f_description">
-            </div>
-            <div class="col-sm-2">
-              <label class="form-label small">Band</label>
-              <select class="form-select form-select-sm" name="band" id="f_band">
-                <option value="">—</option>
-                {% for b in bands %}<option value="{{ b }}">{{ b }}</option>{% endfor %}
-              </select>
             </div>
             <div class="col-sm-2">
               <label class="form-label small">Freq Unit</label>
               <select class="form-select form-select-sm" name="freq_unit" id="f_freq_unit">
                 {% for u in freq_units %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
               </select>
+            </div>
+            <div class="col-12">
+              <span class="small text-muted">
+                <i class="bi bi-calculator me-1"></i>Enter any one frequency — the others auto-calculate from the package BUC/LO/TTF above.
+              </span>
             </div>
             <div class="col-sm-3">
               <label class="form-label small">TxIF</label>
@@ -236,18 +294,11 @@
               <label class="form-label small">Eb/No (dB)</label>
               <input type="number" class="form-control form-control-sm" name="eb_no" id="f_eb_no" step="any">
             </div>
-            <div class="col-sm-3">
+            <div class="col-sm-6">
               <label class="form-label small">Source</label>
               <select class="form-select form-select-sm" name="source" id="f_source">
                 <option value="">—</option>
                 {% for s in signal_sources %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
-              </select>
-            </div>
-            <div class="col-sm-3">
-              <label class="form-label small">Antenna</label>
-              <select class="form-select form-select-sm" name="antenna" id="f_antenna">
-                <option value="">—</option>
-                {% for a in antenna_types %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
               </select>
             </div>
             <div class="col-12">
@@ -320,7 +371,6 @@ function editSignal(entry) {
   document.getElementById('signalForm').action = '/packages/{{ package.id if package }}/signals/' + entry.id + '/update';
   setVal('f_signal_name', entry.signal_name);
   setVal('f_description', entry.description);
-  setVal('f_band', entry.band);
   setVal('f_freq_unit', entry.freq_unit);
   setVal('f_tx_if', entry.tx_if);
   setVal('f_tx_rf', entry.tx_rf);
@@ -333,7 +383,6 @@ function editSignal(entry) {
   setVal('f_power_unit', entry.power_unit);
   setVal('f_eb_no', entry.eb_no);
   setVal('f_source', entry.source);
-  setVal('f_antenna', entry.antenna);
   setVal('f_notes', entry.notes);
   document.getElementById('signalFormCard').scrollIntoView({behavior: 'smooth'});
 }
@@ -349,5 +398,64 @@ function prefillFromRegistry() {
   const name = document.getElementById('registrySelect').value;
   if (name) setVal('f_signal_name', name);
 }
+
+// ── Real-time RF calc for the signal form, using package BUC/LO/TTF ──────────
+function pkgToMHz(v, unit) { return unit === 'GHz' ? v * 1000 : v; }
+function pkgFromMHz(v, unit) { return unit === 'GHz' ? v / 1000 : v; }
+
+function pkgCalcAll(known, valueMHz, buc, lo, ttf, sign) {
+  if (known === 'tx_if') {
+    const tx_rf = valueMHz + buc, rx_rf = tx_rf + sign * ttf;
+    return { tx_if: valueMHz, tx_rf, rx_rf, rx_if: rx_rf - lo };
+  } else if (known === 'tx_rf') {
+    const rx_rf = valueMHz + sign * ttf;
+    return { tx_if: valueMHz - buc, tx_rf: valueMHz, rx_rf, rx_if: rx_rf - lo };
+  } else if (known === 'rx_rf') {
+    const tx_rf = valueMHz - sign * ttf;
+    return { tx_if: tx_rf - buc, tx_rf, rx_rf: valueMHz, rx_if: valueMHz - lo };
+  } else { // rx_if
+    const rx_rf = valueMHz + lo, tx_rf = rx_rf - sign * ttf;
+    return { tx_if: tx_rf - buc, tx_rf, rx_rf, rx_if: valueMHz };
+  }
+}
+
+function recalcSignalFreqs(changedField) {
+  const bucEl = document.getElementById('pkg_buc');
+  const loEl  = document.getElementById('pkg_lo');
+  const ttfEl = document.getElementById('pkg_ttf');
+  const dirEl = document.getElementById('pkg_ttf_dir');
+  if (!bucEl || !loEl || !ttfEl) return;
+
+  // BUC/LO/TTF are configured in the package's freq unit; signal freqs in theirs.
+  const pkgUnit = document.getElementById('pkg_freq_unit')?.value || 'MHz';
+  const sigUnit = document.getElementById('f_freq_unit')?.value || 'MHz';
+  const buc  = pkgToMHz(parseFloat(bucEl.value), pkgUnit);
+  const lo   = pkgToMHz(parseFloat(loEl.value),  pkgUnit);
+  const ttf  = pkgToMHz(parseFloat(ttfEl.value), pkgUnit);
+  const sign = (dirEl?.value || '+') === '+' ? 1 : -1;
+  if (isNaN(buc) || isNaN(lo) || isNaN(ttf)) return;  // package RF config incomplete
+
+  const changedInput = document.getElementById('f_' + changedField);
+  const rawVal = parseFloat(changedInput?.value);
+  if (isNaN(rawVal)) return;
+
+  const res = pkgCalcAll(changedField, pkgToMHz(rawVal, sigUnit), buc, lo, ttf, sign);
+  ['tx_if','tx_rf','rx_rf','rx_if'].forEach(f => {
+    if (f === changedField) return;
+    const el = document.getElementById('f_' + f);
+    if (el) el.value = parseFloat(pkgFromMHz(res[f], sigUnit).toFixed(6));
+  });
+}
+
+['tx_if','tx_rf','rx_rf','rx_if'].forEach(f => {
+  document.getElementById('f_' + f)?.addEventListener('input', () => recalcSignalFreqs(f));
+});
+// Re-run when package RF config or the signal's unit changes
+['pkg_buc','pkg_lo','pkg_ttf','pkg_ttf_dir','pkg_freq_unit','f_freq_unit'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', () => {
+    const filled = ['tx_if','tx_rf','rx_rf','rx_if'].find(f => document.getElementById('f_' + f)?.value !== '');
+    if (filled) recalcSignalFreqs(filled);
+  });
+});
 </script>
 {% endblock %}

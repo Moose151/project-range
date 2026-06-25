@@ -1,0 +1,23 @@
+{# HTMX poll / quick-update response: the serial's table (swapped in place) plus
+   out-of-band updates for the global buzzer bar, summary cards, and this
+   widget's buzzer badge — so counts/indicators stay correct as signals change. #}
+{% include "partials/signal_table.html" %}
+
+<!-- OOB: global buzzer bar (any signal Up across all serials) -->
+<div id="buzzerAlert" hx-swap-oob="true">
+  {% if any_buzzer %}
+  <div class="alert alert-danger buzzer-bar d-flex align-items-center gap-2 py-1 px-3 mb-3">
+    <i class="bi bi-volume-up-fill"></i>
+    <span class="small"><strong>Buzzer on</strong> — signal(s) Up{% if range_state == 'Live' %}, RF transmitting{% endif %}.</span>
+  </div>
+  {% endif %}
+</div>
+
+<!-- OOB: summary cards -->
+{% set summary_oob = true %}
+{% include "partials/dashboard_summary.html" %}
+
+<!-- OOB: this widget's buzzer badge -->
+{% if serial_id is not none %}
+<span id="widgetBuzzer-{{ serial_id }}" hx-swap-oob="true">{% if buzzer_active %}<span class="badge bg-danger">BUZZER</span>{% endif %}</span>
+{% endif %}

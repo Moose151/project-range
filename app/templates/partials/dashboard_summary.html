@@ -1,0 +1,46 @@
+<div id="dashboardSummary" class="row g-3 mb-3"{% if summary_oob %} hx-swap-oob="true"{% endif %}>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card border-secondary h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Range State</div>
+        <div class="fw-bold fs-5
+          {% if range_state == 'Live' %}text-danger{% elif range_state == 'Closed Loop' %}text-info{% else %}text-secondary{% endif %}">
+          <i class="bi bi-{% if range_state == 'Live' %}broadcast-pin blink-icon{% elif range_state == 'Closed Loop' %}arrow-repeat{% else %}power{% endif %} me-1"></i>
+          {{ range_state }}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card {% if any_buzzer %}border-danger{% else %}border-secondary{% endif %} h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-1">
+          Active Signals
+          {% if any_buzzer %}<i class="bi bi-volume-up-fill text-danger ms-1"></i>{% endif %}
+        </div>
+        <div class="fw-bold fs-5 {% if any_buzzer %}text-danger{% else %}text-success{% endif %}">{{ up_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card border-secondary h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Faulted</div>
+        <div class="fw-bold fs-5 {% if faulted_count > 0 %}text-danger{% else %}text-secondary{% endif %}">{{ faulted_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card border-secondary h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Last State Change</div>
+        {% if last_state_change %}
+        <div class="fw-semibold text-primary" style="font-size:0.95rem">{{ last_state_change.timestamp.strftime('%H:%M %d/%m/%y') }}</div>
+        <div class="text-muted small">by {{ last_state_change.changed_by_user.display_name }}</div>
+        {% else %}
+        <div class="text-secondary">—</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>

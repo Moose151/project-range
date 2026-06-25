@@ -3,12 +3,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
-from app.config import SECRET_KEY, APP_VERSION
-from app.routers import auth, dashboard, calculator, logs, range_state, users, config, audit, sessions, packages, serials, history, docs
+from app.config import SECRET_KEY, APP_VERSION, SESSION_MAX_AGE_DAYS
+from app.routers import auth, dashboard, calculator, logs, range_state, users, config, audit, sessions, packages, serials, history, docs, handover
 
 app = FastAPI(title="Project Range", version=APP_VERSION, docs_url=None, redoc_url=None)
 
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, max_age=86400)
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, max_age=SESSION_MAX_AGE_DAYS * 86400)
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
@@ -25,6 +25,7 @@ app.include_router(packages.router)
 app.include_router(serials.router)
 app.include_router(history.router)
 app.include_router(docs.router)
+app.include_router(handover.router)
 
 
 @app.exception_handler(302)

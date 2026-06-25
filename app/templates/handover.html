@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% from "partials/signal_table.html" import status_badge %}
+{% block content %}
+<div class="d-flex align-items-center mb-3">
+  <h4 class="mb-0"><i class="bi bi-arrow-left-right me-2"></i>Shift Handover</h4>
+  <span class="text-muted small ms-3">Snapshot generated {{ generated_at.strftime('%H:%M:%S %d/%m/%Y') }} UTC by {{ user.display_name }}</span>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/handover/report.xlsx" class="btn btn-sm btn-outline-light">
+      <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export XLSX
+    </a>
+    <a href="/handover/print" target="_blank" class="btn btn-sm btn-outline-light">
+      <i class="bi bi-printer me-1"></i>Print / PDF
+    </a>
+  </div>
+</div>
+
+<!-- Summary cards -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card border-secondary h-100">
+      <div class="card-body py-3">
+        <div class="text-muted small">Range State</div>
+        <div class="fs-5 fw-semibold {% if range_state == 'Live' %}text-danger{% elif range_state == 'Closed Loop' %}text-warning{% else %}text-secondary{% endif %}">
+          {{ range_state }}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-secondary h-100">
+      <div class="card-body py-3">
+        <div class="text-muted small">Signals Up</div>
+        <div class="fs-5 fw-semibold">{{ total_up }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100 {% if any_buzzer %}border-danger{% else %}border-secondary{% endif %}">
+      <div class="card-body py-3">
+        <div class="text-muted small">Buzzer</div>
+        <div class="fs-5 fw-semibold {% if any_buzzer %}text-danger blink-icon{% endif %}">
+          {{ 'ACTIVE' if any_buzzer else 'Off' }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Active serials -->
+{% if serial_data %}
+{% for sd in serial_data %}
+<div class="card border-{% if sd.buzzer_active %}danger{% else %}secondary{% endif %} mb-3">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-collection-play"></i>
+    <span class="fw-semibold">{{ sd.serial.title }}</span>
+    <span class="text-muted small">started {{ sd.serial.opened_at.strftime('%H:%M %d/%m') }}</span>
+    {% if sd.buzzer_active %}<span class="badge bg-danger ms-1">BUZZER</span>{% endif %}
+    <span class="ms-auto small">
+      {% for status, count in sd.status_counts.items() %}
+      <span class="me-2">{{ status_badge(status) }} {{ count }}</span>
+      {% endfor %}
+    </span>
+  </div>
+  <div class="card-body p-0">
+    {% if sd.signals %}
+    <table class="table table-sm table-dark mb-0 align-middle small">
+      <thead>
+        <tr>
+          <th>Signal</th><th>Status</th><th>Band</th>
+          <th>TxRF</th><th>RxRF</th><th>Mod/FEC</th><th>Power</th>
+          <th>Source</th><th>Antenna</th><th>Last update</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in sd.signals %}
+        <tr class="{% if log.signal_status == 'Faulted' %}table-danger{% elif log.signal_status == 'Up' %}table-success{% endif %}">
+          <td class="fw-semibold">{{ log.signal_name }}</td>
+          <td>{{ status_badge(log.signal_status) }}</td>
+          <td>{{ log.band or '—' }}</td>
+          <td>{% if log.tx_rf is not none %}{{ log.tx_rf }} {{ log.freq_unit }}{% else %}—{% endif %}</td>
+          <td>{% if log.rx_rf is not none %}{{ log.rx_rf }} {{ log.freq_unit }}{% else %}—{% endif %}</td>
+          <td>{{ log.modulation or '—' }}{% if log.fec %} / {{ log.fec }}{% endif %}</td>
+          <td>{% if log.power is not none %}{{ log.power }} {{ log.power_unit }}{% else %}—{% endif %}</td>
+          <td class="text-muted">{{ log.source or '—' }}</td>
+          <td class="text-muted">{{ log.antenna or '—' }}</td>
+          <td class="text-muted">{{ log.timestamp.strftime('%H:%M %d/%m') }} · {{ log.operator.display_name if log.operator else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="p-3 text-muted small">No signals logged for this serial yet.</div>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="alert alert-secondary"><i class="bi bi-info-circle me-2"></i>No active serials. Start a serial to populate the handover.</div>
+{% endif %}
+
+<!-- Recent activity -->
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card border-secondary">
+      <div class="card-header"><i class="bi bi-shield-check me-1"></i>Recent Range State Changes</div>
+      <div class="card-body p-0">
+        {% if recent_state_changes %}
+        <table class="table table-sm table-dark mb-0 small">
+          <tbody>
+            {% for rsc in recent_state_changes %}
+            <tr>
+              <td class="text-muted text-nowrap">{{ rsc.timestamp.strftime('%H:%M %d/%m') }}</td>
+              <td>{{ rsc.previous_state or '—' }} → <span class="fw-semibold">{{ rsc.new_state }}</span></td>
+              <td class="text-muted">{{ rsc.changed_by_user.display_name if rsc.changed_by_user else '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}<div class="p-3 text-muted small">No range state changes recorded.</div>{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card border-secondary">
+      <div class="card-header"><i class="bi bi-sticky me-1"></i>Recent Notes</div>
+      <div class="card-body p-0">
+        {% if recent_notes %}
+        <table class="table table-sm table-dark mb-0 small">
+          <tbody>
+            {% for note in recent_notes %}
+            <tr>
+              <td class="text-muted text-nowrap">{{ note.timestamp.strftime('%H:%M %d/%m') }}</td>
+              <td class="fst-italic">{{ note.notes or '' }}</td>
+              <td class="text-muted">{{ note.operator.display_name if note.operator else '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}<div class="p-3 text-muted small">No notes recorded.</div>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -34,10 +34,12 @@ document.addEventListener('keydown', (evt) => {
   }
 });
 
-// HTMX: pause the dashboard poll while a quick-edit row is open
+// HTMX: pause the dashboard poll while a quick-edit row is open or a row has
+// unsubmitted inline on/off / power changes staged.
 document.addEventListener('htmx:beforeRequest', (evt) => {
   if (evt.detail.requestConfig?.path?.includes('/dashboard/fragment')) {
-    if (document.querySelector('.signal-table .collapse.show')) {
+    if (document.querySelector('.signal-table .collapse.show') ||
+        document.querySelector('.signal-row-dirty')) {
       evt.preventDefault();
     }
   }

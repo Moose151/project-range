@@ -45,11 +45,16 @@ project-range/
 │   │   │                    #   /serials/{id}/start, /serials/{id}/end, /serials/{id}/packages/add
 │   │   ├── history.py       # Closed serial history: GET /history, /history/{id},
 │   │   │                    #   /history/{id}/export/csv, /history/{id}/export/xlsx
+│   │   ├── handover.py      # GET /handover (on-screen shift summary), /handover/print (printable),
+│   │   │                    #   /handover/report.xlsx (structured multi-sheet range report)
 │   │   ├── range_state.py   # GET/POST /range-state/change
 │   │   ├── config.py        # GET/POST /config — mod types, FEC types, signal sources, antennas,
 │   │   │                    #   signal registry, frequency templates
 │   │   ├── audit.py         # GET /audit — audit log viewer (supervisor only)
 │   │   ├── sessions.py      # LEGACY — kept for old data; no UI link (sessions replaced by serials)
+│   │   ├── docs.py              # GET/POST /docs, /docs/new, /docs/{slug}, /docs/{slug}/edit,
+│   │   │                    #   /docs/{slug}/history, /docs/{slug}/print, /docs/proposals,
+│   │   │                    #   /docs/versions/{id}/approve|reject|restore
 │   │   └── users.py         # GET/POST /users, /users/new, /users/{id}/toggle, /users/{id}/reset-password
 │   ├── templates/
 │   │   ├── base.html                    # Shared layout: nav, range state banner (HTMX serial badge),
@@ -68,6 +73,8 @@ project-range/
 │   │   ├── package_import.html          # Import package from JSON file
 │   │   ├── serials.html                 # Active serials list + create-new form + add-package form
 │   │   ├── serial_start.html            # Confirm/preview page before starting a serial
+│   │   ├── handover.html                # On-screen shift handover snapshot (summary + per-serial signals)
+│   │   ├── handover_print.html          # Printable/PDF shift handover sheet with sign-off lines
 │   │   ├── history.html                 # Paginated searchable list of closed serials
 │   │   ├── history_detail.html          # All logs for one closed serial, with export
 │   │   ├── config.html                  # Supervisor: mod types, FEC, sources, antennas, registry, freq templates
@@ -109,7 +116,7 @@ project-range/
 | Model | Purpose |
 |---|---|
 | `User` | Auth, roles (operator/supervisor), active flag |
-| `Signal` | Signal registry: named signals with defaults and exclusivity groups |
+| `Signal` | Signal registry: named signals with defaults, exclusivity groups, optional `max_power_dbm` ceiling |
 | `SignalLog` | Timestamped log of every signal state change (the audit trail + current state source of truth) |
 | `RangeStateLog` | Timestamped record of every range state change |
 | `ModulationType` | Supervisor-managed list of modulation types shown in dropdowns |
@@ -117,12 +124,28 @@ project-range/
 | `SignalSource` | Supervisor-managed list of signal sources (modems, signal generators) |
 | `AntennaType` | Supervisor-managed list of transmit antennas |
 | `FrequencyTemplate` | Saved BUC/LO/TTF plans for the RF calculator (managed via Config page) |
+| `DocPage` | Documentation wiki page (title, slug, Markdown content, published status) |
+| `DocVersion` | Version history for a doc page (content snapshot, approval status, created/approved by) |
 | `LogSession` | **LEGACY** — old named sessions; kept for old data compatibility, no active UI |
-| `SignalPackage` | Named collection of pre-configured signal definitions (saved as JSON, importable) |
+| `SignalPackage` | Named collection of pre-configured signal definitions (saved as JSON, importable). Now includes package-level RF config: band, antenna, BUC, LO, TTF, TTF direction, freq unit |
 | `SignalPackageEntry` | One signal definition within a package (all params: name, band, freq, power, mod, etc.) |
 | `Serial` | An operational run: has a title, assigned packages, open/close times, log entries |
 | `SerialPackage` | Junction: which packages are assigned to which serial |
 | `AuditLog` | System audit trail (login, edits, state changes, etc.) |
+
+### Package-level RF Configuration (IMPORTANT)
+
+`SignalPackage` stores band, antenna, BUC, LO, TTF, TTF direction, and freq unit at the package level — these are shared by **all signals** in the package (all signals go on the same satellite antenna and use the same transponder plan).
+
+**On log form (`/logs/new`)**: when a serial is selected, `GET /serials/{id}/rf-config` is called (JSON) and the response pre-fills BUC/LO/TTF/band/antenna. The operator only needs to enter one known frequency; the other three resolve automatically via the existing embedded calculator JS.
+
+**On serial start**: `serial_start` copies `pkg.band` and `pkg.antenna` into the initial `SerialStart` log entries for each signal. Existing per-signal freq values (`tx_if` etc.) on `SignalPackageEntry` are still respected when present.
+
+**On dashboard quick-edit**: the fragment endpoint passes `pkg_rf` to the `signal_table.html` partial; the Antenna select defaults to the package antenna when the log row has no antenna set.
+
+Per-signal band and antenna fields are removed from the package signal add/edit form (but the DB columns remain for backward compatibility). Band and Antenna are now set at the package level only.
+
+---
 
 ### Signal Package → Serial → SignalLog data flow (IMPORTANT)
 
@@ -234,6 +257,10 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 - [x] **Log form pre-selects serial via query param**: `GET /logs/new?serial_id=N` pre-selects serial N in the Serial dropdown (without the param, the first active serial is auto-selected).
 - [x] **Drop-merge-target visual**: `drop-merge-target` CSS class added; buzzer alert has a pulsing box-shadow animation.
 - [x] **HTMX loading spinner**: per-serial widget header shows a spinner while the 10s poll is in flight.
+- [x] **Documentation / Wiki module** (`/docs`): Markdown pages with version history, supervisor direct edit, operator edit proposals, approval queue, printable view. 7 seed pages covering core procedures. Nav link visible to all users; pending-proposal badge for supervisors.
+- [x] **Package-level RF configuration**: `SignalPackage` now stores band, antenna, BUC, LO, TTF, TTF direction, and freq unit shared by all signals in the package. When a serial's log entry is created, BUC/LO/TTF/band/antenna are auto-populated from the package — operators only enter one known frequency and the rest resolve automatically. Dashboard quick-edit defaults the Antenna select from the package config. Serial start log entries inherit package-level band and antenna.
+- [x] **Package signal form real-time RF calc**: on the package signal add/edit form, entering any one frequency (TxIF/TxRF/RxRF/RxIF) auto-calculates the other three from the package's BUC/LO/TTF (read live from the form, before saving). Package and signal freq units are converted independently.
+- [x] **Shift Handover module** (`/handover`): point-in-time snapshot of range state, signals-up count, buzzer, and per-serial signal status tables, plus recent range-state changes and notes. `/handover/print` renders a printable/PDF sheet with off-going/on-coming sign-off lines (auto-opens print dialog). Nav link visible to all users.
 
 ---
 
@@ -246,18 +273,23 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 ### Features
 
 - [ ] PostgreSQL migration (switch DATABASE_URL env var, test thoroughly)
-- [ ] Documentation / wiki module (pages, version history, operator proposals, supervisor approval)
-- [ ] Power warning thresholds per-signal or per-template
-- [ ] Formal range report export (PDF or structured XLSX)
+- [x] Power warning thresholds per-signal — `Signal.max_power_dbm` (set on the Config → Signal Registry tab). When a log entry records a power above the ceiling (converted to dBm), `SignalLog.warning_flags` is populated and shown in the dashboard "Warn" column. Computed in `app/signal_warnings.py`, wired into manual log create/edit and dashboard quick-update.
+- [x] **Band/frequency validation warnings** — the same `warning_flags_for` engine also flags TxRF/RxRF outside the configured `FREQUENCY_BANDS` range for the entry's band (reuses the calculator's `band_warnings`). Power and band warnings are combined into one ` · `-joined `warning_flags` string. Stored on log create/edit and dashboard quick-update (warnings are advisory; they never block saving).
+- [x] Formal range report export — structured multi-sheet XLSX via `/handover/report.xlsx` (Summary / Signals / State Changes / Notes), downloadable from the Handover page. PDF still available via the Handover print view (browser "Save as PDF").
 - [ ] Device ping / network status checks
-- [ ] Shift handover module (print/PDF summary of signals and state at shift change)
+- [x] Shift handover module (print/PDF summary of signals and state at shift change) — see Implemented Features
 - [ ] Active Directory / SSO authentication
-- [ ] Session: "remember this terminal" option for thin clients
+- [x] Session: "remember this terminal" option for thin clients — checkbox on the login page; when set, `session["remember"]` makes `session_is_expired()` skip the inactivity timeout, so a fixed terminal stays signed in up to the cookie lifetime (`SESSION_MAX_AGE_DAYS`, default 30). Normal logins still expire after `SESSION_TIMEOUT_MINUTES` of inactivity.
 - [ ] More detailed permissions model beyond operator/supervisor
 - [ ] Backup and restore tooling
 - [ ] Windows Server deployment packaging (Waitress/NSSM service)
 - [ ] HTTPS/TLS support
 - [ ] Dashboard: "Add signal" form directly on dashboard (currently requires /logs/new)
+- [x] **Dashboard inline on/off + power controls**: per-signal-row switch to set Up/Down, and −/+ stepper buttons (step 1) plus an editable number field to set power directly, with Submit/Cancel; a log entry is only written on Submit. The 10s poll pauses while any row has unsubmitted changes. Replaces needing the pencil→Status-dropdown path for the common on/off + power changes (full edit panel still available for other fields).
+- [x] **Dashboard column show/hide**: a "Columns" dropdown (checkbox per column) toggles visibility of any of the 17 signal-table columns across all widgets at once; choice is saved in `localStorage.dashboardHiddenCols` and re-applied after every 10s poll swap (`data-col` attributes on each th/td; `applyColumnVisibility` on `htmx:afterSwap`).
+- [x] **Dashboard widget minimise/expand**: each widget header has a chevron button (`toggleCollapse`) that collapses the body to just the header; per-widget collapsed state is saved in `localStorage.dashboardLayout_v2` and restored on load.
+- [x] **Buzzer indicator toned down**: the large pulsing "BUZZER ON" banner is replaced by a compact one-line red bar (`.buzzer-bar`); blinking removed from the nav badge, summary card, and per-widget badge (only the Live range-state indicator still blinks). The big "BUZZER OFF" banner was removed (nav badge + summary card already convey it).
+- [x] **Dashboard drag tabbing UX**: each serial's body + header actions live together in a `.serial-body-wrap`. **Merge** = drag a serial's tab onto another widget to combine them into one tabbed card. **Split** = a "Pop out" button in the tabbed card header pops the active tab back into its own standalone widget (dragging a tab to empty space also splits, but the button is the reliable path when widgets fill the screen). Grip icon still reorders widgets (SortableJS). Layout persisted in `localStorage.dashboardLayout_v2`.
 
 ---
 
@@ -266,9 +298,11 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 - [x] Log list: column sort — `sort` + `sort_dir` query params; sortable columns: timestamp, signal_name, signal_status, band; icon shows current sort direction
 - [x] Keyboard shortcut `N` → `/logs/new` (suppressed when focus is in input/textarea/select)
 - [x] Calculator: "Create Log Entry" button appears in RF calculator results header after a calculation; links to `/logs/new?tx_if=…&tx_rf=…&rx_rf=…&rx_if=…&freq_unit=…&band=…` which pre-fills the frequency fields on the form
-- [ ] Power chain: save/load named templates
+- [ ] Power chain: save/load named templates (model stub ready — `PowerChainTemplate` not yet wired to UI)
 - [x] Favicon: SVG signal-arcs icon (`/static/favicon.svg`), served via `<link rel="icon" type="image/svg+xml">`
-- [ ] Mobile/tablet responsive polish (currently desktop-first but not broken)
+- [ ] Mobile/tablet responsive polish (currently desktop-first but not broken) — **VERY LOW priority**: this app is almost never used on mobile, so deprioritise mobile/tablet work.
+- [ ] **UI refinement pass (raised 2026-06-22, ongoing)**: the interface is starting to feel clunky as features accumulate and needs a consolidation/refinement pass (spacing, density, grouping of controls). Dark-scheme contrast also needs auditing. **Done so far:** buzzer indicator toned down (compact bar, no pulsing box-shadow, blinking removed from all buzzer elements — only the Live range-state still blinks); dashboard widgets are now minimisable/expandable (persisted); first contrast fixes (lighter muted text via `--bs-secondary-color`, lighter standby banner). **Done since:** dashboard signal rows now use subtle dark status tints (`.status-up/-down/-faulted/-standby` via `--bs-table-bg`) instead of Bootstrap's loud light contextual backgrounds — so the light text and inline controls stay readable (this was the main "hard to read" case: `text-muted` cells on light rows); read-only colored tables (log list, history) get a dark muted-text override so their muted cells stay legible on the light rows. **Done since:** Config page split into tabs (Modulation / FEC / Sources / Antennas / Freq Templates / Signal Registry) instead of one long scroll; grey `bg-secondary` badges darkened to #565e64 for AA contrast; log list + serial history signal rows now use the same subtle dark status tints as the dashboard. **Still to do:** density/spacing pass on the remaining forms; input-group text contrast.
+- [x] **Navigation consolidation**: top-level nav reduced — RF/Power/EIRP grouped under a **Calculators** dropdown (Power and EIRP were previously unreachable from the nav), and the three supervisor links (Users, Audit, Config) grouped under an **Admin** dropdown. Navbar density tightened.
 - [x] Loading indicator during HTMX poll refresh (spinner in widget header)
 - [x] Dashboard quick-edit: exclusivity group warning — "Auto-downs: X, Y" shown below Status select, visible only when "Up" is chosen (JS show/hide)
 - [x] Config drag-to-reorder: SortableJS on all four lists (mod types, FEC, sources, antennas); grip handle column; `fetch` POST to `/config/{type}/reorder` on drop; toast on success. Reorder endpoints added for FEC, sources, antennas (mod already existed).
@@ -277,6 +311,7 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 
 ## Known Issues / Bugs
 
+- ~~**Dashboard summary/buzzer stale on poll**~~: Fixed — the 10s poll only swapped each serial's table body, so the summary cards (Active Signals count, Faulted) never updated and the buzzer bar reflected only the last-polled serial's local state (flipping wrongly with multiple serials). Now the poll + quick-update render `partials/dashboard_fragment.html`, which OOB-swaps the global summary cards, the global buzzer bar, and the per-widget buzzer badge. Global aggregates (`up_count`, `faulted_count`, `any_buzzer`) come from `_dashboard_ctx`.
 - ~~**Chain calculator stage index**~~: Fixed — `removeStage()` now renumbers all remaining `.stage-row` name attributes to fill gaps and resets `stageCount`.
 - **`updated_at` not set by SQLAlchemy `onupdate` on SQLite**: Fixed by setting `log_entry.updated_at = datetime.utcnow()` explicitly in update handlers. Verify behaviour on PostgreSQL.
 - **HTTPException 302 handler**: Using HTTPException with status 302 for auth redirects is non-standard. Consider middleware or a custom exception class for cleaner handling.
@@ -291,7 +326,8 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 |---|---|---|
 | `SECRET_KEY` | `dev-secret-change-in-production-please` | Session signing key |
 | `DATABASE_URL` | `sqlite:///range.db` | SQLAlchemy DB connection |
-| `SESSION_TIMEOUT_MINUTES` | `480` (8 hours) | Auto-logout after inactivity |
+| `SESSION_TIMEOUT_MINUTES` | `480` (8 hours) | Auto-logout after inactivity (skipped for "remember this terminal" sessions) |
+| `SESSION_MAX_AGE_DAYS` | `30` | Session cookie lifetime; the ceiling for "remember this terminal" sessions |
 
 ---
 

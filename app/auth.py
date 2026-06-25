@@ -26,5 +26,9 @@ def session_is_expired(session: dict) -> bool:
     logged_in_at = session.get("logged_in_at")
     if not logged_in_at:
         return True
+    # "Remember this terminal" sessions are not subject to the inactivity timeout
+    # (they last until the session cookie itself expires or the user logs out).
+    if session.get("remember"):
+        return False
     elapsed = datetime.utcnow() - datetime.fromisoformat(logged_in_at)
     return elapsed > timedelta(minutes=SESSION_TIMEOUT_MINUTES)

@@ -40,6 +40,14 @@ def _migrate(conn):
         "ALTER TABLE signal_logs ADD COLUMN session_id INTEGER REFERENCES log_sessions(id)",
         "ALTER TABLE signal_logs ADD COLUMN serial_id INTEGER REFERENCES serials(id)",
         "ALTER TABLE serials ADD COLUMN is_started BOOLEAN DEFAULT 0",
+        "ALTER TABLE signal_packages ADD COLUMN band VARCHAR(8)",
+        "ALTER TABLE signal_packages ADD COLUMN antenna VARCHAR(128)",
+        "ALTER TABLE signal_packages ADD COLUMN buc FLOAT",
+        "ALTER TABLE signal_packages ADD COLUMN lo FLOAT",
+        "ALTER TABLE signal_packages ADD COLUMN ttf FLOAT",
+        "ALTER TABLE signal_packages ADD COLUMN ttf_direction VARCHAR(4) DEFAULT '+'",
+        "ALTER TABLE signal_packages ADD COLUMN freq_unit VARCHAR(4) DEFAULT 'MHz'",
+        "ALTER TABLE signals ADD COLUMN max_power_dbm FLOAT",
     ]
     for sql in migrations:
         try:

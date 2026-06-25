@@ -16,58 +16,42 @@
   {% endif %}
 {% endmacro %}
 
-<!-- OOB swap: keeps the buzzer alert in sync with table refreshes -->
-<div id="buzzerAlert" hx-swap-oob="true">
-  {% if buzzer_active %}
-  <div class="alert alert-danger d-flex align-items-center gap-3 mb-3 buzzer-alert">
-    <i class="bi bi-volume-up-fill fs-3 blink-icon"></i>
-    <div>
-      <strong class="fs-5">BUZZER ON — Signals Active</strong><br>
-      <span class="small">One or more signals are currently <strong>Up</strong> on a live range.
-      {% if range_state == 'Live' %}RF is transmitting. Ensure all safety procedures are followed.{% endif %}
-      </span>
-    </div>
-  </div>
-  {% elif range_state != 'Standby/Off' %}
-  <div class="alert alert-secondary d-flex align-items-center gap-3 mb-3">
-    <i class="bi bi-volume-mute-fill fs-3"></i>
-    <div>
-      <strong>BUZZER OFF — No Signals Active</strong><br>
-      <span class="small text-muted">No signals are currently Up.</span>
-    </div>
-  </div>
-  {% endif %}
-</div>
-
 {% if signals %}
 <table class="table table-dark table-hover table-sm align-middle mb-0 signal-table"
        id="signalTable-{{ serial_id if serial_id is not none else 'legacy' }}">
   <thead class="table-secondary">
     <tr>
       <th></th>
-      <th>Signal</th>
-      <th>Source</th>
-      <th>Status</th>
-      <th>TxIF</th>
-      <th>TxRF</th>
-      <th>RxRF</th>
-      <th>RxIF</th>
-      <th>Unit</th>
-      <th>Band</th>
-      <th>Mod</th>
-      <th>Sym Rate</th>
-      <th>FEC</th>
-      <th>Antenna</th>
-      <th>Power</th>
-      <th>Eb/No</th>
-      <th>Updated</th>
-      <th>Warn</th>
+      <th data-col="signal">Signal</th>
+      <th data-col="source">Source</th>
+      <th data-col="status">Status</th>
+      <th data-col="tx_if">TxIF</th>
+      <th data-col="tx_rf">TxRF</th>
+      <th data-col="rx_rf">RxRF</th>
+      <th data-col="rx_if">RxIF</th>
+      <th data-col="unit">Unit</th>
+      <th data-col="band">Band</th>
+      <th data-col="mod">Mod</th>
+      <th data-col="sym">Sym Rate</th>
+      <th data-col="fec">FEC</th>
+      <th data-col="antenna">Antenna</th>
+      <th data-col="power">Power</th>
+      <th data-col="ebno">Eb/No</th>
+      <th data-col="updated">Updated</th>
+      <th data-col="warn">Warn</th>
     </tr>
   </thead>
   <tbody>
     {% for log in signals %}
-    {% set row_id = "sig-" ~ loop.index %}
-    <tr class="{% if log.signal_status == 'Faulted' %}table-danger{% elif log.signal_status == 'Standby' %}table-warning{% elif log.signal_status == 'Up' %}table-success{% elif log.signal_status == 'Down' %}table-secondary{% endif %}">
+    {% set row_id = "sig-" ~ (serial_id if serial_id is not none else 'legacy') ~ "-" ~ loop.index %}
+    <tr id="{{ row_id }}-row"
+        data-row="{{ row_id }}"
+        data-signal-name="{{ log.signal_name }}"
+        data-serial-id="{{ serial_id if serial_id is not none else '' }}"
+        data-orig-status="{{ log.signal_status }}"
+        data-orig-power="{{ log.power if log.power is not none else '' }}"
+        data-power-unit="{{ log.power_unit }}"
+        class="signal-row{% if log.signal_status == 'Faulted' %} status-faulted{% elif log.signal_status == 'Standby' %} status-standby{% elif log.signal_status == 'Up' %} status-up{% elif log.signal_status == 'Down' %} status-down{% endif %}">
       <td class="ps-2 pe-1" style="width:30px">
         <button type="button"
                 class="btn btn-sm btn-outline-secondary border-0 py-0 px-1 dashboard-edit-btn"
@@ -78,25 +62,51 @@
           <i class="bi bi-pencil-square"></i>
         </button>
       </td>
-      <td class="fw-semibold"><a href="/logs?signal_name={{ log.signal_name }}" class="text-reset text-decoration-none" title="View history for {{ log.signal_name }}">{{ log.signal_name }}</a></td>
-      <td class="text-muted small">{{ log.source or '—' }}</td>
-      <td>{{ status_badge(log.signal_status) }}</td>
-      <td>{{ log.tx_if if log.tx_if is not none else '—' }}</td>
-      <td>{{ log.tx_rf if log.tx_rf is not none else '—' }}</td>
-      <td>{{ log.rx_rf if log.rx_rf is not none else '—' }}</td>
-      <td>{{ log.rx_if if log.rx_if is not none else '—' }}</td>
-      <td class="text-muted">{{ log.freq_unit }}</td>
-      <td>{{ log.band or '—' }}</td>
-      <td>{{ log.modulation or '—' }}</td>
-      <td>{{ log.symbol_rate or '—' }}</td>
-      <td>{{ log.fec or '—' }}</td>
-      <td class="text-muted small">{{ log.antenna or '—' }}</td>
-      <td>
-        {% if log.power is not none %}{{ log.power }} {{ log.power_unit }}{% else %}—{% endif %}
+      <td data-col="signal" class="fw-semibold"><a href="/logs?signal_name={{ log.signal_name }}" class="text-reset text-decoration-none" title="View history for {{ log.signal_name }}">{{ log.signal_name }}</a></td>
+      <td data-col="source" class="text-muted small">{{ log.source or '—' }}</td>
+      <td data-col="status" style="min-width:150px">
+        <div class="d-flex align-items-center gap-2">
+          <div class="form-check form-switch mb-0" title="Toggle Up / Down">
+            <input class="form-check-input" type="checkbox" role="switch"
+                   id="tog-{{ row_id }}" {% if log.signal_status == 'Up' %}checked{% endif %}
+                   onchange="onQuickToggle('{{ row_id }}')">
+          </div>
+          <span id="status-badge-{{ row_id }}">{{ status_badge(log.signal_status) }}</span>
+          <span class="row-dirty-controls" id="dirty-{{ row_id }}" style="display:none">
+            <button type="button" class="btn btn-success btn-sm py-0 px-1" title="Submit — writes a log entry"
+                    onclick="submitQuickRow('{{ row_id }}')"><i class="bi bi-check-lg"></i></button>
+            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Cancel"
+                    onclick="cancelQuickRow('{{ row_id }}')"><i class="bi bi-x-lg"></i></button>
+          </span>
+        </div>
       </td>
-      <td>{{ log.eb_no if log.eb_no is not none else '—' }}</td>
-      <td class="text-muted small">{{ log.timestamp.strftime('%H:%M %d/%m') }}</td>
-      <td>
+      <td data-col="tx_if">{{ log.tx_if if log.tx_if is not none else '—' }}</td>
+      <td data-col="tx_rf">{{ log.tx_rf if log.tx_rf is not none else '—' }}</td>
+      <td data-col="rx_rf">{{ log.rx_rf if log.rx_rf is not none else '—' }}</td>
+      <td data-col="rx_if">{{ log.rx_if if log.rx_if is not none else '—' }}</td>
+      <td data-col="unit" class="text-muted">{{ log.freq_unit }}</td>
+      <td data-col="band">{{ log.band or '—' }}</td>
+      <td data-col="mod">{{ log.modulation or '—' }}</td>
+      <td data-col="sym">{{ log.symbol_rate or '—' }}</td>
+      <td data-col="fec">{{ log.fec or '—' }}</td>
+      <td data-col="antenna" class="text-muted small">{{ log.antenna or '—' }}</td>
+      <td data-col="power" style="min-width:160px">
+        <div class="input-group input-group-sm flex-nowrap" style="width:160px">
+          <button type="button" class="btn btn-outline-secondary px-1" title="Decrease power by 1"
+                  onclick="stepQuickPower('{{ row_id }}', -1)"><i class="bi bi-dash-lg"></i></button>
+          <input type="number" step="any" inputmode="decimal"
+                 class="form-control form-control-sm text-center px-1" id="power-val-{{ row_id }}"
+                 value="{{ log.power if log.power is not none else '' }}"
+                 title="Type a power value, or use −/+"
+                 oninput="onQuickPowerInput('{{ row_id }}')">
+          <button type="button" class="btn btn-outline-secondary px-1" title="Increase power by 1"
+                  onclick="stepQuickPower('{{ row_id }}', 1)"><i class="bi bi-plus-lg"></i></button>
+          <span class="input-group-text px-1">{{ log.power_unit }}</span>
+        </div>
+      </td>
+      <td data-col="ebno">{{ log.eb_no if log.eb_no is not none else '—' }}</td>
+      <td data-col="updated" class="text-muted small">{{ log.timestamp.strftime('%H:%M %d/%m') }}</td>
+      <td data-col="warn">
         {% if log.warning_flags %}
           <span class="text-warning" title="{{ log.warning_flags }}"><i class="bi bi-exclamation-triangle-fill"></i></span>
         {% endif %}
@@ -190,8 +200,10 @@
                 <select class="form-select form-select-sm" name="antenna" style="width:110px">
                   <option value="">—</option>
                   {% if antenna_types is defined %}
+                  {% set signal_pkg_rf = pkg_rf_by_signal.get(log.signal_name) if pkg_rf_by_signal is defined else none %}
+                  {% set default_ant = log.antenna or (signal_pkg_rf.antenna if signal_pkg_rf else (pkg_rf.antenna if pkg_rf is defined and pkg_rf else none)) %}
                   {% for a in antenna_types %}
-                  <option value="{{ a }}" {% if log.antenna == a %}selected{% endif %}>{{ a }}</option>
+                  <option value="{{ a }}" {% if default_ant == a %}selected{% endif %}>{{ a }}</option>
                   {% endfor %}
                   {% endif %}
                 </select>

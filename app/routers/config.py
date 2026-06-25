@@ -170,6 +170,7 @@ async def signal_add(
     name: str = Form(...),
     description: str = Form(""),
     exclusivity_group: str = Form(""),
+    max_power_dbm: Optional[float] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
@@ -179,6 +180,7 @@ async def signal_add(
             name=name,
             description=description.strip() or None,
             exclusivity_group=exclusivity_group.strip() or None,
+            max_power_dbm=max_power_dbm,
         ))
         db.commit()
     return RedirectResponse("/config?toast=Signal+added+to+registry", status_code=302)
@@ -189,6 +191,7 @@ async def signal_update(
     sig_id: int,
     description: str = Form(""),
     exclusivity_group: str = Form(""),
+    max_power_dbm: Optional[float] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
@@ -196,6 +199,7 @@ async def signal_update(
     if sig:
         sig.description = description.strip() or None
         sig.exclusivity_group = exclusivity_group.strip() or None
+        sig.max_power_dbm = max_power_dbm
         db.commit()
     return RedirectResponse("/config?toast=Signal+updated", status_code=302)
 
