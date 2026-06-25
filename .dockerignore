@@ -32,8 +32,8 @@ env/
 .DS_Store
 
 # Docs not needed at runtime
-HANDOVER.md
-Scope.txt
+docs/
+README.md
 
 # Logs
 *.log
