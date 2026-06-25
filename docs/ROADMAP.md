@@ -71,6 +71,76 @@ Theme: blessed for use. Gate criteria:
 - [ ] Backups, user accounts, and audit verified in the live environment.
 - [ ] Operator + supervisor documentation complete in the wiki module.
 - [ ] Password/secret hygiene enforced (no default `admin/changeme`, real `SECRET_KEY`).
+- [ ] **Critical** security items below are closed (they gate 1.0.0).
+
+---
+
+## Security hardening
+
+This system will run on a **sensitive range server**, so security is treated as a
+first-class part of the roadmap rather than an afterthought. The app already does
+some things well — **bcrypt** password hashing, **bleach** sanitisation of
+wiki/doc HTML (XSS), an audit log, sessions with idle timeout, runs as a
+**non-root** container user, and (as of 0.6.0) needs **no internet** at runtime.
+The items below close the remaining gaps. Defence-in-depth: assume the LAN is not
+fully trusted.
+
+### Critical — gate the 1.0.0 operational release
+
+- [ ] **Enforce a real `SECRET_KEY`.** Today `app/config.py` falls back to a
+  hard-coded dev secret if the env var is unset — anyone who knows it can forge
+  session cookies. Fail closed (refuse to start) when `SECRET_KEY` is missing or
+  is the known default. *(Docker compose already requires it; the app itself should too.)*
+- [ ] **Remove default credentials.** The seed creates `admin` / `changeme`.
+  Force a password change on first login (or a guided first-run admin setup) and
+  never leave the default usable in a deployed instance.
+- [ ] **HTTPS/TLS + `Secure` cookies.** Serve over TLS (reverse proxy or app-level)
+  and set the session cookie `Secure`, `HttpOnly` (already on), `SameSite=Strict`.
+  Currently cookies are sent without `Secure`, so on a plain-HTTP LAN they can be
+  sniffed.
+- [ ] **CSRF protection.** There is none today; every state-changing `POST`
+  (logs, range state, users, config, packages) is vulnerable to cross-site request
+  forgery. Add CSRF tokens (or strict `SameSite` + origin checks) to all forms.
+- [ ] **Login brute-force protection.** No throttling or lockout exists. Add rate
+  limiting / temporary lockout on repeated failed logins, and log auth
+  success/failure events to the audit trail.
+- [ ] **Password policy.** No minimum length/complexity is enforced. Add a sane
+  policy on create/change, and block obviously weak passwords.
+
+### High
+
+- [ ] **Security headers** via middleware: `Content-Security-Policy` (now feasible
+  since all assets are local/first-party), `X-Frame-Options: DENY` (clickjacking),
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy`, and `Strict-Transport-Security`
+  once TLS is in place.
+- [ ] **Session hardening:** rotate the session ID on login (prevent fixation);
+  keep both idle and absolute timeouts; re-review the 30-day "remember this
+  terminal" cookie — fine for a locked ops room, risky on any shared/general PC.
+- [ ] **Least-privilege data store:** on Postgres use a dedicated app role with
+  minimal grants; on SQLite lock down file permissions. Restrict who can read the
+  DB/backups (they contain the full audit trail).
+- [ ] **Network exposure:** bind the service to the range subnet only, firewall to
+  known client hosts, and front it with a reverse proxy. Do not expose it beyond
+  the range LAN.
+
+### Medium / ongoing
+
+- [ ] **Dependency & image patching:** pin versions, run `pip-audit` (or similar)
+  on a schedule, and rebuild the image regularly to pick up base-image security
+  fixes. Track CVEs for FastAPI/Starlette/uvicorn/bcrypt.
+- [ ] **Container hardening:** read-only root filesystem where possible,
+  `no-new-privileges`, drop unneeded Linux capabilities, set resource limits.
+- [ ] **Encrypted, access-controlled backups** with a tested restore procedure.
+- [ ] **Finer-grained RBAC** beyond the two current roles; periodic access review.
+- [ ] **Upload validation:** enforce type/size limits and validate JSON on package
+  import and any doc/file uploads.
+- [ ] **Audit log integrity:** make audit records tamper-evident / append-only and
+  ensure they cannot be silently deleted.
+- [ ] **Pre-deployment review:** a focused security review / light pen test before
+  operational sign-off, plus a documented incident-response and patching process.
+
+> Tip: the `/security-review` command can review the pending diff for these
+> categories as features land.
 
 ---
 
