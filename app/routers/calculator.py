@@ -10,7 +10,7 @@ from app.models import User, FrequencyTemplate
 from app.config import FREQUENCY_BANDS
 
 router = APIRouter(prefix="/calculator")
-templates = Jinja2Templates(directory="app/templates")
+from app.templating import templates
 
 
 # ── RF frequency maths ─────────────────────────────────────────────────────────
@@ -116,7 +116,9 @@ async def rf_calc_page(
         "bands": list(FREQUENCY_BANDS.keys()),
         "config_bands": FREQUENCY_BANDS,
         "result": None,
-        "form": {},
+        # Seed the unit selectors from the user's preferred default frequency unit.
+        "form": {"input_unit": current_user.default_freq_unit,
+                 "output_unit": current_user.default_freq_unit},
         "page": "calculator",
     })
 
@@ -197,7 +199,9 @@ async def power_calc_page(
         "range_state": get_current_range_state(db),
         "result": None,
         "chain_result": None,
-        "form": {},
+        # Seed unit selectors from the user's preferred default power unit.
+        "form": {"from_unit": current_user.default_power_unit,
+                 "start_unit": current_user.default_power_unit},
         "page": "calculator",
     })
 

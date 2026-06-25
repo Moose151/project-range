@@ -33,21 +33,21 @@ Core of the MVP scope is in place:
 
 ---
 
-## 0.7.0 — UI & presentation polish
+## 0.7.0 — UI & presentation polish ✅ (shipped, except logo)
 
 Theme: make it look and feel like an operations tool. *(User-requested batch.)*
 
-- [ ] **Range logo** — replace the favicon + navbar brand with the supplied logo (awaiting upload); add to login page and browser tab.
-- [ ] **Navbar / UI tidy** — tighten nav grouping, spacing, and active states; consistent page headers and card rhythm.
-- [ ] **Light / dark mode** — user-toggleable theme (Bootstrap 5.3 `data-bs-theme`), remembered per user/terminal; default dark.
-- [ ] **User-selected default units** (MHz/GHz, dBm/dBW) — from Scope §12.5.
-- [ ] Centralise the version string into a shared template global (remove the `default('0.6.0')` fallback).
+- [ ] **Range logo** — replace the favicon + navbar brand with the supplied logo; add to login page and browser tab. **Blocked: awaiting logo file upload.**
+- [x] **Navbar / UI tidy** — grouped right-side controls (preferences link, theme toggle, logout); user name now links to preferences.
+- [x] **Light / dark mode** — toggle in the navbar (Bootstrap 5.3 `data-bs-theme`), remembered per terminal via localStorage, applied pre-paint to avoid flash; default dark; works on login too.
+- [x] **User-selected default units** (MHz/GHz, dBm/dBW) — stored per user, set on the Preferences page, applied to the RF and Power calculators. Scope §12.5.
+- [x] Centralise the version string into a shared template global (`app/templating.py`); removed the hard-coded fallback.
 
 ## 0.8.0 — RF distribution & device status
 
 Theme: visibility of the physical signal path. *(User-requested splitter page + Scope §11.9.)*
 
-- [ ] **Splitter / combiner routing page** — model the two 16-port devices (16 in / 18 out each); show how each input/output is routed, editable, with a clear matrix/schematic view. Persisted and audited.
+- [ ] **Splitter / combiner routing page** — model the two 16-port devices (16 in / 16 out each); show how each input/output is routed, editable, with a clear matrix/schematic view. Persisted and audited.
 - [ ] **Basic device status checks** — ping-style up/down indicators for modems, splitters, combiners, spectrum analyser, and other configured devices (no hardware control). Scope §11.9.
 - [ ] Device registry (name, type, IP/host, location) underpinning both of the above.
 

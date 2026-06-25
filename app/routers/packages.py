@@ -13,7 +13,7 @@ from app.models import (
 )
 
 router = APIRouter(prefix="/packages")
-templates = Jinja2Templates(directory="app/templates")
+from app.templating import templates
 
 BANDS = ["C", "X", "Ku", "Ka", "Other"]
 FREQ_UNITS = ["MHz", "GHz"]

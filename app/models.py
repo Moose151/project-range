@@ -44,6 +44,9 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # User preferences
+    default_freq_unit: Mapped[str] = mapped_column(String(4), default="MHz")
+    default_power_unit: Mapped[str] = mapped_column(String(4), default="dBm")
 
     signal_logs: Mapped[list["SignalLog"]] = relationship("SignalLog", foreign_keys="SignalLog.operator_id", back_populates="operator")
     range_state_changes: Mapped[list["RangeStateLog"]] = relationship("RangeStateLog", back_populates="changed_by_user")

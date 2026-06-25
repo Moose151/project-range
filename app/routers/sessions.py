@@ -8,7 +8,7 @@ from app.deps import get_current_user, get_current_range_state, get_active_sessi
 from app.models import User, LogSession
 
 router = APIRouter(prefix="/sessions")
-templates = Jinja2Templates(directory="app/templates")
+from app.templating import templates
 
 
 @router.get("", response_class=HTMLResponse)

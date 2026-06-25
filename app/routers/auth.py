@@ -7,7 +7,7 @@ from app.database import get_db
 from app.auth import authenticate_user
 
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
+from app.templating import templates
 
 
 @router.get("/login", response_class=HTMLResponse)

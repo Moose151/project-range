@@ -70,6 +70,8 @@ def _migrate(conn):
         "ALTER TABLE signal_packages ADD COLUMN ttf_direction VARCHAR(4) DEFAULT '+'",
         "ALTER TABLE signal_packages ADD COLUMN freq_unit VARCHAR(4) DEFAULT 'MHz'",
         "ALTER TABLE signals ADD COLUMN max_power_dbm FLOAT",
+        "ALTER TABLE users ADD COLUMN default_freq_unit VARCHAR(4) DEFAULT 'MHz'",
+        "ALTER TABLE users ADD COLUMN default_power_unit VARCHAR(4) DEFAULT 'dBm'",
     ]
     for sql in migrations:
         try:

@@ -15,7 +15,7 @@ from app.models import User, SignalLog, RangeStateLog
 from app.routers.dashboard import _latest_signal_status, _buzzer_active
 
 router = APIRouter(prefix="/handover")
-templates = Jinja2Templates(directory="app/templates")
+from app.templating import templates
 
 
 def _handover_ctx(db: Session) -> dict:

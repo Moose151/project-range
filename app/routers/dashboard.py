@@ -10,7 +10,7 @@ from app.rf_config import serial_package_rf_config
 from app.signal_warnings import warning_flags_for
 
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
+from app.templating import templates
 
 
 def _latest_signal_status(db: Session, serial_id: int | None = None) -> list:

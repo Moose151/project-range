@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Preferences{% endblock %}
+
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-person-gear me-2"></i>Your Preferences</h4>
+
+{% if toast %}
+<div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card border-secondary">
+      <div class="card-header"><i class="bi bi-rulers me-1"></i>Default Units</div>
+      <div class="card-body">
+        <p class="text-muted small">
+          Applied as the starting unit when you open the RF and Power calculators.
+          You can still change the unit on any individual calculation.
+        </p>
+        <form method="post" action="/preferences">
+          <div class="mb-3">
+            <label class="form-label small">Default frequency unit</label>
+            <select class="form-select form-select-sm" name="default_freq_unit" style="max-width:140px">
+              {% for u in freq_units %}
+              <option value="{{ u }}" {% if user.default_freq_unit == u %}selected{% endif %}>{{ u }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small">Default power unit</label>
+            <select class="form-select form-select-sm" name="default_power_unit" style="max-width:140px">
+              {% for u in power_units %}
+              <option value="{{ u }}" {% if user.default_power_unit == u %}selected{% endif %}>{{ u }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check2 me-1"></i>Save</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card border-secondary">
+      <div class="card-header"><i class="bi bi-palette me-1"></i>Appearance</div>
+      <div class="card-body">
+        <p class="text-muted small mb-2">
+          The light / dark theme is remembered on this terminal. Use the
+          <i class="bi bi-moon-stars"></i> toggle in the top navigation bar to switch.
+        </p>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleTheme()">
+          <i class="bi bi-circle-half me-1"></i>Toggle light / dark
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

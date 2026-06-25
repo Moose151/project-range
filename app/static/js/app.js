@@ -5,6 +5,27 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+// ── Light / dark theme (persisted per terminal via localStorage) ──────────────
+// The theme is applied pre-paint by an inline script in <head> to avoid a flash;
+// these helpers handle the toggle button and keep its icon in sync.
+const RANGE_THEME_KEY = 'rangeTheme';
+function syncThemeIcon(theme) {
+  const icon = document.querySelector('#themeToggle i');
+  if (icon) icon.className = theme === 'dark' ? 'bi bi-moon-stars' : 'bi bi-sun-fill';
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-bs-theme', theme);
+  try { localStorage.setItem(RANGE_THEME_KEY, theme); } catch (e) {}
+  syncThemeIcon(theme);
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-bs-theme') || 'dark';
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+document.addEventListener('DOMContentLoaded', () => {
+  syncThemeIcon(document.documentElement.getAttribute('data-bs-theme') || 'dark');
+});
+
 // Show a Bootstrap toast notification
 function showToast(message, type = 'success') {
   const container = document.getElementById('toastContainer');

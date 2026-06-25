@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Apply saved theme before paint to avoid a flash of the wrong theme -->
+  <script>(function(){try{var t=localStorage.getItem('rangeTheme')||'dark';document.documentElement.setAttribute('data-bs-theme',t);}catch(e){}})();</script>
   <title>{% block title %}Project Range{% endblock %}</title>
   <!-- Vendored locally so styling works on LAN devices with no internet access -->
   <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
@@ -111,10 +113,14 @@
         {% endif %}
       </ul>
       <div class="d-flex align-items-center gap-2">
-        <span class="text-secondary small">
+        <a href="/preferences" class="text-secondary small text-decoration-none" title="Your preferences">
           <i class="bi bi-person-circle me-1"></i>{{ user.display_name }}
           {% if user.role == 'supervisor' %}<span class="badge bg-primary ms-1">Supervisor</span>{% endif %}
-        </span>
+        </a>
+        <button id="themeToggle" type="button" class="btn btn-sm btn-outline-secondary"
+                onclick="toggleTheme()" title="Toggle light / dark">
+          <i class="bi bi-moon-stars"></i>
+        </button>
         <a href="/logout" class="btn btn-sm btn-outline-secondary">
           <i class="bi bi-box-arrow-right me-1"></i>Logout
         </a>
@@ -132,7 +138,7 @@
 </main>
 
 <!-- Version badge, bottom-right. Single source of truth: app/config.py APP_VERSION -->
-<div class="app-version-badge" title="Application version">v{{ app_version | default('0.6.0') }}</div>
+<div class="app-version-badge" title="Application version">v{{ app_version }}</div>
 
 <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="/static/vendor/htmx/htmx.min.js"></script>

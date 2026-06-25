@@ -7,7 +7,7 @@ from app.deps import get_current_user, get_current_range_state
 from app.models import User, RangeStateLog, AuditLog, RangeState
 
 router = APIRouter(prefix="/range-state")
-templates = Jinja2Templates(directory="app/templates")
+from app.templating import templates
 
 VALID_STATES = [s.value for s in RangeState]
 

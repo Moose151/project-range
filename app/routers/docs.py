@@ -14,7 +14,7 @@ from app.deps import get_current_user, get_current_range_state, require_supervis
 from app.models import AuditLog, DocPage, DocVersion, User
 
 router = APIRouter(prefix="/docs")
-templates = Jinja2Templates(directory="app/templates")
+from app.templating import templates
 
 ALLOWED_TAGS = list(bleach.sanitizer.ALLOWED_TAGS) + [
     "h1", "h2", "h3", "h4", "h5", "h6",

@@ -8,7 +8,7 @@ from app.models import User, Role
 from app.auth import hash_password
 
 router = APIRouter(prefix="/users")
-templates = Jinja2Templates(directory="app/templates")
+from app.templating import templates
 
 
 @router.get("", response_class=HTMLResponse)

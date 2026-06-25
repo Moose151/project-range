@@ -10,7 +10,7 @@ from app.deps import require_supervisor, get_current_range_state
 from app.models import AuditLog, User
 
 router = APIRouter(prefix="/audit")
-templates = Jinja2Templates(directory="app/templates")
+from app.templating import templates
 
 PAGE_SIZE = 100
 

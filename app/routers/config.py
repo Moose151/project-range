@@ -8,7 +8,7 @@ from app.deps import require_supervisor, get_current_range_state
 from app.models import ModulationType, FecType, SignalSource, AntennaType, Signal, FrequencyTemplate, User
 
 router = APIRouter(prefix="/config")
-templates = Jinja2Templates(directory="app/templates")
+from app.templating import templates
 
 
 @router.get("", response_class=HTMLResponse)

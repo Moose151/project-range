@@ -12,7 +12,7 @@ from app.models import (
 from app.rf_config import serial_package_rf_config
 
 router = APIRouter(prefix="/serials")
-templates = Jinja2Templates(directory="app/templates")
+from app.templating import templates
 
 
 @router.get("", response_class=HTMLResponse)

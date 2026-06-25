@@ -15,7 +15,7 @@ from app.rf_config import serial_package_rf_config
 from app.signal_warnings import warning_flags_for
 
 router = APIRouter(prefix="/logs")
-templates = Jinja2Templates(directory="app/templates")
+from app.templating import templates
 
 SIGNAL_STATUSES = [s.value for s in SignalStatus]
 MODULATIONS = ["BPSK", "QPSK", "8PSK", "16APSK", "32APSK", "Other"]

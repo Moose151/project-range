@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>(function(){try{var t=localStorage.getItem('rangeTheme')||'dark';document.documentElement.setAttribute('data-bs-theme',t);}catch(e){}})();</script>
   <title>Login — Project Range</title>
   <!-- Vendored locally so the login page styles on LAN devices with no internet -->
   <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
@@ -10,6 +11,11 @@
   <link rel="stylesheet" href="/static/css/app.css?v=8">
 </head>
 <body class="d-flex align-items-center justify-content-center min-vh-100 bg-body">
+<button type="button" class="btn btn-sm btn-outline-secondary position-fixed top-0 end-0 m-3"
+        title="Toggle light / dark"
+        onclick="(function(){var c=document.documentElement.getAttribute('data-bs-theme')||'dark';var n=c==='dark'?'light':'dark';document.documentElement.setAttribute('data-bs-theme',n);try{localStorage.setItem('rangeTheme',n);}catch(e){}this.querySelector('i').className=n==='dark'?'bi bi-moon-stars':'bi bi-sun-fill';}).call(this)">
+  <i class="bi bi-moon-stars"></i>
+</button>
 <div class="login-card card shadow-lg border-secondary" style="width:100%;max-width:420px">
   <div class="card-body p-4">
     <div class="text-center mb-4">
@@ -61,7 +67,7 @@
     </form>
   </div>
 </div>
-<div class="app-version-badge" title="Application version">v{{ app_version | default('0.6.0') }}</div>
+<div class="app-version-badge" title="Application version">v{{ app_version }}</div>
 <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 </body>
 </html>

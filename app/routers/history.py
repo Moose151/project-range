@@ -11,7 +11,7 @@ from app.deps import get_current_user, get_current_range_state
 from app.models import User, Serial, SignalLog
 
 router = APIRouter(prefix="/history")
-templates = Jinja2Templates(directory="app/templates")
+from app.templating import templates
 
 PAGE_SIZE = 20  # serials per page on the history list
 
