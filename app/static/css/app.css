@@ -192,3 +192,16 @@ code {
 .serial-widget-group.collapsed .widget-collapse-btn .bi {
   transform: rotate(180deg);
 }
+
+/* ── Version badge (bottom-right, subtle) ───────────────────── */
+.app-version-badge {
+  position: fixed;
+  right: 0.5rem;
+  bottom: 0.4rem;
+  z-index: 1030;
+  font-size: 0.7rem;
+  color: #6c757d;
+  opacity: 0.6;
+  pointer-events: none;
+  user-select: none;
+}

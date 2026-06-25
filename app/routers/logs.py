@@ -169,8 +169,8 @@ async def log_new(
 ):
     signals = db.query(Signal).filter(Signal.is_active == True).order_by(Signal.name).all()
     last_calc = {
-        "buc": request.session.get("last_buc"),
-        "lo": request.session.get("last_lo"),
+        "tx_lo": request.session.get("last_tx_lo"),
+        "rx_lo": request.session.get("last_rx_lo"),
         "ttf": request.session.get("last_ttf"),
         "ttf_direction": request.session.get("last_ttf_direction", "+"),
         "freq_unit": request.session.get("last_freq_unit", "MHz"),
@@ -180,7 +180,7 @@ async def log_new(
     all_serials = db.query(Serial).filter(Serial.closed_at == None).order_by(Serial.opened_at.desc()).all()
     preselect_serial_id = serial_id if serial_id else (active_serials[0].id if active_serials else None)
 
-    # Look up the package RF config for the preselected serial so it can pre-fill BUC/LO/TTF
+    # Look up the package RF config for the preselected serial so it can pre-fill TxLO/RxLO/TTF
     pkg_rf = serial_package_rf_config(db, preselect_serial_id) if preselect_serial_id else None
     if pkg_rf:
         # Package RF config takes priority over the user's last calculator values.

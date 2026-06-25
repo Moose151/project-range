@@ -71,14 +71,14 @@
               </select>
             </div>
             <div class="col-6">
-              <label class="form-label small">BUC</label>
-              <input type="number" class="form-control form-control-sm" name="buc" id="pkg_buc" step="any"
-                     value="{{ package.buc if package and package.buc is not none else '' }}" placeholder="e.g. 9750">
+              <label class="form-label small">TxLO</label>
+              <input type="number" class="form-control form-control-sm" name="tx_lo" id="pkg_tx_lo" step="any"
+                     value="{{ package.tx_lo if package and package.tx_lo is not none else '' }}" placeholder="e.g. 9750">
             </div>
             <div class="col-6">
-              <label class="form-label small">LO</label>
-              <input type="number" class="form-control form-control-sm" name="lo" id="pkg_lo" step="any"
-                     value="{{ package.lo if package and package.lo is not none else '' }}" placeholder="e.g. 10750">
+              <label class="form-label small">RxLO</label>
+              <input type="number" class="form-control form-control-sm" name="rx_lo" id="pkg_rx_lo" step="any"
+                     value="{{ package.rx_lo if package and package.rx_lo is not none else '' }}" placeholder="e.g. 10750">
             </div>
             <div class="col-12">
               <label class="form-label small">TTF</label>
@@ -101,12 +101,12 @@
               </select>
             </div>
           </div>
-          {% if package and (package.buc or package.lo or package.ttf) %}
+          {% if package and (package.tx_lo or package.rx_lo or package.ttf) %}
           <div class="text-muted small mb-2">
             <i class="bi bi-calculator me-1"></i>
-            TxIF + {{ package.buc or '?' }} = TxRF &nbsp;·&nbsp;
+            TxIF + {{ package.tx_lo or '?' }} = TxRF &nbsp;·&nbsp;
             TxRF {{ package.ttf_direction or '+' }} {{ package.ttf or '?' }} = RxRF &nbsp;·&nbsp;
-            RxRF − {{ package.lo or '?' }} = RxIF
+            RxRF − {{ package.rx_lo or '?' }} = RxIF
             <span class="ms-1">({{ package.freq_unit or 'MHz' }})</span>
           </div>
           {% endif %}
@@ -244,7 +244,7 @@
             </div>
             <div class="col-12">
               <span class="small text-muted">
-                <i class="bi bi-calculator me-1"></i>Enter any one frequency — the others auto-calculate from the package BUC/LO/TTF above.
+                <i class="bi bi-calculator me-1"></i>Enter any one frequency — the others auto-calculate from the package TxLO/RxLO/TTF above.
               </span>
             </div>
             <div class="col-sm-3">
@@ -330,7 +330,7 @@
 {% block scripts %}
 {{ super() }}
 {% if package %}
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script src="/static/vendor/sortablejs/Sortable.min.js"></script>
 {% endif %}
 <script>
 {% if toast %}
@@ -399,47 +399,47 @@ function prefillFromRegistry() {
   if (name) setVal('f_signal_name', name);
 }
 
-// ── Real-time RF calc for the signal form, using package BUC/LO/TTF ──────────
+// ── Real-time RF calc for the signal form, using package TxLO/RxLO/TTF ──────────
 function pkgToMHz(v, unit) { return unit === 'GHz' ? v * 1000 : v; }
 function pkgFromMHz(v, unit) { return unit === 'GHz' ? v / 1000 : v; }
 
-function pkgCalcAll(known, valueMHz, buc, lo, ttf, sign) {
+function pkgCalcAll(known, valueMHz, txLo, rxLo, ttf, sign) {
   if (known === 'tx_if') {
-    const tx_rf = valueMHz + buc, rx_rf = tx_rf + sign * ttf;
-    return { tx_if: valueMHz, tx_rf, rx_rf, rx_if: rx_rf - lo };
+    const tx_rf = valueMHz + txLo, rx_rf = tx_rf + sign * ttf;
+    return { tx_if: valueMHz, tx_rf, rx_rf, rx_if: rx_rf - rxLo };
   } else if (known === 'tx_rf') {
     const rx_rf = valueMHz + sign * ttf;
-    return { tx_if: valueMHz - buc, tx_rf: valueMHz, rx_rf, rx_if: rx_rf - lo };
+    return { tx_if: valueMHz - txLo, tx_rf: valueMHz, rx_rf, rx_if: rx_rf - rxLo };
   } else if (known === 'rx_rf') {
     const tx_rf = valueMHz - sign * ttf;
-    return { tx_if: tx_rf - buc, tx_rf, rx_rf: valueMHz, rx_if: valueMHz - lo };
+    return { tx_if: tx_rf - txLo, tx_rf, rx_rf: valueMHz, rx_if: valueMHz - rxLo };
   } else { // rx_if
-    const rx_rf = valueMHz + lo, tx_rf = rx_rf - sign * ttf;
-    return { tx_if: tx_rf - buc, tx_rf, rx_rf, rx_if: valueMHz };
+    const rx_rf = valueMHz + rxLo, tx_rf = rx_rf - sign * ttf;
+    return { tx_if: tx_rf - txLo, tx_rf, rx_rf, rx_if: valueMHz };
   }
 }
 
 function recalcSignalFreqs(changedField) {
-  const bucEl = document.getElementById('pkg_buc');
-  const loEl  = document.getElementById('pkg_lo');
+  const txLoEl = document.getElementById('pkg_tx_lo');
+  const rxLoEl = document.getElementById('pkg_rx_lo');
   const ttfEl = document.getElementById('pkg_ttf');
   const dirEl = document.getElementById('pkg_ttf_dir');
-  if (!bucEl || !loEl || !ttfEl) return;
+  if (!txLoEl || !rxLoEl || !ttfEl) return;
 
-  // BUC/LO/TTF are configured in the package's freq unit; signal freqs in theirs.
+  // TxLO/RxLO/TTF are configured in the package's freq unit; signal freqs in theirs.
   const pkgUnit = document.getElementById('pkg_freq_unit')?.value || 'MHz';
   const sigUnit = document.getElementById('f_freq_unit')?.value || 'MHz';
-  const buc  = pkgToMHz(parseFloat(bucEl.value), pkgUnit);
-  const lo   = pkgToMHz(parseFloat(loEl.value),  pkgUnit);
+  const txLo = pkgToMHz(parseFloat(txLoEl.value), pkgUnit);
+  const rxLo = pkgToMHz(parseFloat(rxLoEl.value), pkgUnit);
   const ttf  = pkgToMHz(parseFloat(ttfEl.value), pkgUnit);
   const sign = (dirEl?.value || '+') === '+' ? 1 : -1;
-  if (isNaN(buc) || isNaN(lo) || isNaN(ttf)) return;  // package RF config incomplete
+  if (isNaN(txLo) || isNaN(rxLo) || isNaN(ttf)) return;  // package RF config incomplete
 
   const changedInput = document.getElementById('f_' + changedField);
   const rawVal = parseFloat(changedInput?.value);
   if (isNaN(rawVal)) return;
 
-  const res = pkgCalcAll(changedField, pkgToMHz(rawVal, sigUnit), buc, lo, ttf, sign);
+  const res = pkgCalcAll(changedField, pkgToMHz(rawVal, sigUnit), txLo, rxLo, ttf, sign);
   ['tx_if','tx_rf','rx_rf','rx_if'].forEach(f => {
     if (f === changedField) return;
     const el = document.getElementById('f_' + f);
@@ -451,7 +451,7 @@ function recalcSignalFreqs(changedField) {
   document.getElementById('f_' + f)?.addEventListener('input', () => recalcSignalFreqs(f));
 });
 // Re-run when package RF config or the signal's unit changes
-['pkg_buc','pkg_lo','pkg_ttf','pkg_ttf_dir','pkg_freq_unit','f_freq_unit'].forEach(id => {
+['pkg_tx_lo','pkg_rx_lo','pkg_ttf','pkg_ttf_dir','pkg_freq_unit','f_freq_unit'].forEach(id => {
   document.getElementById(id)?.addEventListener('input', () => {
     const filled = ['tx_if','tx_rf','rx_rf','rx_if'].find(f => document.getElementById('f_' + f)?.value !== '');
     if (filled) recalcSignalFreqs(filled);

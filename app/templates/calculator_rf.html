@@ -28,7 +28,7 @@
             <option value="">— Select a template —</option>
             {% for t in freq_templates %}
             <option value="{{ t.id }}"
-              data-buc="{{ t.buc }}" data-lo="{{ t.lo }}" data-ttf="{{ t.ttf }}"
+              data-tx-lo="{{ t.tx_lo }}" data-rx-lo="{{ t.rx_lo }}" data-ttf="{{ t.ttf }}"
               data-dir="{{ t.ttf_direction }}" data-unit="{{ t.default_unit }}" data-band="{{ t.band }}">
               {{ t.name }} {% if t.band %}({{ t.band }}){% endif %}
             </option>
@@ -59,20 +59,20 @@
 
           <div class="row g-2 mb-3">
             <div class="col-6">
-              <label class="form-label">BUC
+              <label class="form-label">TxLO
                 <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
-                   title="Block Up Converter frequency (same unit as input)"></i>
+                   title="Transmit (up-convert) local oscillator — formerly BUC. Same unit as input."></i>
               </label>
-              <input type="number" class="form-control" name="buc" id="buc"
-                     step="any" value="{{ form.buc or '' }}" placeholder="BUC" required>
+              <input type="number" class="form-control" name="tx_lo" id="tx_lo"
+                     step="any" value="{{ form.tx_lo or '' }}" placeholder="TxLO" required>
             </div>
             <div class="col-6">
-              <label class="form-label">LO
+              <label class="form-label">RxLO
                 <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
-                   title="Local Oscillator frequency (same unit as input)"></i>
+                   title="Receive (down-convert) local oscillator — formerly LO. Same unit as input."></i>
               </label>
-              <input type="number" class="form-control" name="lo" id="lo"
-                     step="any" value="{{ form.lo or '' }}" placeholder="LO" required>
+              <input type="number" class="form-control" name="rx_lo" id="rx_lo"
+                     step="any" value="{{ form.rx_lo or '' }}" placeholder="RxLO" required>
             </div>
           </div>
 
@@ -182,9 +182,9 @@
       <div class="card-header small text-muted">Formula Reference</div>
       <div class="card-body">
         <code class="small" id="formulaRef">
-          TxIF + BUC = TxRF<br>
+          TxIF + TxLO = TxRF<br>
           TxRF <span id="ttfDirDisplay">{{ form.ttf_direction if form.ttf_direction else '+' }}</span> TTF = RxRF<br>
-          RxRF − LO = RxIF
+          RxRF − RxLO = RxIF
         </code>
       </div>
     </div>
@@ -207,8 +207,8 @@ document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootst
 function loadTemplate(sel) {
   const opt = sel.options[sel.selectedIndex];
   if (!opt.value) return;
-  document.getElementById('buc').value = opt.dataset.buc || '';
-  document.getElementById('lo').value  = opt.dataset.lo  || '';
+  document.getElementById('tx_lo').value = opt.dataset.txLo || '';
+  document.getElementById('rx_lo').value = opt.dataset.rxLo || '';
   document.getElementById('ttf').value = opt.dataset.ttf || '';
   document.getElementById('ttfDir').value   = opt.dataset.dir  || '+';
   document.getElementById('band').value     = opt.dataset.band || '';
@@ -220,20 +220,20 @@ function loadTemplate(sel) {
 function toMHz(v, unit) { return unit === 'GHz' ? v * 1000 : v; }
 function fromMHz(v, unit) { return unit === 'GHz' ? v / 1000 : v; }
 
-function calcAll(known, valueMHz, bucMHz, loMHz, ttfMHz, sign) {
+function calcAll(known, valueMHz, txLoMHz, rxLoMHz, ttfMHz, sign) {
   let tx_if, tx_rf, rx_rf, rx_if;
   if (known === 'TxIF') {
-    tx_if = valueMHz; tx_rf = tx_if + bucMHz;
-    rx_rf = tx_rf + sign * ttfMHz; rx_if = rx_rf - loMHz;
+    tx_if = valueMHz; tx_rf = tx_if + txLoMHz;
+    rx_rf = tx_rf + sign * ttfMHz; rx_if = rx_rf - rxLoMHz;
   } else if (known === 'TxRF') {
-    tx_rf = valueMHz; tx_if = tx_rf - bucMHz;
-    rx_rf = tx_rf + sign * ttfMHz; rx_if = rx_rf - loMHz;
+    tx_rf = valueMHz; tx_if = tx_rf - txLoMHz;
+    rx_rf = tx_rf + sign * ttfMHz; rx_if = rx_rf - rxLoMHz;
   } else if (known === 'RxRF') {
     rx_rf = valueMHz; tx_rf = rx_rf - sign * ttfMHz;
-    tx_if = tx_rf - bucMHz; rx_if = rx_rf - loMHz;
+    tx_if = tx_rf - txLoMHz; rx_if = rx_rf - rxLoMHz;
   } else { // RxIF
-    rx_if = valueMHz; rx_rf = rx_if + loMHz;
-    tx_rf = rx_rf - sign * ttfMHz; tx_if = tx_rf - bucMHz;
+    rx_if = valueMHz; rx_rf = rx_if + rxLoMHz;
+    tx_rf = rx_rf - sign * ttfMHz; tx_if = tx_rf - txLoMHz;
   }
   return { tx_if, tx_rf, rx_rf, rx_if };
 }
@@ -253,18 +253,18 @@ function getBandWarnings(txRfMHz, rxRfMHz, band) {
 }
 
 function recalculate(knownOverride) {
-  const bucRaw  = parseFloat(document.getElementById('buc').value);
-  const loRaw   = parseFloat(document.getElementById('lo').value);
+  const txLoRaw = parseFloat(document.getElementById('tx_lo').value);
+  const rxLoRaw = parseFloat(document.getElementById('rx_lo').value);
   const ttfRaw  = parseFloat(document.getElementById('ttf').value);
   const inUnit  = document.getElementById('inputUnit').value;
   const outUnit = document.querySelector('[name="output_unit"]').value;
   const sign    = document.getElementById('ttfDir').value === '+' ? 1 : -1;
   const band    = document.getElementById('band').value;
 
-  if (isNaN(bucRaw) || isNaN(loRaw) || isNaN(ttfRaw)) return;
+  if (isNaN(txLoRaw) || isNaN(rxLoRaw) || isNaN(ttfRaw)) return;
 
-  const buc = toMHz(bucRaw, inUnit);
-  const lo  = toMHz(loRaw,  inUnit);
+  const txLo = toMHz(txLoRaw, inUnit);
+  const rxLo = toMHz(rxLoRaw, inUnit);
   const ttf = toMHz(ttfRaw, inUnit);
 
   // Determine which field is the known one
@@ -285,7 +285,7 @@ function recalculate(knownOverride) {
     valueMHz = toMHz(mainVal, inUnit);
   }
 
-  const res = calcAll(known, valueMHz, buc, lo, ttf, sign);
+  const res = calcAll(known, valueMHz, txLo, rxLo, ttf, sign);
 
   // Update display
   const map = { tx_if: res.tx_if, tx_rf: res.tx_rf, rx_rf: res.rx_rf, rx_if: res.rx_if };
@@ -335,7 +335,7 @@ function recalculate(knownOverride) {
 }
 
 // ── Event wiring ───────────────────────────────────────────────────────────────
-['buc','lo','ttf'].forEach(id => {
+['tx_lo','rx_lo','ttf'].forEach(id => {
   document.getElementById(id)?.addEventListener('input', () => recalculate());
 });
 document.getElementById('ttfDir')?.addEventListener('change', () => recalculate());

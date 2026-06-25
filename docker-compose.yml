@@ -4,7 +4,10 @@ services:
     image: project-range:latest
     container_name: project-range
     ports:
-      - "8001:8001"
+      # host:container — browse to http://<host>:7474. Change only the left
+      # (host) number to use a different external port; the app listens on 8001
+      # inside the container. Allow 7474 through the host firewall for LAN access.
+      - "7474:8001"
     environment:
       # REQUIRED in production. Generate with:
       #   python -c "import secrets; print(secrets.token_hex(32))"

@@ -46,8 +46,8 @@ def _package_to_dict(pkg: SignalPackage) -> dict:
         "rf_config": {
             "band": pkg.band or "",
             "antenna": pkg.antenna or "",
-            "buc": pkg.buc,
-            "lo": pkg.lo,
+            "tx_lo": pkg.tx_lo,
+            "rx_lo": pkg.rx_lo,
             "ttf": pkg.ttf,
             "ttf_direction": pkg.ttf_direction or "+",
             "freq_unit": pkg.freq_unit or "MHz",
@@ -153,8 +153,8 @@ async def package_create(
     description: str = Form(""),
     band: str = Form(""),
     antenna: str = Form(""),
-    buc: Optional[float] = Form(None),
-    lo: Optional[float] = Form(None),
+    tx_lo: Optional[float] = Form(None),
+    rx_lo: Optional[float] = Form(None),
     ttf: Optional[float] = Form(None),
     ttf_direction: str = Form("+"),
     freq_unit: str = Form("MHz"),
@@ -166,8 +166,8 @@ async def package_create(
         description=description.strip() or None,
         band=band or None,
         antenna=antenna.strip() or None,
-        buc=buc,
-        lo=lo,
+        tx_lo=tx_lo,
+        rx_lo=rx_lo,
         ttf=ttf,
         ttf_direction=ttf_direction or "+",
         freq_unit=freq_unit or "MHz",
@@ -210,8 +210,8 @@ async def package_update_meta(
     description: str = Form(""),
     band: str = Form(""),
     antenna: str = Form(""),
-    buc: Optional[float] = Form(None),
-    lo: Optional[float] = Form(None),
+    tx_lo: Optional[float] = Form(None),
+    rx_lo: Optional[float] = Form(None),
     ttf: Optional[float] = Form(None),
     ttf_direction: str = Form("+"),
     freq_unit: str = Form("MHz"),
@@ -224,8 +224,8 @@ async def package_update_meta(
         pkg.description = description.strip() or None
         pkg.band = band or None
         pkg.antenna = antenna.strip() or None
-        pkg.buc = buc
-        pkg.lo = lo
+        pkg.tx_lo = tx_lo
+        pkg.rx_lo = rx_lo
         pkg.ttf = ttf
         pkg.ttf_direction = ttf_direction or "+"
         pkg.freq_unit = freq_unit or "MHz"
@@ -368,8 +368,8 @@ async def package_duplicate(
         description=orig.description,
         band=orig.band,
         antenna=orig.antenna,
-        buc=orig.buc,
-        lo=orig.lo,
+        tx_lo=orig.tx_lo,
+        rx_lo=orig.rx_lo,
         ttf=orig.ttf,
         ttf_direction=orig.ttf_direction,
         freq_unit=orig.freq_unit,
@@ -495,8 +495,9 @@ async def package_import_submit(
             description=str(data.get("description", "")).strip() or None,
             band=str(rf.get("band", "")).strip() or None,
             antenna=str(rf.get("antenna", "")).strip() or None,
-            buc=_float_or_none(rf.get("buc")),
-            lo=_float_or_none(rf.get("lo")),
+            # Accept legacy "buc"/"lo" keys from packages exported before the rename.
+            tx_lo=_float_or_none(rf.get("tx_lo", rf.get("buc"))),
+            rx_lo=_float_or_none(rf.get("rx_lo", rf.get("lo"))),
             ttf=_float_or_none(rf.get("ttf")),
             ttf_direction=str(rf.get("ttf_direction", "+")) or "+",
             freq_unit=str(rf.get("freq_unit", "MHz")) or "MHz",

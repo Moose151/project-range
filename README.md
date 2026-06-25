@@ -34,6 +34,7 @@ docs/           DEPLOY.md, HANDOVER.md, Scope.txt
 
 ## Documentation
 
+- [docs/ROADMAP.md](docs/ROADMAP.md) — roadmap to v1.0
 - [docs/DEPLOY.md](docs/DEPLOY.md) — Docker deployment guide
 - [docs/HANDOVER.md](docs/HANDOVER.md) — project handover notes
 - [docs/Scope.txt](docs/Scope.txt) — project scope

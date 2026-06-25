@@ -23,29 +23,29 @@ def _from_mhz(value: float, unit: str) -> float:
     return value / 1000 if unit == "GHz" else value
 
 
-def calculate_rf(known: str, value_mhz: float, buc: float, lo: float, ttf: float, ttf_dir: str):
+def calculate_rf(known: str, value_mhz: float, tx_lo: float, rx_lo: float, ttf: float, ttf_dir: str):
     """Return (tx_if, tx_rf, rx_rf, rx_if) all in MHz."""
     sign = 1 if ttf_dir == "+" else -1
     if known == "TxIF":
         tx_if = value_mhz
-        tx_rf = tx_if + buc
+        tx_rf = tx_if + tx_lo
         rx_rf = tx_rf + sign * ttf
-        rx_if = rx_rf - lo
+        rx_if = rx_rf - rx_lo
     elif known == "TxRF":
         tx_rf = value_mhz
-        tx_if = tx_rf - buc
+        tx_if = tx_rf - tx_lo
         rx_rf = tx_rf + sign * ttf
-        rx_if = rx_rf - lo
+        rx_if = rx_rf - rx_lo
     elif known == "RxRF":
         rx_rf = value_mhz
         tx_rf = rx_rf - sign * ttf
-        tx_if = tx_rf - buc
-        rx_if = rx_rf - lo
+        tx_if = tx_rf - tx_lo
+        rx_if = rx_rf - rx_lo
     elif known == "RxIF":
         rx_if = value_mhz
-        rx_rf = rx_if + lo
+        rx_rf = rx_if + rx_lo
         tx_rf = rx_rf - sign * ttf
-        tx_if = tx_rf - buc
+        tx_if = tx_rf - tx_lo
     else:
         raise ValueError(f"Unknown frequency type: {known}")
     return tx_if, tx_rf, rx_rf, rx_if
@@ -127,8 +127,8 @@ async def rf_calc_submit(
     known_freq: str = Form(...),
     known_value: float = Form(...),
     input_unit: str = Form("MHz"),
-    buc: float = Form(...),
-    lo: float = Form(...),
+    tx_lo: float = Form(...),
+    rx_lo: float = Form(...),
     ttf: float = Form(...),
     ttf_direction: str = Form("+"),
     output_unit: str = Form("MHz"),
@@ -139,7 +139,7 @@ async def rf_calc_submit(
     templates_list = db.query(FrequencyTemplate).order_by(FrequencyTemplate.name).all()
     form_data = {
         "known_freq": known_freq, "known_value": known_value,
-        "input_unit": input_unit, "buc": buc, "lo": lo,
+        "input_unit": input_unit, "tx_lo": tx_lo, "rx_lo": rx_lo,
         "ttf": ttf, "ttf_direction": ttf_direction,
         "output_unit": output_unit, "band": band,
     }
@@ -149,11 +149,11 @@ async def rf_calc_submit(
     try:
         # All input converted to MHz for calculation
         val_mhz = _to_mhz(known_value, input_unit)
-        buc_mhz = _to_mhz(buc, input_unit)
-        lo_mhz = _to_mhz(lo, input_unit)
+        tx_lo_mhz = _to_mhz(tx_lo, input_unit)
+        rx_lo_mhz = _to_mhz(rx_lo, input_unit)
         ttf_mhz = _to_mhz(ttf, input_unit)
 
-        tx_if, tx_rf, rx_rf, rx_if = calculate_rf(known_freq, val_mhz, buc_mhz, lo_mhz, ttf_mhz, ttf_direction)
+        tx_if, tx_rf, rx_rf, rx_if = calculate_rf(known_freq, val_mhz, tx_lo_mhz, rx_lo_mhz, ttf_mhz, ttf_direction)
         warnings = band_warnings(tx_rf, rx_rf, band or None)
         result = {
             "tx_if": round(_from_mhz(tx_if, output_unit), 6),
@@ -164,8 +164,8 @@ async def rf_calc_submit(
             "warnings": warnings,
         }
         # Persist conversion values so the log form can pre-fill them
-        request.session["last_buc"] = buc
-        request.session["last_lo"] = lo
+        request.session["last_tx_lo"] = tx_lo
+        request.session["last_rx_lo"] = rx_lo
         request.session["last_ttf"] = ttf
         request.session["last_ttf_direction"] = ttf_direction
         request.session["last_freq_unit"] = input_unit

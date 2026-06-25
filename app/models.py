@@ -97,8 +97,8 @@ class SignalPackage(Base):
     # Package-level RF configuration — shared by all signals in this package
     band: Mapped[str | None] = mapped_column(String(8), nullable=True)
     antenna: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    buc: Mapped[float | None] = mapped_column(Float, nullable=True)
-    lo: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tx_lo: Mapped[float | None] = mapped_column(Float, nullable=True)  # was "buc"
+    rx_lo: Mapped[float | None] = mapped_column(Float, nullable=True)  # was "lo"
     ttf: Mapped[float | None] = mapped_column(Float, nullable=True)
     ttf_direction: Mapped[str] = mapped_column(String(4), default="+")
     freq_unit: Mapped[str] = mapped_column(String(4), default="MHz")
@@ -253,8 +253,8 @@ class FrequencyTemplate(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     band: Mapped[str | None] = mapped_column(String(8), nullable=True)
-    buc: Mapped[float | None] = mapped_column(Float, nullable=True)
-    lo: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tx_lo: Mapped[float | None] = mapped_column(Float, nullable=True)  # was "buc"
+    rx_lo: Mapped[float | None] = mapped_column(Float, nullable=True)  # was "lo"
     ttf: Mapped[float | None] = mapped_column(Float, nullable=True)
     ttf_direction: Mapped[str] = mapped_column(String(4), default="+")
     default_unit: Mapped[str] = mapped_column(String(4), default="MHz")

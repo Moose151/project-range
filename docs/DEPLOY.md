@@ -25,8 +25,12 @@ python -c "import secrets; print('SECRET_KEY=' + secrets.token_hex(32))" >> .env
 docker compose up -d --build
 ```
 
-The app is now on http://localhost:8001 — log in with the seeded
-`admin` / `changeme` account and **change the password immediately**.
+The app is now on http://localhost:7474 (Docker publishes host port 7474 → the
+container's 8001). From other devices on the LAN use http://<host-ip>:7474.
+Log in with the seeded `admin` / `changeme` account and **change the password
+immediately**.
+
+> Firewall: allow inbound TCP 7474 on the host so other devices can reach it.
 
 ## Common operations
 

@@ -365,8 +365,8 @@ async def freq_template_add(
     request: Request,
     name: str = Form(...),
     band: str = Form(""),
-    buc: Optional[float] = Form(None),
-    lo: Optional[float] = Form(None),
+    tx_lo: Optional[float] = Form(None),
+    rx_lo: Optional[float] = Form(None),
     ttf: Optional[float] = Form(None),
     ttf_direction: str = Form("+"),
     default_unit: str = Form("MHz"),
@@ -379,8 +379,8 @@ async def freq_template_add(
         db.add(FrequencyTemplate(
             name=name,
             band=band or None,
-            buc=buc,
-            lo=lo,
+            tx_lo=tx_lo,
+            rx_lo=rx_lo,
             ttf=ttf,
             ttf_direction=ttf_direction or "+",
             default_unit=default_unit or "MHz",
@@ -397,8 +397,8 @@ async def freq_template_update(
     request: Request,
     name: str = Form(...),
     band: str = Form(""),
-    buc: Optional[float] = Form(None),
-    lo: Optional[float] = Form(None),
+    tx_lo: Optional[float] = Form(None),
+    rx_lo: Optional[float] = Form(None),
     ttf: Optional[float] = Form(None),
     ttf_direction: str = Form("+"),
     default_unit: str = Form("MHz"),
@@ -410,8 +410,8 @@ async def freq_template_update(
     if tmpl:
         tmpl.name = name.strip() or tmpl.name
         tmpl.band = band or None
-        tmpl.buc = buc
-        tmpl.lo = lo
+        tmpl.tx_lo = tx_lo
+        tmpl.rx_lo = rx_lo
         tmpl.ttf = ttf
         tmpl.ttf_direction = ttf_direction or "+"
         tmpl.default_unit = default_unit or "MHz"

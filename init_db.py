@@ -31,8 +31,30 @@ DEFAULT_FEC_TYPES = [
     ("9/10", 6),
 ]
 
+def _columns(conn, table):
+    return [row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))]
+
+
+def _rename_column(conn, table, old, new):
+    """Rename old->new if old exists and new does not yet. Safe to re-run."""
+    cols = _columns(conn, table)
+    if old in cols and new not in cols:
+        try:
+            conn.execute(text(f"ALTER TABLE {table} RENAME COLUMN {old} TO {new}"))
+            conn.commit()
+        except Exception:
+            pass
+
+
 def _migrate(conn):
     """Apply additive SQLite migrations for new columns. Safe to re-run."""
+    # BUC/LO were renamed to TxLO/RxLO. Rename existing columns first so legacy
+    # databases keep their data; the additive step below covers brand-new and
+    # pre-RF-feature databases.
+    for table in ("signal_packages", "frequency_templates"):
+        _rename_column(conn, table, "buc", "tx_lo")
+        _rename_column(conn, table, "lo", "rx_lo")
+
     migrations = [
         "ALTER TABLE signals ADD COLUMN exclusivity_group VARCHAR(128)",
         "ALTER TABLE signal_logs ADD COLUMN source VARCHAR(128)",
@@ -42,8 +64,8 @@ def _migrate(conn):
         "ALTER TABLE serials ADD COLUMN is_started BOOLEAN DEFAULT 0",
         "ALTER TABLE signal_packages ADD COLUMN band VARCHAR(8)",
         "ALTER TABLE signal_packages ADD COLUMN antenna VARCHAR(128)",
-        "ALTER TABLE signal_packages ADD COLUMN buc FLOAT",
-        "ALTER TABLE signal_packages ADD COLUMN lo FLOAT",
+        "ALTER TABLE signal_packages ADD COLUMN tx_lo FLOAT",
+        "ALTER TABLE signal_packages ADD COLUMN rx_lo FLOAT",
         "ALTER TABLE signal_packages ADD COLUMN ttf FLOAT",
         "ALTER TABLE signal_packages ADD COLUMN ttf_direction VARCHAR(4) DEFAULT '+'",
         "ALTER TABLE signal_packages ADD COLUMN freq_unit VARCHAR(4) DEFAULT 'MHz'",
@@ -196,22 +218,22 @@ The RF Calculator computes all four key frequencies from one known frequency and
 ## Frequency Relationships
 
 ```
-TxIF + BUC = TxRF
-TxRF ± TTF = RxRF   (direction selectable: + or −)
-RxRF − LO  = RxIF
+TxIF + TxLO = TxRF
+TxRF ± TTF  = RxRF   (direction selectable: + or −)
+RxRF − RxLO = RxIF
 ```
 
 Where:
-- **BUC** — Block Up Converter offset frequency
+- **TxLO** — Transmit (up-convert) local oscillator frequency (formerly "BUC")
 - **TTF** — Transponder Translation Frequency
-- **LO** — Local Oscillator frequency
+- **RxLO** — Receive (down-convert) local oscillator frequency (formerly "LO")
 
 ## How to Use
 
 1. Go to **Calculators → RF Freq**.
 2. Select which frequency you know (TxIF, TxRF, RxRF, or RxIF).
 3. Enter the known frequency value and its unit (MHz or GHz).
-4. Enter your BUC, LO, and TTF values (same unit as the known frequency).
+4. Enter your TxLO, RxLO, and TTF values (same unit as the known frequency).
 5. Select the TTF direction (+ or −).
 6. Select the output unit.
 7. Optionally select a frequency band for validation.
@@ -219,7 +241,7 @@ Where:
 
 ## Frequency Templates
 
-Common BUC/LO/TTF configurations can be saved as **Frequency Templates** on the Config page (supervisor only). Templates appear in the dropdown above the calculator and pre-fill all conversion values with a single click.
+Common TxLO/RxLO/TTF configurations can be saved as **Frequency Templates** on the Config page (supervisor only). Templates appear in the dropdown above the calculator and pre-fill all conversion values with a single click.
 
 ## Creating a Log Entry from the Calculator
 

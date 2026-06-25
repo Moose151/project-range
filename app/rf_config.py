@@ -5,7 +5,7 @@ from app.models import SerialPackage
 
 def package_has_rf_config(package) -> bool:
     """Return whether a package contains any package-level RF setting."""
-    return any(value is not None for value in (package.buc, package.lo, package.ttf)) or bool(
+    return any(value is not None for value in (package.tx_lo, package.rx_lo, package.ttf)) or bool(
         package.band or package.antenna
     )
 
@@ -14,8 +14,8 @@ def package_rf_config(package) -> dict:
     return {
         "package_id": package.id,
         "package_name": package.name,
-        "buc": package.buc,
-        "lo": package.lo,
+        "tx_lo": package.tx_lo,
+        "rx_lo": package.rx_lo,
         "ttf": package.ttf,
         "ttf_direction": package.ttf_direction or "+",
         "freq_unit": package.freq_unit or "MHz",

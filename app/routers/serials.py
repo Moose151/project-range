@@ -247,11 +247,11 @@ async def serial_rf_config(
     """Return the best matching package RF config assigned to this serial (JSON).
 
     If signal_name is supplied, its package is preferred. Used by the log form to
-    auto-populate BUC/LO/TTF/band/antenna. Returns nulls when no package has RF config.
+    auto-populate TxLO/RxLO/TTF/band/antenna. Returns nulls when no package has RF config.
     """
     config = serial_package_rf_config(db, serial_id, signal_name)
     if not config:
-        return JSONResponse({"buc": None, "lo": None, "ttf": None,
+        return JSONResponse({"tx_lo": None, "rx_lo": None, "ttf": None,
                              "ttf_direction": "+", "freq_unit": "MHz",
                              "band": None, "antenna": None})
     return JSONResponse(config)

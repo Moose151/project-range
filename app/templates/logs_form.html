@@ -114,23 +114,23 @@
                 <i class="bi bi-sliders me-1"></i>Conversion Values
                 {% if pkg_rf %}
                 <span class="badge bg-info text-dark ms-1">from package</span>
-                {% elif last_calc and last_calc.buc %}
+                {% elif last_calc and last_calc.tx_lo %}
                 <span class="badge bg-secondary ms-1">from last calculation</span>
                 {% endif %}
                 <span id="rfConfigSource" class="badge bg-info text-dark ms-1" style="display:none">from package</span>
               </span>
             </div>
             <div class="col-6 col-sm-3 col-lg-2">
-              <label class="form-label small">BUC</label>
-              <input type="number" class="form-control form-control-sm" id="fc_buc" step="any"
-                     value="{{ last_calc.buc if last_calc and last_calc.buc is not none else '' }}"
-                     placeholder="BUC">
+              <label class="form-label small">TxLO</label>
+              <input type="number" class="form-control form-control-sm" id="fc_tx_lo" step="any"
+                     value="{{ last_calc.tx_lo if last_calc and last_calc.tx_lo is not none else '' }}"
+                     placeholder="TxLO">
             </div>
             <div class="col-6 col-sm-3 col-lg-2">
-              <label class="form-label small">LO</label>
-              <input type="number" class="form-control form-control-sm" id="fc_lo" step="any"
-                     value="{{ last_calc.lo if last_calc and last_calc.lo is not none else '' }}"
-                     placeholder="LO">
+              <label class="form-label small">RxLO</label>
+              <input type="number" class="form-control form-control-sm" id="fc_rx_lo" step="any"
+                     value="{{ last_calc.rx_lo if last_calc and last_calc.rx_lo is not none else '' }}"
+                     placeholder="RxLO">
             </div>
             <div class="col-6 col-sm-3 col-lg-2">
               <label class="form-label small">TTF</label>
@@ -154,7 +154,7 @@
             <div class="col-12 col-lg-4">
               <label class="form-label small d-lg-block d-none">&nbsp;</label>
               <p class="text-muted small mb-0 mt-1">
-                TxIF + BUC = TxRF &nbsp;·&nbsp; TxRF ± TTF = RxRF &nbsp;·&nbsp; RxRF − LO = RxIF
+                TxIF + TxLO = TxRF &nbsp;·&nbsp; TxRF ± TTF = RxRF &nbsp;·&nbsp; RxRF − RxLO = RxIF
               </p>
             </div>
           </div>
@@ -328,44 +328,44 @@ document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootst
 function toMHz(v, unit) { return unit === 'GHz' ? v * 1000 : v; }
 function fromMHz(v, unit) { return unit === 'GHz' ? v / 1000 : v; }
 
-function logFormCalcAll(known, valueMHz, buc, lo, ttf, sign) {
+function logFormCalcAll(known, valueMHz, txLo, rxLo, ttf, sign) {
   if (known === 'tx_if') {
-    const tx_rf = valueMHz + buc, rx_rf = tx_rf + sign * ttf;
-    return { tx_if: valueMHz, tx_rf, rx_rf, rx_if: rx_rf - lo };
+    const tx_rf = valueMHz + txLo, rx_rf = tx_rf + sign * ttf;
+    return { tx_if: valueMHz, tx_rf, rx_rf, rx_if: rx_rf - rxLo };
   } else if (known === 'tx_rf') {
     const rx_rf = valueMHz + sign * ttf;
-    return { tx_if: valueMHz - buc, tx_rf: valueMHz, rx_rf, rx_if: rx_rf - lo };
+    return { tx_if: valueMHz - txLo, tx_rf: valueMHz, rx_rf, rx_if: rx_rf - rxLo };
   } else if (known === 'rx_rf') {
     const tx_rf = valueMHz - sign * ttf;
-    return { tx_if: tx_rf - buc, tx_rf, rx_rf: valueMHz, rx_if: valueMHz - lo };
+    return { tx_if: tx_rf - txLo, tx_rf, rx_rf: valueMHz, rx_if: valueMHz - rxLo };
   } else { // rx_if
-    const rx_rf = valueMHz + lo, tx_rf = rx_rf - sign * ttf;
-    return { tx_if: tx_rf - buc, tx_rf, rx_rf, rx_if: valueMHz };
+    const rx_rf = valueMHz + rxLo, tx_rf = rx_rf - sign * ttf;
+    return { tx_if: tx_rf - txLo, tx_rf, rx_rf, rx_if: valueMHz };
   }
 }
 
 function recalcLogFreqs(changedField) {
-  const bucEl  = document.getElementById('fc_buc');
-  const loEl   = document.getElementById('fc_lo');
+  const txLoEl = document.getElementById('fc_tx_lo');
+  const rxLoEl = document.getElementById('fc_rx_lo');
   const ttfEl  = document.getElementById('fc_ttf');
   const dirEl  = document.getElementById('fc_ttf_dir');
   const unitEl = document.getElementById('fc_unit');
-  if (!bucEl || !loEl || !ttfEl) return;   // edit form — no calc inputs
+  if (!txLoEl || !rxLoEl || !ttfEl) return;   // edit form — no calc inputs
 
   const unit = unitEl?.value || 'MHz';
-  const buc  = toMHz(parseFloat(bucEl.value), unit);
-  const lo   = toMHz(parseFloat(loEl.value),  unit);
+  const txLo = toMHz(parseFloat(txLoEl.value), unit);
+  const rxLo = toMHz(parseFloat(rxLoEl.value), unit);
   const ttf  = toMHz(parseFloat(ttfEl.value), unit);
   const sign = (dirEl?.value || '+') === '+' ? 1 : -1;
 
-  if (isNaN(buc) || isNaN(lo) || isNaN(ttf)) return;
+  if (isNaN(txLo) || isNaN(rxLo) || isNaN(ttf)) return;
 
   const changedInput = document.getElementById('lf_' + changedField);
   const rawVal = parseFloat(changedInput?.value);
   if (isNaN(rawVal)) return;
 
   const valueMHz = toMHz(rawVal, unit);
-  const res = logFormCalcAll(changedField, valueMHz, buc, lo, ttf, sign);
+  const res = logFormCalcAll(changedField, valueMHz, txLo, rxLo, ttf, sign);
 
   ['tx_if','tx_rf','rx_rf','rx_if'].forEach(f => {
     if (f === changedField) return;
@@ -382,7 +382,7 @@ function recalcLogFreqs(changedField) {
 document.querySelectorAll('.log-freq-field').forEach(el => {
   el.addEventListener('input', () => recalcLogFreqs(el.dataset.field));
 });
-['fc_buc','fc_lo','fc_ttf','fc_ttf_dir','fc_unit'].forEach(id => {
+['fc_tx_lo','fc_rx_lo','fc_ttf','fc_ttf_dir','fc_unit'].forEach(id => {
   document.getElementById(id)?.addEventListener('input', () => {
     // Recalculate from whichever freq field has a value
     const fields = ['tx_if','tx_rf','rx_rf','rx_if'];
@@ -399,15 +399,15 @@ function applyRFConfig(cfg) {
     if (el) el.value = val === null || val === undefined ? '' : val;
   };
 
-  setValue('fc_buc', cfg.buc);
-  setValue('fc_lo', cfg.lo);
+  setValue('fc_tx_lo', cfg.tx_lo);
+  setValue('fc_rx_lo', cfg.rx_lo);
   setValue('fc_ttf', cfg.ttf);
   setValue('fc_ttf_dir', cfg.ttf_direction || '+');
   setValue('fc_unit', cfg.freq_unit || 'MHz');
   setValue('field_band', cfg.band);
   setValue('field_antenna', cfg.antenna);
 
-  const hasCfg = cfg.buc !== null || cfg.lo !== null || cfg.ttf !== null;
+  const hasCfg = cfg.tx_lo !== null || cfg.rx_lo !== null || cfg.ttf !== null;
   const badge = document.getElementById('rfConfigSource');
   if (badge) badge.style.display = hasCfg ? 'inline-block' : 'none';
 
@@ -422,7 +422,7 @@ const signalNameInput = document.querySelector('[name="signal_name"]');
 function loadSerialRFConfig() {
   const sid = serialSelect?.value;
   if (!sid) {
-    applyRFConfig({buc:null, lo:null, ttf:null, ttf_direction:'+', freq_unit:'MHz', band:null, antenna:null});
+    applyRFConfig({tx_lo:null, rx_lo:null, ttf:null, ttf_direction:'+', freq_unit:'MHz', band:null, antenna:null});
     return;
   }
   const params = new URLSearchParams();
