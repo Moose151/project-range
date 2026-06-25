@@ -1,0 +1,19 @@
+# Normalize line endings. Files that run inside the Linux container MUST stay
+# LF, otherwise Windows clones (core.autocrlf=true) break the Docker build with
+# "exec format error" / "bad interpreter".
+* text=auto
+
+*.sh            text eol=lf
+docker-entrypoint.sh text eol=lf
+Dockerfile      text eol=lf
+*.py            text eol=lf
+
+# Keep Windows-style endings for Windows-only scripts (none yet, shown for intent)
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+
+# Binary / data files — never touch
+*.db            binary
+*.xlsx          binary
+*.png           binary
+*.ico           binary
