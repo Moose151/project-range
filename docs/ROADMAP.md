@@ -43,13 +43,13 @@ Theme: make it look and feel like an operations tool. *(User-requested batch.)*
 - [x] **User-selected default units** (MHz/GHz, dBm/dBW) — stored per user, set on the Preferences page, applied to the RF and Power calculators. Scope §12.5.
 - [x] Centralise the version string into a shared template global (`app/templating.py`); removed the hard-coded fallback.
 
-## 0.8.0 — RF distribution & device status
+## 0.8.0 — RF distribution & device status ✅ (shipped)
 
 Theme: visibility of the physical signal path. *(User-requested splitter page + Scope §11.9.)*
 
-- [ ] **Splitter / combiner routing page** — model the two 16-port devices (16 in / 16 out each); show how each input/output is routed, editable, with a clear matrix/schematic view. Persisted and audited.
-- [ ] **Basic device status checks** — ping-style up/down indicators for modems, splitters, combiners, spectrum analyser, and other configured devices (no hardware control). Scope §11.9.
-- [ ] Device registry (name, type, IP/host, location) underpinning both of the above.
+- [x] **Splitter / combiner routing page** — crossbar matrix (each output routed from an input) **plus** a free-text label on every input/output port. Port counts configurable per device (default 16/16). Persisted and audited (`DEVICE_ROUTING`).
+- [x] **Basic device status checks** — live up/down/no-check badges via a non-blocking concurrent TCP reachability probe (`/devices/status`, polled every 15s); no hardware control. Scope §11.9.
+- [x] **Device registry** (name, type, host/IP, check port, location, port counts) — supervisor-managed CRUD, audited; underpins both of the above. New "Devices" nav entry.
 
 ## 0.9.0 — Operational hardening
 

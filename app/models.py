@@ -367,3 +367,48 @@ class AntennaType(Base):
     display_order: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class RFDevice(Base):
+    """A range device (modem, splitter, combiner, spectrum analyser, ...).
+
+    Splitter/combiner-type devices also carry a routing matrix via DevicePort:
+    each output port can be routed from an input port, and every port has a
+    free-text label describing what is physically cabled to it.
+    """
+    __tablename__ = "rf_devices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    device_type: Mapped[str] = mapped_column(String(32), nullable=False, default="other")
+    host: Mapped[str | None] = mapped_column(String(128), nullable=True)        # IP / hostname
+    check_port: Mapped[int | None] = mapped_column(Integer, nullable=True)      # TCP port for reachability
+    location: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    num_inputs: Mapped[int] = mapped_column(Integer, default=16)
+    num_outputs: Mapped[int] = mapped_column(Integer, default=16)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    ports: Mapped[list["DevicePort"]] = relationship(
+        "DevicePort", back_populates="device",
+        cascade="all, delete-orphan", order_by="DevicePort.idx",
+    )
+
+    @property
+    def is_routing(self) -> bool:
+        return self.device_type in ("splitter", "combiner", "switch")
+
+
+class DevicePort(Base):
+    """One input or output port on an RFDevice."""
+    __tablename__ = "device_ports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    device_id: Mapped[int] = mapped_column(ForeignKey("rf_devices.id"), nullable=False, index=True)
+    direction: Mapped[str] = mapped_column(String(3), nullable=False)   # 'in' or 'out'
+    idx: Mapped[int] = mapped_column(Integer, nullable=False)           # 1-based port number
+    label: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    routed_from: Mapped[int | None] = mapped_column(Integer, nullable=True)  # input idx feeding an output
+
+    device: Mapped["RFDevice"] = relationship("RFDevice", back_populates="ports")

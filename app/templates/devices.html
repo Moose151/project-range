@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Devices{% endblock %}
+
+{% block content %}
+{# ── Reusable device form macro (defined before use) ── #}
+{% macro device_form(d, device_types, action, submit_label) %}
+<form method="post" action="{{ action }}" class="row g-2 align-items-end">
+  <div class="col-md-3">
+    <label class="form-label small mb-0">Name</label>
+    <input type="text" class="form-control form-control-sm" name="name" value="{{ d.name if d else '' }}" required>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label small mb-0">Type</label>
+    <select class="form-select form-select-sm" name="device_type">
+      {% for val, lbl in device_types %}
+      <option value="{{ val }}" {% if d and d.device_type == val %}selected{% endif %}>{{ lbl }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label small mb-0">Host / IP</label>
+    <input type="text" class="form-control form-control-sm" name="host" value="{{ d.host or '' if d else '' }}" placeholder="10.0.0.5">
+  </div>
+  <div class="col-md-1">
+    <label class="form-label small mb-0">Port</label>
+    <input type="number" class="form-control form-control-sm" name="check_port" value="{{ d.check_port or '' if d else '' }}" placeholder="80">
+  </div>
+  <div class="col-md-2">
+    <label class="form-label small mb-0">Location</label>
+    <input type="text" class="form-control form-control-sm" name="location" value="{{ d.location or '' if d else '' }}">
+  </div>
+  <div class="col-md-1">
+    <label class="form-label small mb-0">Inputs</label>
+    <input type="number" class="form-control form-control-sm" name="num_inputs" value="{{ d.num_inputs if d else 16 }}" min="0" max="128">
+  </div>
+  <div class="col-md-1">
+    <label class="form-label small mb-0">Outputs</label>
+    <input type="number" class="form-control form-control-sm" name="num_outputs" value="{{ d.num_outputs if d else 16 }}" min="0" max="128">
+  </div>
+  <div class="col-12">
+    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check2 me-1"></i>{{ submit_label }}</button>
+    <span class="text-muted small ms-2">Host + Port enable the reachability check. Inputs/Outputs apply to splitter/combiner/switch routing.</span>
+  </div>
+</form>
+{% endmacro %}
+
+<div class="d-flex align-items-center mb-3 gap-2">
+  <h4 class="mb-0"><i class="bi bi-hdd-network me-2"></i>Range Devices</h4>
+  <span class="text-muted small ms-2" id="statusUpdated"></span>
+</div>
+
+{% if toast %}
+<div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
+
+<div class="card border-secondary mb-3">
+  <div class="card-body p-0 overflow-auto">
+    <table class="table table-dark table-sm align-middle mb-0">
+      <thead class="table-secondary">
+        <tr>
+          <th>Status</th><th>Name</th><th>Type</th><th>Host : Port</th><th>Location</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in devices %}
+        <tr class="{% if not d.is_active %}opacity-50{% endif %}">
+          <td>
+            <span class="badge bg-secondary" data-device-status="{{ d.id }}" title="Reachability">
+              <i class="bi bi-question-circle"></i> …
+            </span>
+          </td>
+          <td class="fw-semibold">{{ d.name }}</td>
+          <td><span class="badge bg-dark border border-secondary text-capitalize">{{ d.device_type.replace('_', ' ') }}</span></td>
+          <td class="text-muted small">{{ d.host or '—' }}{% if d.check_port %} : {{ d.check_port }}{% endif %}</td>
+          <td class="text-muted small">{{ d.location or '—' }}</td>
+          <td class="text-nowrap">
+            {% if d.is_routing %}
+            <a href="/devices/{{ d.id }}/routing" class="btn btn-sm btn-outline-info py-0 px-1" title="Routing matrix">
+              <i class="bi bi-diagram-3"></i> Routing
+            </a>
+            {% endif %}
+            {% if user.role == 'supervisor' %}
+            <button class="btn btn-sm btn-outline-secondary py-0 px-1" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#edit-{{ d.id }}" title="Edit">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <form method="post" action="/devices/{{ d.id }}/delete" class="d-inline"
+                  onsubmit="return confirm('Delete device {{ d.name }}?')">
+              <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete"><i class="bi bi-trash"></i></button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% if user.role == 'supervisor' %}
+        <tr class="collapse" id="edit-{{ d.id }}">
+          <td colspan="6">
+            {{ device_form(d, device_types, '/devices/' ~ d.id ~ '/update', 'Save') }}
+          </td>
+        </tr>
+        {% endif %}
+        {% else %}
+        <tr><td colspan="6" class="text-muted text-center py-3">No devices yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if user.role == 'supervisor' %}
+<div class="card border-secondary">
+  <div class="card-header"><i class="bi bi-plus-lg me-1"></i>Add Device</div>
+  <div class="card-body">
+    {{ device_form(None, device_types, '/devices/new', 'Add Device') }}
+  </div>
+</div>
+{% else %}
+<p class="text-muted small">Device registry is managed by supervisors. Status updates automatically.</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+const STATUS_MAP = {
+  up:      {cls: 'bg-success',   icon: 'bi-check-circle',    text: 'Up'},
+  down:    {cls: 'bg-danger',    icon: 'bi-x-circle',        text: 'Down'},
+  unknown: {cls: 'bg-secondary', icon: 'bi-question-circle', text: 'No check'},
+};
+function refreshDeviceStatus() {
+  fetch('/devices/status').then(r => r.json()).then(map => {
+    document.querySelectorAll('[data-device-status]').forEach(el => {
+      const s = map[el.dataset.deviceStatus] || 'unknown';
+      const m = STATUS_MAP[s] || STATUS_MAP.unknown;
+      el.className = 'badge ' + m.cls;
+      el.innerHTML = '<i class="bi ' + m.icon + '"></i> ' + m.text;
+    });
+    const u = document.getElementById('statusUpdated');
+    if (u) u.textContent = 'Status checked ' + new Date().toLocaleTimeString();
+  }).catch(() => {});
+}
+document.addEventListener('DOMContentLoaded', () => {
+  refreshDeviceStatus();
+  setInterval(refreshDeviceStatus, 15000);
+});
+</script>
+{% endblock %}
