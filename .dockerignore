@@ -1,0 +1,40 @@
+# Version control
+.git
+.gitignore
+
+# Python caches / build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Local databases (never bake into the image — use the data volume)
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets / local env
+.env
+.env.local
+.env.*.local
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Docs not needed at runtime
+HANDOVER.md
+Scope.txt
+
+# Logs
+*.log
+logs/
