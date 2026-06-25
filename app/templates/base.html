@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Apply saved theme before paint to avoid a flash of the wrong theme -->
   <script>(function(){try{var t=localStorage.getItem('rangeTheme')||'dark';document.documentElement.setAttribute('data-bs-theme',t);}catch(e){}})();</script>
-  <title>{% block title %}Project Range{% endblock %}</title>
+  <title>{% block title %}SEW Range{% endblock %}</title>
   <!-- Vendored locally so styling works on LAN devices with no internet access -->
   <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="/static/vendor/bootstrap-icons/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=8">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/css/app.css?v=9">
+  <link rel="icon" type="image/png" href="/static/img/sew-range-logo.png">
 </head>
 <body>
 
@@ -46,8 +46,9 @@
 <!-- Navbar -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-secondary">
   <div class="container-fluid">
-    <a class="navbar-brand fw-bold" href="/">
-      <i class="bi bi-reception-4 me-1 text-primary"></i> Range
+    <a class="navbar-brand fw-bold d-flex align-items-center brand-sew" href="/">
+      <img src="/static/img/sew-range-logo.png" alt="SEW Range" height="30" class="me-2">
+      <span>SEW Range</span>
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
       <span class="navbar-toggler-icon"></span>

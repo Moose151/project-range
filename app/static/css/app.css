@@ -205,3 +205,16 @@ code {
   pointer-events: none;
   user-select: none;
 }
+
+/* ── SEW Range brand palette (sampled from the logo) ───────── */
+:root {
+  --range-gold: #e0a52e;        /* primary gold accent (ring / arrows / text) */
+  --range-gold-bright: #f2a81c; /* eagle-eye highlight */
+  --range-gold-deep: #b9822a;   /* shadowed gold */
+  --range-silver: #c9ced6;      /* silver arrow */
+  --range-ink: #0e0f12;         /* badge near-black */
+}
+/* Light brand touch now; fuller palette adoption is a roadmap item. */
+.brand-sew span { color: var(--range-gold); letter-spacing: .04em; }
+.navbar { border-bottom: 2px solid var(--range-gold) !important; }
+.app-version-badge { color: var(--range-gold); }

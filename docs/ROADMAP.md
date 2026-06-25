@@ -37,7 +37,8 @@ Core of the MVP scope is in place:
 
 Theme: make it look and feel like an operations tool. *(User-requested batch.)*
 
-- [ ] **Range logo** — replace the favicon + navbar brand with the supplied logo; add to login page and browser tab. **Blocked: awaiting logo file upload.**
+- [x] **Range logo** — SEW Range eagle badge added to the navbar brand, login page, and favicon; app re-branded "SEW Range". A light gold accent (brand text, navbar underline, version badge) was applied from the logo.
+- [ ] **Full palette adoption from the logo** *(follow-up)* — extend the logo colours (gold `#e0a52e`, eye-amber `#f2a81c`, silver `#c9ced6`, ink `#0e0f12`) across the interface: primary buttons, links, active nav, badges and focus rings, in both light and dark themes. Brand CSS variables are already defined in `app.css` (`--range-gold`, etc.); this is the deliberate restyle on top of them.
 - [x] **Navbar / UI tidy** — grouped right-side controls (preferences link, theme toggle, logout); user name now links to preferences.
 - [x] **Light / dark mode** — toggle in the navbar (Bootstrap 5.3 `data-bs-theme`), remembered per terminal via localStorage, applied pre-paint to avoid flash; default dark; works on login too.
 - [x] **User-selected default units** (MHz/GHz, dBm/dBW) — stored per user, set on the Preferences page, applied to the RF and Power calculators. Scope §12.5.
