@@ -1,0 +1,22 @@
+services:
+  web:
+    build: .
+    image: project-range:latest
+    container_name: project-range
+    ports:
+      - "8001:8001"
+    environment:
+      # REQUIRED in production. Generate with:
+      #   python -c "import secrets; print(secrets.token_hex(32))"
+      # Compose fails fast if SECRET_KEY is unset (see .env / .env.example).
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
+      DATABASE_URL: sqlite:////app/data/range.db
+      SESSION_TIMEOUT_MINUTES: ${SESSION_TIMEOUT_MINUTES:-480}
+      SESSION_MAX_AGE_DAYS: ${SESSION_MAX_AGE_DAYS:-30}
+    volumes:
+      # Persist the SQLite database across rebuilds/restarts.
+      - range-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  range-data:
