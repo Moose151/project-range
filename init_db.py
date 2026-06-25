@@ -72,6 +72,7 @@ def _migrate(conn):
         "ALTER TABLE signals ADD COLUMN max_power_dbm FLOAT",
         "ALTER TABLE users ADD COLUMN default_freq_unit VARCHAR(4) DEFAULT 'MHz'",
         "ALTER TABLE users ADD COLUMN default_power_unit VARCHAR(4) DEFAULT 'dBm'",
+        "ALTER TABLE users ADD COLUMN must_change_password BOOLEAN DEFAULT 0",
     ]
     for sql in migrations:
         try:
@@ -358,6 +359,7 @@ def main():
                 password_hash=hash_password("changeme"),
                 display_name="Administrator",
                 role="supervisor",
+                must_change_password=True,  # force a real password at first login
             )
             db.add(admin)
             db.flush()

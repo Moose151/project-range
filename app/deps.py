@@ -16,6 +16,9 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     if not user:
         request.session.clear()
         raise HTTPException(status_code=302, headers={"Location": "/login"})
+    # Force a password change before anything else (seeded/reset accounts).
+    if user.must_change_password and request.url.path not in ("/account/password", "/logout"):
+        raise HTTPException(status_code=302, headers={"Location": "/account/password"})
     # Refresh session activity timestamp
     request.session["logged_in_at"] = datetime.utcnow().isoformat()
     return user

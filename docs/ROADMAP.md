@@ -88,32 +88,31 @@ fully trusted.
 
 ### Critical — gate the 1.0.0 operational release
 
-- [ ] **Enforce a real `SECRET_KEY`.** Today `app/config.py` falls back to a
-  hard-coded dev secret if the env var is unset — anyone who knows it can forge
-  session cookies. Fail closed (refuse to start) when `SECRET_KEY` is missing or
-  is the known default. *(Docker compose already requires it; the app itself should too.)*
-- [ ] **Remove default credentials.** The seed creates `admin` / `changeme`.
-  Force a password change on first login (or a guided first-run admin setup) and
-  never leave the default usable in a deployed instance.
-- [ ] **HTTPS/TLS + `Secure` cookies.** Serve over TLS (reverse proxy or app-level)
-  and set the session cookie `Secure`, `HttpOnly` (already on), `SameSite=Strict`.
-  Currently cookies are sent without `Secure`, so on a plain-HTTP LAN they can be
-  sniffed.
-- [ ] **CSRF protection.** There is none today; every state-changing `POST`
-  (logs, range state, users, config, packages) is vulnerable to cross-site request
-  forgery. Add CSRF tokens (or strict `SameSite` + origin checks) to all forms.
-- [ ] **Login brute-force protection.** No throttling or lockout exists. Add rate
-  limiting / temporary lockout on repeated failed logins, and log auth
-  success/failure events to the audit trail.
-- [ ] **Password policy.** No minimum length/complexity is enforced. Add a sane
-  policy on create/change, and block obviously weak passwords.
+- [x] **Enforce a real `SECRET_KEY`.** (0.9.0) The hard-coded default is gone; an
+  unset/placeholder key now generates a strong ephemeral key at boot with a loud
+  warning, so there is no known static key to forge cookies with. Set `SECRET_KEY`
+  in production for persistent sessions.
+- [x] **Remove default credentials.** (0.9.0) The seeded `admin` account now has
+  `must_change_password` set; the app forces a password change at first login
+  before any other page is reachable. Admin-created/reset accounts do the same.
+- [~] **HTTPS/TLS + `Secure` cookies.** (0.9.0, partial) Session cookies are now
+  `HttpOnly` + `SameSite=Strict`, and `Secure` is available via `SESSION_HTTPS_ONLY=1`.
+  **TLS termination itself is deferred** (your call — no infra to configure yet).
+- [x] **CSRF protection.** (0.9.0) `SameSite=Strict` cookies plus a same-origin
+  `Origin`/`Referer` check middleware on all unsafe methods — cross-origin POSTs
+  are rejected (403). No per-form tokens needed.
+- [x] **Login brute-force protection.** (0.9.0) Per username+IP throttle: lockout
+  after `LOGIN_MAX_ATTEMPTS` (default 5) for `LOGIN_LOCKOUT_SECONDS` (default 300).
+  `LOGIN_SUCCESS` / `LOGIN_FAILED` / `LOGIN_LOCKED` are written to the audit log.
+- [x] **Password policy.** (0.9.0) Minimum length (`MIN_PASSWORD_LENGTH`, default 10),
+  not-equal-to-username, and a common-password blocklist, enforced on change + admin create/reset.
 
 ### High
 
-- [ ] **Security headers** via middleware: `Content-Security-Policy` (now feasible
-  since all assets are local/first-party), `X-Frame-Options: DENY` (clickjacking),
-  `X-Content-Type-Options: nosniff`, `Referrer-Policy`, and `Strict-Transport-Security`
-  once TLS is in place.
+- [x] **Security headers** (0.9.0) via middleware: `Content-Security-Policy`
+  (first-party; `'unsafe-inline'` allowed for our inline scripts/styles),
+  `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`.
+  Add `Strict-Transport-Security` once TLS is in place.
 - [ ] **Session hardening:** rotate the session ID on login (prevent fixation);
   keep both idle and absolute timeouts; re-review the 30-day "remember this
   terminal" cookie — fine for a locked ops room, risky on any shared/general PC.

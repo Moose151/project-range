@@ -1,14 +1,57 @@
+from urllib.parse import urlparse
+
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
-from app.config import SECRET_KEY, APP_VERSION, SESSION_MAX_AGE_DAYS
+from app.config import (
+    SECRET_KEY, APP_VERSION, SESSION_MAX_AGE_DAYS,
+    SESSION_SAME_SITE, SESSION_HTTPS_ONLY,
+)
 from app.templating import templates
-from app.routers import auth, dashboard, calculator, logs, range_state, users, config, audit, sessions, packages, serials, history, docs, handover, preferences, devices
+from app.routers import (
+    auth, dashboard, calculator, logs, range_state, users, config, audit, sessions,
+    packages, serials, history, docs, handover, preferences, devices, account,
+)
 
-app = FastAPI(title="Project Range", version=APP_VERSION, docs_url=None, redoc_url=None)
+app = FastAPI(title="SEW Range", version=APP_VERSION, docs_url=None, redoc_url=None)
 
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, max_age=SESSION_MAX_AGE_DAYS * 86400)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SECRET_KEY,
+    max_age=SESSION_MAX_AGE_DAYS * 86400,
+    same_site=SESSION_SAME_SITE,
+    https_only=SESSION_HTTPS_ONLY,
+)
+
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
+
+
+@app.middleware("http")
+async def security_middleware(request: Request, call_next):
+    # CSRF defence: for state-changing methods, require a same-origin Origin/Referer.
+    # Combined with SameSite=strict session cookies this blocks cross-site form posts
+    # without threading a token through every form.
+    if request.method not in SAFE_METHODS:
+        origin = request.headers.get("origin") or request.headers.get("referer")
+        if origin:
+            host = urlparse(origin).netloc.split("@")[-1]
+            if host and host != request.headers.get("host", ""):
+                return PlainTextResponse("Cross-origin request blocked.", status_code=403)
+    response = await call_next(request)
+    # Security headers. All assets are first-party; inline scripts/styles are used,
+    # so the CSP permits 'unsafe-inline' for script/style only.
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+        "script-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; "
+        "frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    )
+    return response
+
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
@@ -28,6 +71,7 @@ app.include_router(docs.router)
 app.include_router(handover.router)
 app.include_router(preferences.router)
 app.include_router(devices.router)
+app.include_router(account.router)
 
 
 @app.exception_handler(302)

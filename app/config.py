@@ -1,9 +1,30 @@
 import os
+import logging
+import secrets
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-in-production-please")
+# Session signing key. Never ship a known static default: if SECRET_KEY is unset
+# (or left as the old placeholder), generate a strong ephemeral key at boot. The
+# app still runs for dev, but sessions won't survive a restart — set SECRET_KEY in
+# production for persistent sessions. (docker-compose already requires it.)
+_INSECURE_DEFAULTS = {"", None, "dev-secret-change-in-production-please"}
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if SECRET_KEY in _INSECURE_DEFAULTS:
+    SECRET_KEY = secrets.token_hex(32)
+    logging.getLogger("uvicorn.error").warning(
+        "SECRET_KEY is not set — using an ephemeral random key. Sessions will not "
+        "persist across restarts. Set SECRET_KEY in the environment for production."
+    )
+
+# Security knobs (overridable via env).
+SESSION_SAME_SITE = os.environ.get("SESSION_SAME_SITE", "strict")   # strict|lax|none
+SESSION_HTTPS_ONLY = os.environ.get("SESSION_HTTPS_ONLY", "0") == "1"  # set 1 behind TLS
+MIN_PASSWORD_LENGTH = int(os.environ.get("MIN_PASSWORD_LENGTH", "10"))
+LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
+LOGIN_LOCKOUT_SECONDS = int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "300"))
+
 DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{BASE_DIR}/range.db")
 SESSION_TIMEOUT_MINUTES = int(os.environ.get("SESSION_TIMEOUT_MINUTES", "480"))
 # Cookie lifetime. Normal sessions still expire after SESSION_TIMEOUT_MINUTES of
