@@ -45,6 +45,7 @@ async def serial_create(
     title: str = Form(...),
     notes: str = Form(""),
     package_ids: list[int] = Form(default=[]),
+    action: str = Form("start"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -66,6 +67,8 @@ async def serial_create(
         entity_type="Serial", entity_id=serial.id, new_value=serial.title,
     ))
     db.commit()
+    if action == "save":
+        return RedirectResponse("/serials?toast=Serial+saved+as+pending", status_code=302)
     return RedirectResponse(f"/serials/{serial.id}/start", status_code=302)
 
 
