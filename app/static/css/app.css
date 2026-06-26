@@ -51,6 +51,56 @@ tr.status-faulted { --bs-table-bg: rgba(220, 53, 69, 0.20); }
 tr.status-standby { --bs-table-bg: rgba(255, 193, 7, 0.14); }
 tr.status-down    { --bs-table-bg: rgba(108, 117, 125, 0.12); }
 
+/* Log review helpers: changed parameters get a quiet highlight, while serial
+   lifecycle rows stay visually distinct without Bootstrap's bright warning row. */
+.log-change-cell {
+  box-shadow: inset 3px 0 0 rgba(var(--range-accent-rgb), 0.85);
+  background-color: rgba(var(--range-accent-rgb), 0.16) !important;
+}
+.log-change-list {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-wrap: wrap;
+  min-width: 6.5rem;
+}
+.log-change-badge,
+.log-change-more {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(var(--range-accent-rgb), 0.55);
+  background: rgba(var(--range-accent-rgb), 0.14);
+  color: var(--bs-body-color);
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.28rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.log-change-more {
+  border-color: var(--bs-border-color);
+  background: rgba(108, 117, 125, 0.16);
+}
+.log-event-row {
+  --bs-table-color: var(--bs-body-color);
+}
+.log-event-row .bi {
+  opacity: 0.95;
+}
+.log-event-start {
+  --bs-table-bg: rgba(13, 202, 240, 0.14);
+  box-shadow: inset 4px 0 0 rgba(13, 202, 240, 0.7);
+}
+.log-event-end {
+  --bs-table-bg: rgba(214, 51, 132, 0.13);
+  box-shadow: inset 4px 0 0 rgba(214, 51, 132, 0.68);
+}
+.log-event-note {
+  --bs-table-bg: rgba(108, 117, 125, 0.14);
+  box-shadow: inset 4px 0 0 rgba(173, 181, 189, 0.58);
+}
+
 /* Darker grey secondary badges — the default #6c757d is ~3.4:1 with white
    text (below AA); this lifts it to a readable level. */
 .badge.bg-secondary,

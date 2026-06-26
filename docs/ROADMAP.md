@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.6.0` (beta) · shown bottom-right in the UI and in `app/config.py`.
+**Current version:** `0.9.4` (beta) · shown bottom-right in the UI and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -17,18 +17,22 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.6.0)
+## ✅ Already delivered (through 0.9.4)
 
 Core of the MVP scope is in place:
 
 - RF frequency calculator (TxIF/TxRF/RxRF/RxIF from one known value) + frequency templates
 - Power converter (dBm/dBW/W), gain/loss chain, EIRP
 - Signal logging with per-signal power-warning thresholds + band/frequency validation
-- Live dashboard (status, buzzer, drag-tab merge/split, steppers, column toggles)
-- Range state management (Standby/Closed Loop/Live) with reason + audit
+- Live dashboard (status, buzzer, drag-tab merge/split, steppers, column toggles, bulk-submit)
+- Range state management (Standby/Closed Loop/Live) with reason + two-person supervisor auth
 - Package-level RF config (TxLO/RxLO/TTF) with one-frequency auto-calc across signals
 - Documentation/wiki module, structured XLSX export, shift handover
 - User auth (operator/supervisor), audit log, "remember this terminal"
+- Device registry with TCP reachability, routing matrix (splitter/combiner), topology view
+- Incident/fault reporting, hard-delete for logs, security hardening (CSRF, headers, throttle, forced PW change)
+- Serial pending/pre-create: serials can be saved as pending before starting
+- Log readability: signal log rows identify changed parameters and history lifecycle rows use calmer colours
 - **0.6.0:** TxLO/RxLO naming, version badge, fully offline (LAN) styling, Docker deploy on port 7474
 
 ---
@@ -55,6 +59,25 @@ Theme: visibility of the physical signal path. *(User-requested splitter page + 
 - [x] **Splitter / combiner routing page** — crossbar matrix (each output routed from an input) **plus** a free-text label on every input/output port. Port counts configurable per device (default 16/16). Persisted and audited (`DEVICE_ROUTING`).
 - [x] **Basic device status checks** — live up/down/no-check badges via a non-blocking concurrent TCP reachability probe (`/devices/status`, polled every 15s); no hardware control. Scope §11.9.
 - [x] **Device registry** (name, type, host/IP, check port, location, port counts) — supervisor-managed CRUD, audited; underpins both of the above. New "Devices" nav entry.
+
+## 0.9.3 — Device enhancements + serial pre-create ✅ (shipped 2026-06-26)
+
+Theme: richer device modelling and operational pre-planning.
+
+- [x] **Extended device types** — IP Switch, 10MHz Reference, Sync Server, DC Injector added to the registry dropdown. IP Switch is intentionally *not* a routing device (no crossbar matrix) — it gets topology links only.
+- [x] **Device name vs model** — `RFDevice` now has `name` (instance, e.g. `CBM-400-1`) and `device_model` (product, e.g. `CBM-400`) as separate fields. Both shown in the devices table. Migration: `ALTER TABLE rf_devices ADD COLUMN device_model VARCHAR(128)`.
+- [x] **Web GUI link** — `has_web_gui` boolean per device (checkbox in add/edit). When set, an "Open" link button appears in the devices table pointing to `http://<host>/`. Migration: `ALTER TABLE rf_devices ADD COLUMN has_web_gui BOOLEAN DEFAULT 0`.
+- [x] **Topology view** (`/devices/topology`) — tabbed RF / IP / Clock / All views. SVG diagram auto-positioned by device layer type. Colour-coded links (RF=gold, IP=teal, Clock=purple, Power=red). Connection list with delete for supervisors. Supervisor add-connection form with port labels + port index for routing integration.
+- [x] **`DeviceLink` model** — directed connection between two RFDevices (from/to device, port label, port index, link_type, label). Port index enables routing page auto-hints.
+- [x] **Routing page auto-hints** — the combiner/splitter routing page reads `DeviceLink` records and pre-populates port label fields with the name of the connected device (and shows a "linked: DeviceName" hint below unlabelled ports).
+- [x] **Serial pre-create / pending serials** — "Save as Pending" button on the serial create form saves a serial with `is_started=False`. Pending serials appear in their own section at the top of `/serials` with Start and Delete buttons. Serials can now be prepared in advance and started when needed.
+
+## 0.9.4 — Log readability ✅ (shipped 2026-06-26)
+
+Theme: make audit trails easier to scan under pressure.
+
+- [x] **Changed-parameter highlighting** — `/logs` and `/history/{serial_id}` compare each signal log against the previous entry for the same signal in the same serial. A new "Changed" column summarizes changed fields, and visible changed cells are subtly highlighted.
+- [x] **Calmer history lifecycle rows** — `SerialStart`, `SerialEnd`, and narrative note rows in serial history now use custom muted colours instead of the bright Bootstrap warning row.
 
 ## 0.9.0 — Operational hardening ✅ (security + features shipped; infra deferred)
 

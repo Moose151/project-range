@@ -107,6 +107,21 @@
 </th>
 {% endmacro %}
 
+{% macro change_badges(log) %}
+{% if log.changed_details %}
+<div class="log-change-list" title="{{ log.change_title }}">
+  {% for change in log.changed_details[:4] %}
+  <span class="log-change-badge">{{ change.label }}</span>
+  {% endfor %}
+  {% if log.changed_details | length > 4 %}
+  <span class="log-change-more">+{{ (log.changed_details | length) - 4 }}</span>
+  {% endif %}
+</div>
+{% else %}
+<span class="text-muted small">—</span>
+{% endif %}
+{% endmacro %}
+
 <!-- Log table -->
 {% if logs %}
 <div class="card border-secondary">
@@ -119,6 +134,7 @@
           <th>Serial</th>
           {{ sort_th('signal_name', 'Signal') }}
           {{ sort_th('signal_status', 'Status') }}
+          <th>Changed</th>
           <th>TxIF</th>
           <th>TxRF</th>
           <th>RxRF</th>
@@ -136,8 +152,8 @@
       </thead>
       <tbody>
         {% for log in logs %}
-        {% if log.entry_type == 'Narrative' %}
-        <tr class="{% if log.is_deleted %}opacity-50{% endif %} table-warning bg-opacity-10">
+        {% if log.entry_type == 'Narrative' or log.signal_name == '[NOTE]' %}
+        <tr class="{% if log.is_deleted %}opacity-50{% endif %} log-event-row {% if log.entry_type == 'SerialStart' %}log-event-start{% elif log.entry_type == 'SerialEnd' %}log-event-end{% else %}log-event-note{% endif %}">
           <td class="text-nowrap small">{{ log.timestamp.strftime('%d/%m/%y %H:%M') }}</td>
           <td class="small">{{ log.operator.username if log.operator else '—' }}</td>
           <td class="small text-muted" style="max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
@@ -146,9 +162,15 @@
             <a href="/logs?serial_id={{ log.serial.id }}" class="text-muted text-decoration-none">{{ log.serial.title }}</a>
             {% else %}—{% endif %}
           </td>
-          <td colspan="13" class="fst-italic">
-            <i class="bi bi-sticky text-warning me-1"></i>
-            <span class="text-warning-emphasis">{{ log.notes }}</span>
+          <td colspan="14" class="fst-italic">
+            {% if log.entry_type == 'SerialStart' %}
+            <i class="bi bi-play-circle me-1"></i>
+            {% elif log.entry_type == 'SerialEnd' %}
+            <i class="bi bi-stop-circle me-1"></i>
+            {% else %}
+            <i class="bi bi-sticky me-1"></i>
+            {% endif %}
+            <span>{{ log.notes }}</span>
             {% if log.activity_ref %}<span class="text-muted small ms-2">[{{ log.activity_ref }}]</span>{% endif %}
             {% if log.is_deleted %}<span class="badge bg-secondary ms-1">deleted</span>{% endif %}
           </td>
@@ -188,7 +210,7 @@
             <a href="/logs?signal_name={{ log.signal_name }}" class="text-reset text-decoration-none">{{ log.signal_name }}</a>
             {% if log.is_deleted %}<span class="badge bg-secondary ms-1">deleted</span>{% endif %}
           </td>
-          <td>
+          <td class="{% if log.changed_fields and 'signal_status' in log.changed_fields %}log-change-cell{% endif %}" title="{{ log.change_title or '' }}">
             {% if log.signal_status == 'Up' %}<span class="badge bg-success">Up</span>
             {% elif log.signal_status == 'Down' %}<span class="badge bg-secondary">Down</span>
             {% elif log.signal_status == 'Configured' %}<span class="badge bg-primary">Configured</span>
@@ -197,17 +219,18 @@
             {% elif log.signal_status == 'Planned' %}<span class="badge bg-info text-dark">Planned</span>
             {% else %}<span class="badge bg-secondary">{{ log.signal_status }}</span>{% endif %}
           </td>
-          <td>{{ log.tx_if or '—' }}</td>
-          <td>{{ log.tx_rf or '—' }}</td>
-          <td>{{ log.rx_rf or '—' }}</td>
-          <td>{{ log.rx_if or '—' }}</td>
-          <td class="text-muted small">{{ log.freq_unit }}</td>
-          <td>{{ log.band or '—' }}</td>
-          <td class="small">{{ log.modulation or '—' }}</td>
-          <td class="small">
+          <td>{{ change_badges(log) }}</td>
+          <td class="{% if log.changed_fields and 'tx_if' in log.changed_fields %}log-change-cell{% endif %}" title="{{ log.change_title or '' }}">{{ log.tx_if or '—' }}</td>
+          <td class="{% if log.changed_fields and 'tx_rf' in log.changed_fields %}log-change-cell{% endif %}" title="{{ log.change_title or '' }}">{{ log.tx_rf or '—' }}</td>
+          <td class="{% if log.changed_fields and 'rx_rf' in log.changed_fields %}log-change-cell{% endif %}" title="{{ log.change_title or '' }}">{{ log.rx_rf or '—' }}</td>
+          <td class="{% if log.changed_fields and 'rx_if' in log.changed_fields %}log-change-cell{% endif %}" title="{{ log.change_title or '' }}">{{ log.rx_if or '—' }}</td>
+          <td class="text-muted small {% if log.changed_fields and 'freq_unit' in log.changed_fields %}log-change-cell{% endif %}" title="{{ log.change_title or '' }}">{{ log.freq_unit }}</td>
+          <td class="{% if log.changed_fields and 'band' in log.changed_fields %}log-change-cell{% endif %}" title="{{ log.change_title or '' }}">{{ log.band or '—' }}</td>
+          <td class="small {% if log.changed_fields and 'modulation' in log.changed_fields %}log-change-cell{% endif %}" title="{{ log.change_title or '' }}">{{ log.modulation or '—' }}</td>
+          <td class="small {% if log.changed_fields and 'power' in log.changed_fields %}log-change-cell{% endif %}" title="{{ log.change_title or '' }}">
             {% if log.power is not none %}{{ log.power }} {{ log.power_unit }}{% else %}—{% endif %}
           </td>
-          <td>{{ log.eb_no or '—' }}</td>
+          <td class="{% if log.changed_fields and 'eb_no' in log.changed_fields %}log-change-cell{% endif %}" title="{{ log.change_title or '' }}">{{ log.eb_no or '—' }}</td>
           <td class="small text-muted">{{ log.range_state }}</td>
           <td class="small">{{ log.activity_ref or '—' }}</td>
           <td class="small text-muted" style="max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"

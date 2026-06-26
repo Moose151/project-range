@@ -9,6 +9,7 @@ from sqlalchemy import or_
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state
 from app.models import User, Serial, SignalLog
+from app.log_changes import annotate_log_changes
 
 router = APIRouter(prefix="/history")
 from app.templating import templates
@@ -62,6 +63,7 @@ async def history_detail(
             SignalLog.notes.ilike(f"%{search}%"),
         ))
     logs = q.order_by(SignalLog.timestamp.asc()).all()
+    annotate_log_changes(db, logs)
 
     return templates.TemplateResponse(request, "history_detail.html", {
         "user": current_user,

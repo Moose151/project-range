@@ -12,7 +12,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.9.2` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.9.4` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -31,30 +31,40 @@
 - **Security hardening:** `SECRET_KEY` no longer has a static default (ephemeral if unset); forced password change (`User.must_change_password`, enforced in `deps.get_current_user`, page `/account/password` via `routers/account.py`); password policy + login throttle + auth audit (`auth.py`); security headers + CSRF origin-check + `SameSite=Strict` cookies (middleware in `main.py`, knobs in `config.py`).
 - **Logs:** hard-delete added (supervisor, only on soft-deleted rows) alongside existing soft-delete/restore.
 - **Range state:** going **Live** requires safety acknowledgment + supervisor authorisation (operators enter a supervisor's credentials = two-person).
-- **0.9.2 bug fixes** (latest):
-  - Password minimum length set consistently to **6** across config, server validation (`auth.py → validate_password`), and all HTML `minlength` attributes. Previously the server enforced 10 but the form showed 8, causing confusing rejections. `MIN_PASSWORD_LENGTH` is envvar-overridable.
-  - **HTMX chaos on forced password-change page fixed:** When a new user logs in and is redirected to `/account/password`, the range-state banner in `base.html` was firing HTMX polls (`hx-trigger="load, every 10s"`) to `/status/buzzer` and `/status/serials`. Those endpoints also check `must_change_password` and redirect to `/account/password`, so HTMX was injecting the full HTML page into tiny `<span>` elements — causing the card to visually jump/break and inputs to be unresponsive. Fixed by wrapping both poller `<span>`s in `{% if not user.must_change_password %}` guards in `base.html`.
+- **Dashboard bulk-submit** (0.9.2): per-row green tick replaced with a single "Submit All Changes" bar at the bottom of each serial widget. All staged signal changes in that widget are sent in one `POST /dashboard/bulk-update` (JSON body) and committed in a single DB transaction — staging multiple signals then submitting no longer wipes other staged rows.
+- **0.9.2 bug fixes:**
+  - Password minimum length set consistently to **6** across config, server validation (`auth.py → validate_password`), and all HTML `minlength` attributes. Previously the server enforced 10 but the form showed 8. `MIN_PASSWORD_LENGTH` is envvar-overridable.
+  - **HTMX chaos on forced password-change page fixed:** When a new user logs in and must change their password, the range-state banner HTMX pollers in `base.html` were firing on page load and following the `must_change_password` redirect, injecting a full HTML page into tiny `<span>` elements — causing the card to visually jump and inputs to be unresponsive. Fixed by wrapping both poller spans in `{% if not user.must_change_password %}` guards.
+- **0.9.3 — Device page enhancements + Serial pending:**
+  - **New device types:** IP Switch, 10MHz Reference, Sync Server, DC Injector added to the device type dropdown (alongside existing Modem, Splitter, Combiner, RF Switch, Spectrum Analyser, Signal Generator, Power Meter, Other).
+  - **Device name vs model:** `RFDevice` now has two separate text fields — `name` (unique instance name, e.g. `CBM-400-1`) and `device_model` (product model, e.g. `CBM-400`). Both shown in the devices table. Migration adds `device_model VARCHAR(128)`.
+  - **Web GUI link:** `RFDevice.has_web_gui` boolean (checkbox in add/edit form). When set, a "Open" link button appears in the devices table pointing to `http://<host>/`. `web_gui_url` is a Python property on the model.  Migration adds `has_web_gui BOOLEAN DEFAULT 0`.
+  - **Topology page** (`/devices/topology`, `app/templates/topology.html`): tabbed view (RF / IP / Clock / All), SVG diagram auto-arranged by device layer type (modems/generators at top, switches/combiners in middle, instruments at bottom), colour-coded connections (RF=gold, IP=teal, Clock=purple, Power=red). Connection list table with delete for supervisors. Add-connection form for supervisors (from device / port / port index → to device / port / port index / type / label). "Topology" button in devices page header.
+  - **`DeviceLink` model** (`app/models.py`): stores directed connections between `RFDevice` instances. Fields: `from_device_id`, `from_port` (label), `from_port_idx` (integer, for routing matrix integration), `to_device_id`, `to_port`, `to_port_idx`, `link_type` (rf/ip/clock/power), `label`. Table auto-created by `Base.metadata.create_all`.
+  - **Routing page auto-hints:** When a `DeviceLink` has `to_port_idx` matching a combiner/splitter port, the routing page (`/devices/{id}/routing`) pre-populates that port's label with the connected device's name and shows a "linked: DeviceName" hint. Input hints from the `to` side of links; output hints from the `from` side.
+  - **Serial pending / pre-create:** The serial create form (`/serials`) now has two buttons — **Save as Pending** (creates the serial with packages attached, `is_started=False`, redirects to serials list) and **Create & Start** (existing behaviour, goes to start confirmation). Pending serials appear in a "Pending — not yet started" section at the top of the serials page with Start and Delete buttons. `Serial.is_started` and the pending/active separation already existed in the DB and router; the only change was adding the `action` form param and the second button.
+- **0.9.4 — Log readability:** `/logs` and `/history/{serial_id}` now compare each signal log entry with the previous entry for that signal in the same serial. Changed fields are summarized in a new "Changed" column and visible changed cells get a subtle accent highlight. Serial history lifecycle rows now use calmer custom colours for `SerialStart`, `SerialEnd`, and narrative notes instead of the bright warning-yellow row.
 
-### ⚠ Outstanding REQUESTED work (NOT yet done — user asked for these next)
-1. **Theme improvements** — user feedback: *"themes do not change enough / all look the same"* and *"light mode is too bright / bad contrast."* Current themes only vary the accent colour. Need to make palettes visually distinct: theme the nav background, card surfaces, and body background per palette, not just the accent. Also fix light mode — Bootstrap's default light is too bright; darken `--bs-body-bg` slightly and audit text contrast. Files: `app/static/css/app.css` (theme blocks at the bottom), pre-paint `<script>` in `base.html` and `login.html`.
-2. **Dashboard Zulu/local clock widget** — UTC clock + local time on the dashboard, implemented as an **add/drag widget like the serial cards**. Local time zone chosen from an IANA dropdown, stored per-user on the `User` model (like `default_freq_unit`). Clock ticks client-side. Must reuse the existing SortableJS drag/merge/pop-out system in `dashboard.py` + `dashboard.html`. Roadmap 0.10.0.
-3. **Create serial without starting** — let users pre-configure a serial and start it later. `Serial.is_started` (Boolean, default=False) already exists. `deps.get_active_serials()` already filters `is_started == True`, so the dashboard won't show unstarted serials. Need: create path that sets `is_started=False` (or a toggle), a list of pending/unstarted serials on `serials.html`, and a "Start" button. Check what `/serials/{id}/start` already does.
-4. **Settings area** — consolidate preferences and config under a discoverable "Settings" nav entry. Currently: themes/units are at `/preferences` (reached only by clicking the user's name in the navbar — users couldn't find it). The admin config is at `/config`. Roadmap 0.10.0 suggests a tabbed Settings page (Preferences | Admin) or a Settings dropdown grouping both. A Settings nav icon (gear) is the minimum discoverability fix.
+### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
+1. **Theme improvements** — user feedback: *"themes do not change enough / all look the same"* and *"light mode is too bright / bad contrast."* Current themes only vary the accent colour. Need to make palettes visually distinct: theme the nav background, card surfaces, and body background per palette. Also fix light mode — Bootstrap's default light is too bright; darken `--bs-body-bg` and audit text contrast. Files: `app/static/css/app.css` (theme CSS blocks at the bottom), pre-paint `<script>` in `base.html` and `login.html`.
+2. **Dashboard Zulu/local clock widget** — UTC clock + local time on the dashboard as an add/drag widget (like the serial cards). Local timezone chosen from an IANA dropdown, stored per-user on `User` model. Clock ticks client-side. Must reuse the SortableJS drag/merge/pop-out system in `dashboard.py` + `dashboard.html`. Requires `User.timezone` column (see "Model changes" below). Roadmap 0.10.0.
+3. **Settings area** — consolidate preferences and config under a discoverable "Settings" nav entry. Currently themes/units are at `/preferences` (only reachable by clicking the user's display name — users can't find it). Minimum fix: add a gear icon "Settings" nav item pointing to `/preferences`. Better: tabbed `/settings` page (Preferences | Admin Config). Roadmap 0.10.0.
 
 ### Also pending (from ROADMAP)
 - **Scheduled backups** (script) — manual `docker compose cp` documented for now.
 - **Deferred infra (user's call):** HTTPS/TLS, PostgreSQL (+ Alembic). Cookies are TLS-ready (`SESSION_HTTPS_ONLY=1`).
 - **1.0.0 gate:** deploy validated on range server, docs complete, backups verified, security Critical items closed (most are — see ROADMAP "Security hardening").
 
-### Template/model changes the next assistant needs to know
-- `User` model needs a `timezone` column (VARCHAR, default `"UTC"`) for the Zulu clock feature — add it in `init_db.py` migration block + `models.py`.
-- `preferences.html` will need an IANA timezone dropdown saved via `POST /preferences`.
-- For Settings area: easiest approach is a `/settings` route that renders a tabbed template with Preferences and (if supervisor) Config tabs, then redirect `/preferences` there. Or just add a "Settings" nav item pointing to `/preferences` as a first step.
+### Model/template changes the next assistant needs to know
+- **`User.timezone`** — still needs adding: `VARCHAR(64)`, default `"UTC"`, in both `models.py` (`Mapped[str]`) and `init_db.py` migration block. Required for the Zulu clock widget. `preferences.html` will need an IANA timezone dropdown saved via `POST /preferences`.
+- **Settings area** — easiest path: add a "Settings" nav item in `base.html` pointing to `/preferences` as an immediately visible entry point, then optionally wrap preferences + config into a tabbed `/settings` page later.
+- **`DeviceLink` and `RFDevice` new columns are fully implemented** — `device_model`, `has_web_gui`, and the `device_links` table are all in place. No further migration needed for those.
 
 ### Caveats / verification gaps
-- Theme switching verified at **build/markup level only** — not click-tested in a real browser (no headless browser available). The palette CSS blocks are in `app.css` and the pre-paint script is in `base.html`, but the user confirmed they "don't change enough", so **theme rework is needed** (see outstanding item 1 above).
+- Theme switching verified at **build/markup level only** — not click-tested in a real browser. User confirmed themes "don't change enough", so **theme rework is still outstanding** (item 1 above).
 - Login throttle is **in-memory** (per-process) — fine for single-container; revisit if multiple workers/HA.
-- The new-user forced password-change flow is now fixed (0.9.2), but hasn't been re-tested end-to-end in Docker since the fix. Recommended: create a test user, log in, verify the password-change page renders cleanly, change password, verify normal login works.
+- Topology SVG diagram is rendered entirely client-side in vanilla JS from embedded JSON — positions are auto-calculated by device type layer. No layout persistence; positions reset on page load. Works well for small topologies (< ~20 devices).
+- The "Serial created before confirmation" DB artefact still exists: if an operator clicks "Create & Start", the serial is committed before the confirmation page, so abandoning that page leaves an `is_started=False` serial in the DB. This is now less of a concern since pending serials are a first-class feature — the operator can just delete it from the Pending list. But worth knowing.
 
 ### Working conventions
 - Each milestone: implement → **build+boot+smoke-test in Docker** → bump `APP_VERSION` in `app/config.py` → tick ROADMAP.md → **commit + push to `main`** (user pulls onto the range server directly; they prefer no PRs/branches — commit straight to `main`).
@@ -142,6 +152,9 @@ project-range/
 │   │   ├── sessions.html                # LEGACY — not linked in nav
 │   │   ├── range_state_confirm.html     # State change confirmation form
 │   │   ├── users.html                   # Supervisor: user list + create + password reset
+│   │   ├── devices.html                 # Device registry: status table (name, model, type, host, web GUI link), add/edit forms
+│   │   ├── device_routing.html          # Routing matrix for splitter/combiner/switch (input labels, output→input routing, auto-hints from DeviceLink)
+│   │   ├── topology.html                # Device topology: tabbed RF/IP/Clock/All views, SVG diagram, connection list, add-link form
 │   │   ├── error.html                   # Generic error page (403, etc.)
 │   │   └── partials/
 │   │       ├── signal_table.html        # HTMX fragment: signal status table with inline quick-edit
@@ -192,6 +205,10 @@ project-range/
 | `Serial` | An operational run: has a title, assigned packages, open/close times, log entries |
 | `SerialPackage` | Junction: which packages are assigned to which serial |
 | `AuditLog` | System audit trail (login, edits, state changes, etc.) |
+| `RFDevice` | Range device registry (name, device_model, type, host, check_port, location, has_web_gui, port counts). Types: modem, splitter, combiner, switch, ip_switch, spectrum_analyser, signal_generator, power_meter, reference_10mhz, sync_server, dc_injector, other |
+| `DevicePort` | Input/output port on a routing device (splitter/combiner/RF switch) — stores per-port label and routed_from index |
+| `DeviceLink` | Directed connection between two `RFDevice` instances (from_device → to_device). Fields: from/to port label + port index, link_type (rf/ip/clock/power), label. Port index maps to `DevicePort.idx` for routing page auto-hints |
+| `Incident` | Incident/fault report (severity, status, affected equipment, associated serial, resolution) |
 
 ### Package-level RF Configuration (IMPORTANT)
 
@@ -375,7 +392,7 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 - ~~**Chain calculator stage index**~~: Fixed — `removeStage()` now renumbers all remaining `.stage-row` name attributes to fill gaps and resets `stageCount`.
 - **`updated_at` not set by SQLAlchemy `onupdate` on SQLite**: Fixed by setting `log_entry.updated_at = datetime.utcnow()` explicitly in update handlers. Verify behaviour on PostgreSQL.
 - **HTTPException 302 handler**: Using HTTPException with status 302 for auth redirects is non-standard. Consider middleware or a custom exception class for cleaner handling.
-- **Serial created before confirmation**: When an operator fills in the "Create New Serial" form and is taken to the confirmation/preview page, the serial row is already committed to the DB. If they abandon the page, an empty serial sits in the DB. Low impact — they can end it from the dashboard or it'll show in History.
+- **Serial created before confirmation**: When an operator uses "Create & Start", the serial is committed to DB before the confirmation page. If they abandon the confirmation page, an `is_started=False` serial sits in the DB. Now lower impact — it appears in the **Pending** section on `/serials` where it can be deleted or started. It won't appear on the dashboard.
 - **Dashboard tab-merge order restore**: On page refresh, `restoreLayout()` re-applies tab merges and drag order from localStorage. Works for tab merges; order restore uses `appendChild` which may reorder incorrectly if saved order doesn't match current DOM order exactly.
 
 ---

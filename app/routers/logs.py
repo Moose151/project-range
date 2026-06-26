@@ -13,6 +13,7 @@ from app.deps import get_current_user, get_current_range_state, get_active_seria
 from app.models import User, SignalLog, Signal, AuditLog, SignalStatus, Role, ModulationType, FecType, SignalSource, AntennaType, LogSession, Serial
 from app.rf_config import serial_package_rf_config
 from app.signal_warnings import warning_flags_for
+from app.log_changes import annotate_log_changes
 
 router = APIRouter(prefix="/logs")
 from app.templating import templates
@@ -116,6 +117,7 @@ async def log_list(
     sort_col = _SORT_COLS.get(sort, SignalLog.timestamp)
     order = sort_col.asc() if sort_dir == "asc" else sort_col.desc()
     logs = q.order_by(order).offset((page - 1) * LOG_PAGE_SIZE).limit(LOG_PAGE_SIZE).all()
+    annotate_log_changes(db, logs)
     total_pages = max(1, (total + LOG_PAGE_SIZE - 1) // LOG_PAGE_SIZE)
 
     # Serial lookup for filter display
