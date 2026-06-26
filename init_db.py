@@ -7,7 +7,7 @@ from app.database import engine, Base
 from app.models import (
     User, RangeStateLog, Signal, ModulationType, FecType, SignalSource, AntennaType,
     LogSession, SignalPackage, SignalPackageEntry, Serial, SerialPackage,
-    DocPage, DocVersion,
+    DocPage, DocVersion, RFDevice, DevicePort, DeviceLink,
 )
 from app.auth import hash_password
 from sqlalchemy.orm import Session
@@ -73,6 +73,8 @@ def _migrate(conn):
         "ALTER TABLE users ADD COLUMN default_freq_unit VARCHAR(4) DEFAULT 'MHz'",
         "ALTER TABLE users ADD COLUMN default_power_unit VARCHAR(4) DEFAULT 'dBm'",
         "ALTER TABLE users ADD COLUMN must_change_password BOOLEAN DEFAULT 0",
+        "ALTER TABLE rf_devices ADD COLUMN device_model VARCHAR(128)",
+        "ALTER TABLE rf_devices ADD COLUMN has_web_gui BOOLEAN DEFAULT 0",
     ]
     for sql in migrations:
         try:

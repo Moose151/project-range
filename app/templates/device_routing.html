@@ -24,10 +24,17 @@
             <thead class="table-secondary"><tr><th style="width:48px">In</th><th>Label / what's connected</th></tr></thead>
             <tbody>
               {% for p in inputs %}
+              {% set hint = input_hints.get(p.idx) if input_hints is defined else none %}
               <tr>
                 <td class="fw-semibold text-info">{{ p.idx }}</td>
-                <td><input type="text" class="form-control form-control-sm" name="in_label_{{ p.idx }}"
-                           value="{{ p.label or '' }}" placeholder="e.g. Modem A Tx"></td>
+                <td>
+                  <input type="text" class="form-control form-control-sm" name="in_label_{{ p.idx }}"
+                         value="{{ p.label or (hint or '') }}"
+                         placeholder="{{ hint or 'e.g. Modem A Tx' }}">
+                  {% if hint and not p.label %}
+                  <div class="text-muted" style="font-size:0.7rem"><i class="bi bi-link-45deg"></i> linked: {{ hint }}</div>
+                  {% endif %}
+                </td>
               </tr>
               {% endfor %}
             </tbody>
@@ -47,6 +54,7 @@
             </thead>
             <tbody>
               {% for p in outputs %}
+              {% set hint = output_hints.get(p.idx) if output_hints is defined else none %}
               <tr>
                 <td class="fw-semibold text-warning">{{ p.idx }}</td>
                 <td>
@@ -59,8 +67,14 @@
                     {% endfor %}
                   </select>
                 </td>
-                <td><input type="text" class="form-control form-control-sm" name="out_label_{{ p.idx }}"
-                           value="{{ p.label or '' }}" placeholder="e.g. To HPA 1"></td>
+                <td>
+                  <input type="text" class="form-control form-control-sm" name="out_label_{{ p.idx }}"
+                         value="{{ p.label or (hint or '') }}"
+                         placeholder="{{ hint or 'e.g. To HPA 1' }}">
+                  {% if hint and not p.label %}
+                  <div class="text-muted" style="font-size:0.7rem"><i class="bi bi-link-45deg"></i> linked: {{ hint }}</div>
+                  {% endif %}
+                </td>
               </tr>
               {% endfor %}
             </tbody>

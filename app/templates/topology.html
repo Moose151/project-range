@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+{% block title %}Topology{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <h4 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Device Topology</h4>
+  <a href="/devices" class="btn btn-sm btn-outline-secondary ms-2">
+    <i class="bi bi-arrow-left me-1"></i>All Devices
+  </a>
+</div>
+
+{% if toast %}
+<div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
+
+{# ── Tab nav ── #}
+<ul class="nav nav-tabs mb-3" id="topoTabs">
+  <li class="nav-item">
+    <button class="nav-link active" onclick="showTab('rf',this)"><i class="bi bi-broadcast me-1"></i>RF Topology</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" onclick="showTab('ip',this)"><i class="bi bi-ethernet me-1"></i>IP / Ethernet</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" onclick="showTab('clock',this)"><i class="bi bi-clock me-1"></i>Clock / Timing</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" onclick="showTab('all',this)"><i class="bi bi-diagram-2 me-1"></i>All Connections</button>
+  </li>
+</ul>
+
+{# ── Legend ── #}
+<div class="d-flex gap-3 mb-3 flex-wrap small">
+  <span><span class="badge" style="background:#e0a52e">&nbsp;</span> RF (coax / waveguide)</span>
+  <span><span class="badge" style="background:#19b8c9">&nbsp;</span> IP / Ethernet</span>
+  <span><span class="badge" style="background:#a855f7">&nbsp;</span> Clock / Timing</span>
+  <span><span class="badge" style="background:#ef4444">&nbsp;</span> DC Power</span>
+</div>
+
+{# ── SVG diagram ── #}
+<div class="card border-secondary mb-3">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-diagram-3 me-1"></i>Diagram
+    <span class="text-muted small ms-2" id="diagramNote"></span>
+  </div>
+  <div class="card-body p-2" id="topoDiagram" style="min-height:200px; overflow:auto"></div>
+</div>
+
+{# ── Connection list ── #}
+<div class="card border-secondary mb-3">
+  <div class="card-header"><i class="bi bi-list-ul me-1"></i>Connections</div>
+  <div class="card-body p-0">
+    <table class="table table-dark table-sm align-middle mb-0" id="linkTable">
+      <thead class="table-secondary">
+        <tr>
+          <th>From</th>
+          <th>From Port</th>
+          <th></th>
+          <th>To</th>
+          <th>To Port</th>
+          <th>Type</th>
+          <th>Label</th>
+          {% if user.role == 'supervisor' %}<th></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody id="linkTableBody">
+        {% if links %}
+        {% for lnk in links %}
+        <tr data-link-type="{{ lnk.link_type }}">
+          <td class="fw-semibold">{{ lnk.from_device.name }}</td>
+          <td class="text-muted small">
+            {% if lnk.from_port_idx %}Port {{ lnk.from_port_idx }}{% if lnk.from_port %} — {{ lnk.from_port }}{% endif %}
+            {% elif lnk.from_port %}{{ lnk.from_port }}{% else %}—{% endif %}
+          </td>
+          <td class="text-center">
+            <span class="link-type-badge badge" data-lt="{{ lnk.link_type }}">→</span>
+          </td>
+          <td class="fw-semibold">{{ lnk.to_device.name }}</td>
+          <td class="text-muted small">
+            {% if lnk.to_port_idx %}Port {{ lnk.to_port_idx }}{% if lnk.to_port %} — {{ lnk.to_port }}{% endif %}
+            {% elif lnk.to_port %}{{ lnk.to_port }}{% else %}—{% endif %}
+          </td>
+          <td>
+            <span class="badge link-type-badge" data-lt="{{ lnk.link_type }}">{{ lnk.link_type.upper() }}</span>
+          </td>
+          <td class="text-muted small">{{ lnk.label or '—' }}</td>
+          {% if user.role == 'supervisor' %}
+          <td>
+            <form method="post" action="/devices/links/{{ lnk.id }}/delete" class="d-inline"
+                  onsubmit="return confirm('Remove this connection?')">
+              <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Remove"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+        {% else %}
+        <tr id="emptyRow"><td colspan="8" class="text-muted text-center py-3">No connections defined yet.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── Add connection form (supervisor only) ── #}
+{% if user.role == 'supervisor' %}
+<div class="card border-secondary">
+  <div class="card-header"><i class="bi bi-plus-lg me-1"></i>Add Connection</div>
+  <div class="card-body">
+    <form method="post" action="/devices/links/new" class="row g-2 align-items-end">
+
+      <div class="col-md-2">
+        <label class="form-label small mb-0">From Device</label>
+        <select class="form-select form-select-sm" name="from_device_id" required id="fromDevSel">
+          <option value="">— select —</option>
+          {% for d in devices %}
+          <option value="{{ d.id }}" data-routing="{{ 'yes' if d.is_routing else 'no' }}">{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-1" id="fromPortIdxWrap" style="display:none">
+        <label class="form-label small mb-0">Port #</label>
+        <input type="number" class="form-control form-control-sm" name="from_port_idx" min="1" placeholder="e.g. 3">
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label small mb-0">From Port <span class="text-muted">(optional)</span></label>
+        <input type="text" class="form-control form-control-sm" name="from_port" placeholder="e.g. TX Out / Eth 0/1">
+      </div>
+
+      <div class="col-auto d-flex align-items-end pb-1">
+        <i class="bi bi-arrow-right fs-5 text-muted"></i>
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label small mb-0">To Device</label>
+        <select class="form-select form-select-sm" name="to_device_id" required id="toDevSel">
+          <option value="">— select —</option>
+          {% for d in devices %}
+          <option value="{{ d.id }}" data-routing="{{ 'yes' if d.is_routing else 'no' }}">{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-1" id="toPortIdxWrap" style="display:none">
+        <label class="form-label small mb-0">Port #</label>
+        <input type="number" class="form-control form-control-sm" name="to_port_idx" min="1" placeholder="e.g. 3">
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label small mb-0">To Port <span class="text-muted">(optional)</span></label>
+        <input type="text" class="form-control form-control-sm" name="to_port" placeholder="e.g. In 3 / Eth 0/2">
+      </div>
+
+      <div class="col-md-1">
+        <label class="form-label small mb-0">Type</label>
+        <select class="form-select form-select-sm" name="link_type">
+          {% for val, lbl in link_types %}
+          <option value="{{ val }}">{{ lbl }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label small mb-0">Label <span class="text-muted">(optional)</span></label>
+        <input type="text" class="form-control form-control-sm" name="label" placeholder="e.g. Ku-band TX path">
+      </div>
+
+      <div class="col-12">
+        <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Add Connection</button>
+        <span class="text-muted small ms-2">Port # is only needed for splitter / combiner / RF switch ports (auto-populates the routing matrix label).</span>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+// ── Link-type colours ──────────────────────────────────────────────────────
+const LT_COLOR = { rf:'#e0a52e', ip:'#19b8c9', clock:'#a855f7', power:'#ef4444' };
+function ltColor(t) { return LT_COLOR[t] || '#6c757d'; }
+
+// Apply badge colours
+document.querySelectorAll('.link-type-badge').forEach(el => {
+  el.style.background = ltColor(el.dataset.lt);
+  el.style.color = '#111';
+});
+
+// ── Tab filtering ─────────────────────────────────────────────────────────
+let activeTab = 'rf';
+function showTab(tab, btn) {
+  activeTab = tab;
+  document.querySelectorAll('#topoTabs .nav-link').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('#linkTableBody tr[data-link-type]').forEach(row => {
+    row.style.display = (tab === 'all' || row.dataset.linkType === tab) ? '' : 'none';
+  });
+  renderDiagram(tab);
+}
+
+// ── Device / link data (embedded as JSON for the SVG renderer) ────────────
+const DEVICES = {{ devices | map(attribute='id') | list | tojson }};
+const DEVICE_MAP = {
+  {% for d in devices %}
+  {{ d.id }}: { id: {{ d.id }}, name: {{ d.name | tojson }}, type: {{ d.device_type | tojson }} },
+  {% endfor %}
+};
+const ALL_LINKS = [
+  {% for lnk in links %}
+  { id: {{ lnk.id }}, from: {{ lnk.from_device_id }}, to: {{ lnk.to_device_id }},
+    fromPort: {{ (lnk.from_port or '') | tojson }}, toPort: {{ (lnk.to_port or '') | tojson }},
+    fromIdx: {{ lnk.from_port_idx or 'null' }}, toIdx: {{ lnk.to_port_idx or 'null' }},
+    lt: {{ lnk.link_type | tojson }}, label: {{ (lnk.label or '') | tojson }} },
+  {% endfor %}
+];
+
+// ── SVG topology renderer ─────────────────────────────────────────────────
+// Device type → vertical layer (0 = top / sources, higher = further downstream)
+const TYPE_LAYER = {
+  signal_generator: 0, modem: 0,
+  dc_injector: 1, reference_10mhz: 1, sync_server: 1,
+  splitter: 2, combiner: 2, switch: 2, ip_switch: 2,
+  spectrum_analyser: 3, power_meter: 3,
+  other: 3,
+};
+
+function renderDiagram(filterType) {
+  const container = document.getElementById('topoDiagram');
+  const note = document.getElementById('diagramNote');
+  const filteredLinks = filterType === 'all' ? ALL_LINKS : ALL_LINKS.filter(l => l.lt === filterType);
+
+  // Collect visible device IDs
+  const visIds = new Set();
+  filteredLinks.forEach(l => { visIds.add(l.from); visIds.add(l.to); });
+  const visDevices = DEVICES.filter(id => visIds.has(id)).map(id => DEVICE_MAP[id]).filter(Boolean);
+
+  if (visDevices.length === 0) {
+    container.innerHTML = '<p class="text-muted py-4 text-center"><i class="bi bi-diagram-3 me-1"></i>No connections defined for this view.</p>';
+    if (note) note.textContent = '';
+    return;
+  }
+
+  const W = Math.max(container.clientWidth || 800, 600);
+  const BOXW = 120, BOXH = 36, PAD = 20, ROWH = 100;
+
+  // Group devices by layer
+  const layerMap = {};
+  visDevices.forEach(d => {
+    const layer = TYPE_LAYER[d.type] ?? 3;
+    (layerMap[layer] = layerMap[layer] || []).push(d);
+  });
+  const layers = Object.keys(layerMap).map(Number).sort((a, b) => a - b);
+  const H = Math.max(layers.length * ROWH + PAD * 2, 200);
+
+  // Assign pixel positions
+  const pos = {};
+  layers.forEach((layer, li) => {
+    const devs = layerMap[layer];
+    const y = PAD + li * ROWH + BOXH / 2;
+    devs.forEach((d, di) => {
+      const x = (di + 0.5) / devs.length * W;
+      pos[d.id] = { x, y };
+    });
+  });
+
+  // Build SVG
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', H);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.style.display = 'block';
+
+  // Draw links first (under nodes)
+  filteredLinks.forEach(lnk => {
+    const fp = pos[lnk.from], tp = pos[lnk.to];
+    if (!fp || !tp) return;
+    const color = ltColor(lnk.lt);
+    const mx = (fp.x + tp.x) / 2, my = (fp.y + tp.y) / 2;
+
+    const path = document.createElementNS(NS, 'path');
+    path.setAttribute('d', `M${fp.x},${fp.y} C${fp.x},${my} ${tp.x},${my} ${tp.x},${tp.y}`);
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('opacity', '0.8');
+    svg.appendChild(path);
+
+    // Arrowhead
+    const arrowLen = 8;
+    const dx = tp.x - mx, dy = tp.y - my;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const ax = tp.x - (dx / len) * arrowLen, ay = tp.y - (dy / len) * arrowLen;
+    const px = -(dy / len) * 4, py = (dx / len) * 4;
+    const arrow = document.createElementNS(NS, 'polygon');
+    arrow.setAttribute('points', `${tp.x},${tp.y} ${ax + px},${ay + py} ${ax - px},${ay - py}`);
+    arrow.setAttribute('fill', color);
+    svg.appendChild(arrow);
+
+    // Label on midpoint
+    const portLabel = [lnk.fromIdx ? `P${lnk.fromIdx}` : lnk.fromPort, lnk.toIdx ? `P${lnk.toIdx}` : lnk.toPort].filter(Boolean).join('→');
+    const midLabel = lnk.label || portLabel;
+    if (midLabel) {
+      const bg = document.createElementNS(NS, 'rect');
+      bg.setAttribute('x', mx - 28); bg.setAttribute('y', my - 9);
+      bg.setAttribute('width', 56); bg.setAttribute('height', 14);
+      bg.setAttribute('rx', 3); bg.setAttribute('fill', '#1a1d20');
+      svg.appendChild(bg);
+      const txt = document.createElementNS(NS, 'text');
+      txt.setAttribute('x', mx); txt.setAttribute('y', my + 1);
+      txt.setAttribute('text-anchor', 'middle');
+      txt.setAttribute('fill', color);
+      txt.setAttribute('font-size', '9');
+      txt.setAttribute('font-family', 'monospace');
+      const labelText = midLabel.length > 10 ? midLabel.slice(0, 9) + '…' : midLabel;
+      txt.textContent = labelText;
+      svg.appendChild(txt);
+    }
+  });
+
+  // Draw device nodes
+  visDevices.forEach(d => {
+    const p = pos[d.id];
+    if (!p) return;
+
+    const g = document.createElementNS(NS, 'g');
+    g.style.cursor = 'default';
+
+    const rect = document.createElementNS(NS, 'rect');
+    rect.setAttribute('x', p.x - BOXW / 2);
+    rect.setAttribute('y', p.y - BOXH / 2);
+    rect.setAttribute('width', BOXW);
+    rect.setAttribute('height', BOXH);
+    rect.setAttribute('rx', '6');
+    rect.setAttribute('fill', '#2b2d31');
+    rect.setAttribute('stroke', '#6c757d');
+    rect.setAttribute('stroke-width', '1.5');
+    g.appendChild(rect);
+
+    const nameEl = document.createElementNS(NS, 'text');
+    nameEl.setAttribute('x', p.x);
+    nameEl.setAttribute('y', p.y - 2);
+    nameEl.setAttribute('text-anchor', 'middle');
+    nameEl.setAttribute('fill', '#f8f9fa');
+    nameEl.setAttribute('font-size', '11');
+    nameEl.setAttribute('font-family', 'sans-serif');
+    nameEl.setAttribute('font-weight', 'bold');
+    nameEl.textContent = d.name.length > 15 ? d.name.slice(0, 14) + '…' : d.name;
+    g.appendChild(nameEl);
+
+    const typeEl = document.createElementNS(NS, 'text');
+    typeEl.setAttribute('x', p.x);
+    typeEl.setAttribute('y', p.y + 12);
+    typeEl.setAttribute('text-anchor', 'middle');
+    typeEl.setAttribute('fill', '#6c757d');
+    typeEl.setAttribute('font-size', '9');
+    typeEl.setAttribute('font-family', 'sans-serif');
+    typeEl.textContent = d.type.replace(/_/g, ' ');
+    g.appendChild(typeEl);
+
+    svg.appendChild(g);
+  });
+
+  container.innerHTML = '';
+  container.appendChild(svg);
+  if (note) note.textContent = `${visDevices.length} device${visDevices.length !== 1 ? 's' : ''}, ${filteredLinks.length} connection${filteredLinks.length !== 1 ? 's' : ''}`;
+}
+
+// ── Show/hide port-index field based on whether selected device is a routing device ──
+function wirePortIdx(selId, wrapId) {
+  const sel = document.getElementById(selId);
+  const wrap = document.getElementById(wrapId);
+  if (!sel || !wrap) return;
+  sel.addEventListener('change', () => {
+    const opt = sel.options[sel.selectedIndex];
+    wrap.style.display = opt && opt.dataset.routing === 'yes' ? '' : 'none';
+  });
+}
+wirePortIdx('fromDevSel', 'fromPortIdxWrap');
+wirePortIdx('toDevSel', 'toPortIdxWrap');
+
+// ── Init ──────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  renderDiagram('rf');
+  // Apply tab filter to table rows on load
+  document.querySelectorAll('#linkTableBody tr[data-link-type]').forEach(row => {
+    row.style.display = row.dataset.linkType === 'rf' ? '' : 'none';
+  });
+});
+</script>
+{% endblock %}

@@ -2,12 +2,18 @@
 {% block title %}Devices{% endblock %}
 
 {% block content %}
-{# ── Reusable device form macro (defined before use) ── #}
+{# ── Reusable device form macro ── #}
 {% macro device_form(d, device_types, action, submit_label) %}
 <form method="post" action="{{ action }}" class="row g-2 align-items-end">
-  <div class="col-md-3">
-    <label class="form-label small mb-0">Name</label>
-    <input type="text" class="form-control form-control-sm" name="name" value="{{ d.name if d else '' }}" required>
+  <div class="col-md-2">
+    <label class="form-label small mb-0">Name <span class="text-muted">(instance)</span></label>
+    <input type="text" class="form-control form-control-sm" name="name"
+           value="{{ d.name if d else '' }}" required placeholder="e.g. CBM-400-1">
+  </div>
+  <div class="col-md-2">
+    <label class="form-label small mb-0">Device Model</label>
+    <input type="text" class="form-control form-control-sm" name="device_model"
+           value="{{ d.device_model or '' if d else '' }}" placeholder="e.g. CBM-400">
   </div>
   <div class="col-md-2">
     <label class="form-label small mb-0">Type</label>
@@ -19,33 +25,48 @@
   </div>
   <div class="col-md-2">
     <label class="form-label small mb-0">Host / IP</label>
-    <input type="text" class="form-control form-control-sm" name="host" value="{{ d.host or '' if d else '' }}" placeholder="10.0.0.5">
+    <input type="text" class="form-control form-control-sm" name="host"
+           value="{{ d.host or '' if d else '' }}" placeholder="10.0.0.5">
   </div>
   <div class="col-md-1">
-    <label class="form-label small mb-0">Port</label>
-    <input type="number" class="form-control form-control-sm" name="check_port" value="{{ d.check_port or '' if d else '' }}" placeholder="80">
+    <label class="form-label small mb-0">Check Port</label>
+    <input type="number" class="form-control form-control-sm" name="check_port"
+           value="{{ d.check_port or '' if d else '' }}" placeholder="80">
   </div>
-  <div class="col-md-2">
+  <div class="col-md-1">
     <label class="form-label small mb-0">Location</label>
-    <input type="text" class="form-control form-control-sm" name="location" value="{{ d.location or '' if d else '' }}">
+    <input type="text" class="form-control form-control-sm" name="location"
+           value="{{ d.location or '' if d else '' }}">
   </div>
   <div class="col-md-1">
     <label class="form-label small mb-0">Inputs</label>
-    <input type="number" class="form-control form-control-sm" name="num_inputs" value="{{ d.num_inputs if d else 16 }}" min="0" max="128">
+    <input type="number" class="form-control form-control-sm" name="num_inputs"
+           value="{{ d.num_inputs if d else 16 }}" min="0" max="128">
   </div>
   <div class="col-md-1">
     <label class="form-label small mb-0">Outputs</label>
-    <input type="number" class="form-control form-control-sm" name="num_outputs" value="{{ d.num_outputs if d else 16 }}" min="0" max="128">
+    <input type="number" class="form-control form-control-sm" name="num_outputs"
+           value="{{ d.num_outputs if d else 16 }}" min="0" max="128">
   </div>
-  <div class="col-12">
+  <div class="col-12 d-flex align-items-center gap-3 flex-wrap">
+    <div class="form-check mb-0">
+      <input class="form-check-input" type="checkbox" name="has_web_gui" value="1" id="wg-{{ action | replace('/', '_') }}"
+             {% if d and d.has_web_gui %}checked{% endif %}>
+      <label class="form-check-label small" for="wg-{{ action | replace('/', '_') }}">
+        Has web GUI (link opens <code>http://&lt;host&gt;/</code>)
+      </label>
+    </div>
     <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check2 me-1"></i>{{ submit_label }}</button>
-    <span class="text-muted small ms-2">Host + Port enable the reachability check. Inputs/Outputs apply to splitter/combiner/switch routing.</span>
+    <span class="text-muted small">Host + Check Port enable the reachability badge. Inputs/Outputs for routing matrix.</span>
   </div>
 </form>
 {% endmacro %}
 
-<div class="d-flex align-items-center mb-3 gap-2">
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
   <h4 class="mb-0"><i class="bi bi-hdd-network me-2"></i>Range Devices</h4>
+  <a href="/devices/topology" class="btn btn-sm btn-outline-info ms-2">
+    <i class="bi bi-diagram-3 me-1"></i>Topology
+  </a>
   <span class="text-muted small ms-2" id="statusUpdated"></span>
 </div>
 
@@ -58,7 +79,14 @@
     <table class="table table-dark table-sm align-middle mb-0">
       <thead class="table-secondary">
         <tr>
-          <th>Status</th><th>Name</th><th>Type</th><th>Host : Port</th><th>Location</th><th></th>
+          <th>Status</th>
+          <th>Name</th>
+          <th>Model</th>
+          <th>Type</th>
+          <th>Host : Port</th>
+          <th>Location</th>
+          <th>Web GUI</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -70,9 +98,20 @@
             </span>
           </td>
           <td class="fw-semibold">{{ d.name }}</td>
+          <td class="text-muted small">{{ d.device_model or '—' }}</td>
           <td><span class="badge bg-dark border border-secondary text-capitalize">{{ d.device_type.replace('_', ' ') }}</span></td>
           <td class="text-muted small">{{ d.host or '—' }}{% if d.check_port %} : {{ d.check_port }}{% endif %}</td>
           <td class="text-muted small">{{ d.location or '—' }}</td>
+          <td>
+            {% if d.web_gui_url %}
+            <a href="{{ d.web_gui_url }}" target="_blank" rel="noopener noreferrer"
+               class="btn btn-sm btn-outline-secondary py-0 px-1" title="Open web GUI for {{ d.name }}">
+              <i class="bi bi-box-arrow-up-right me-1"></i>Open
+            </a>
+            {% else %}
+            <span class="text-muted small">—</span>
+            {% endif %}
+          </td>
           <td class="text-nowrap">
             {% if d.is_routing %}
             <a href="/devices/{{ d.id }}/routing" class="btn btn-sm btn-outline-info py-0 px-1" title="Routing matrix">
@@ -93,13 +132,13 @@
         </tr>
         {% if user.role == 'supervisor' %}
         <tr class="collapse" id="edit-{{ d.id }}">
-          <td colspan="6">
+          <td colspan="8" class="p-2 bg-body-tertiary">
             {{ device_form(d, device_types, '/devices/' ~ d.id ~ '/update', 'Save') }}
           </td>
         </tr>
         {% endif %}
         {% else %}
-        <tr><td colspan="6" class="text-muted text-center py-3">No devices yet.</td></tr>
+        <tr><td colspan="8" class="text-muted text-center py-3">No devices yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>

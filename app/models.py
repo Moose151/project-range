@@ -381,10 +381,12 @@ class RFDevice(Base):
     __tablename__ = "rf_devices"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)          # unique instance name, e.g. "CBM-400-1"
+    device_model: Mapped[str | None] = mapped_column(String(128), nullable=True)  # product model, e.g. "CBM-400"
     device_type: Mapped[str] = mapped_column(String(32), nullable=False, default="other")
     host: Mapped[str | None] = mapped_column(String(128), nullable=True)        # IP / hostname
     check_port: Mapped[int | None] = mapped_column(Integer, nullable=True)      # TCP port for reachability
+    has_web_gui: Mapped[bool] = mapped_column(Boolean, default=False)           # exposes a web GUI at http://<host>/
     location: Mapped[str | None] = mapped_column(String(128), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     num_inputs: Mapped[int] = mapped_column(Integer, default=16)
@@ -401,6 +403,10 @@ class RFDevice(Base):
     def is_routing(self) -> bool:
         return self.device_type in ("splitter", "combiner", "switch")
 
+    @property
+    def web_gui_url(self) -> str | None:
+        return f"http://{self.host}/" if self.has_web_gui and self.host else None
+
 
 class DevicePort(Base):
     """One input or output port on an RFDevice."""
@@ -414,6 +420,30 @@ class DevicePort(Base):
     routed_from: Mapped[int | None] = mapped_column(Integer, nullable=True)  # input idx feeding an output
 
     device: Mapped["RFDevice"] = relationship("RFDevice", back_populates="ports")
+
+
+class DeviceLink(Base):
+    """A physical or logical connection between two devices.
+
+    link_type: 'rf' (coax/waveguide), 'ip' (ethernet), 'clock' (timing ref), 'power' (DC)
+    from_port_idx / to_port_idx: port number on routing devices (splitter/combiner/switch);
+        used to auto-populate labels on the routing page.
+    """
+    __tablename__ = "device_links"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    from_device_id: Mapped[int] = mapped_column(ForeignKey("rf_devices.id"), nullable=False)
+    from_port: Mapped[str | None] = mapped_column(String(64), nullable=True)       # free-text port label
+    from_port_idx: Mapped[int | None] = mapped_column(Integer, nullable=True)      # port number for routing devices
+    to_device_id: Mapped[int] = mapped_column(ForeignKey("rf_devices.id"), nullable=False)
+    to_port: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    to_port_idx: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    link_type: Mapped[str] = mapped_column(String(16), default="rf")   # rf|ip|clock|power
+    label: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    from_device: Mapped["RFDevice"] = relationship("RFDevice", foreign_keys=[from_device_id])
+    to_device: Mapped["RFDevice"] = relationship("RFDevice", foreign_keys=[to_device_id])
 
 
 class Incident(Base):
