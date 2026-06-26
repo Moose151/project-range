@@ -444,14 +444,73 @@ function quickRowState(row) {
   };
 }
 
+function refreshBulkBar(container) {
+  const cnt = container.querySelectorAll('.signal-row-dirty').length;
+  const bar = container.querySelector('.bulk-submit-bar');
+  if (!bar) return;
+  bar.classList.toggle('d-none', cnt === 0);
+  const countEl = bar.querySelector('[id^="bulk-count-"]');
+  if (countEl) countEl.textContent = cnt > 0 ? `${cnt} unsaved change${cnt > 1 ? 's' : ''}` : '';
+}
+
 function refreshQuickDirty(rowId) {
   const row = quickRow(rowId);
   if (!row) return;
   const s = quickRowState(row);
   const dirty = (s.status !== row.dataset.origStatus) || ((s.power || '') !== (row.dataset.origPower || ''));
   row.classList.toggle('signal-row-dirty', dirty);
-  const ctl = document.getElementById('dirty-' + rowId);
-  if (ctl) ctl.style.display = dirty ? 'inline-block' : 'none';
+  const container = row.closest('[id^="signalTableContainer-"]');
+  if (container) refreshBulkBar(container);
+}
+
+function cancelAllDirty(btn) {
+  const container = btn.closest('[id^="signalTableContainer-"]');
+  if (!container) return;
+  [...container.querySelectorAll('.signal-row-dirty')].forEach(row => cancelQuickRow(row.dataset.row));
+}
+
+async function submitAllDirty(btn) {
+  const container = btn.closest('[id^="signalTableContainer-"]');
+  if (!container) return;
+  const dirtyRows = [...container.querySelectorAll('.signal-row-dirty')];
+  if (!dirtyRows.length) return;
+  const serialId = dirtyRows[0].dataset.serialId || null;
+  const updates = dirtyRows.map(row => {
+    const s = quickRowState(row);
+    const upd = { signal_name: row.dataset.signalName, signal_status: s.status, power_unit: row.dataset.powerUnit || 'dBm' };
+    const pval = parseFloat(s.power);
+    if (!isNaN(pval)) upd.power = pval;
+    return upd;
+  });
+  const payload = { updates };
+  if (serialId) payload.serial_id = parseInt(serialId, 10);
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/dashboard/bulk-update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) throw new Error();
+    const html = await resp.text();
+    // Parse response; apply OOB swaps (buzzer bar, summary cards, widget badge) manually
+    // then put remaining content (the signal table) into the container.
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    [...tmp.querySelectorAll('[hx-swap-oob]')].forEach(oob => {
+      const tgt = document.getElementById(oob.id);
+      oob.removeAttribute('hx-swap-oob');
+      if (tgt) tgt.outerHTML = oob.outerHTML;
+      oob.remove();
+    });
+    container.innerHTML = tmp.innerHTML;
+    applyColumnVisibility();
+    updateRefreshTime();
+    showToast(`${updates.length} signal${updates.length > 1 ? 's' : ''} updated`, 'success');
+  } catch (_) {
+    showToast('Update failed — please try again', 'danger');
+    btn.disabled = false;
+  }
 }
 
 function applyRowStatusVisual(row, status) {
@@ -505,22 +564,5 @@ function cancelQuickRow(rowId) {
   refreshQuickDirty(rowId);
 }
 
-function submitQuickRow(rowId) {
-  const row = quickRow(rowId);
-  if (!row) return;
-  const s = quickRowState(row);
-  const sid = row.dataset.serialId;
-  const containerId = 'signalTableContainer-' + (sid || 'legacy');
-  const values = {
-    signal_name: row.dataset.signalName,
-    signal_status: s.status,
-    power_unit: row.dataset.powerUnit || 'dBm',
-  };
-  if (s.power !== undefined && s.power !== '' && !isNaN(parseFloat(s.power))) values.power = s.power;
-  if (sid) values.serial_id = sid;
-  htmx.ajax('POST', '/dashboard/quick-update', {
-    target: '#' + containerId, swap: 'innerHTML', values,
-  }).then(() => showToast(row.dataset.signalName + ' updated', 'success'));
-}
 </script>
 {% endblock %}

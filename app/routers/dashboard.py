@@ -2,12 +2,25 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials
 from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial
 from app.rf_config import serial_package_rf_config
 from app.signal_warnings import warning_flags_for
+
+
+class _SignalUpdate(BaseModel):
+    signal_name: str
+    signal_status: str
+    power: Optional[float] = None
+    power_unit: str = "dBm"
+
+
+class _BulkUpdateBody(BaseModel):
+    serial_id: Optional[int] = None
+    updates: list[_SignalUpdate]
 
 router = APIRouter()
 from app.templating import templates
@@ -340,6 +353,108 @@ async def dashboard_quick_update(
         "pkg_rf_by_signal": (
             _pkg_rf_by_signal(db, effective_serial_id, signals) if effective_serial_id else {}
         ),
+    })
+
+
+@router.post("/dashboard/bulk-update", response_class=HTMLResponse)
+async def dashboard_bulk_update(
+    request: Request,
+    body: _BulkUpdateBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Apply status/power changes for multiple signals in one DB transaction."""
+    range_state = get_current_range_state(db)
+    serial_id = body.serial_id
+
+    for upd in body.updates:
+        latest_q = db.query(SignalLog).filter(
+            SignalLog.signal_name == upd.signal_name,
+            SignalLog.is_deleted == False,
+        )
+        if serial_id is not None:
+            latest_q = latest_q.filter(SignalLog.serial_id == serial_id)
+        latest = latest_q.order_by(SignalLog.timestamp.desc()).first()
+
+        # Exclusivity group enforcement
+        if upd.signal_status == "Up":
+            sig_reg = db.query(Signal).filter(Signal.name == upd.signal_name).first()
+            if sig_reg and sig_reg.exclusivity_group:
+                siblings = db.query(Signal).filter(
+                    Signal.exclusivity_group == sig_reg.exclusivity_group,
+                    Signal.name != upd.signal_name,
+                ).all()
+                for sib in siblings:
+                    sib_q = db.query(SignalLog).filter(
+                        SignalLog.signal_name == sib.name, SignalLog.is_deleted == False,
+                    )
+                    if serial_id is not None:
+                        sib_q = sib_q.filter(SignalLog.serial_id == serial_id)
+                    sib_latest = sib_q.order_by(SignalLog.timestamp.desc()).first()
+                    if sib_latest and sib_latest.signal_status == "Up":
+                        db.add(SignalLog(
+                            operator_id=current_user.id, range_state=range_state,
+                            signal_name=sib.name, signal_status="Down",
+                            tx_if=sib_latest.tx_if, tx_rf=sib_latest.tx_rf,
+                            rx_rf=sib_latest.rx_rf, rx_if=sib_latest.rx_if,
+                            freq_unit=sib_latest.freq_unit, band=sib_latest.band,
+                            modulation=sib_latest.modulation, symbol_rate=sib_latest.symbol_rate,
+                            fec=sib_latest.fec, power=sib_latest.power,
+                            power_unit=sib_latest.power_unit, eb_no=sib_latest.eb_no,
+                            source=sib_latest.source, antenna=sib_latest.antenna,
+                            notes=f"Auto-downed: {upd.signal_name} came Up (group: {sig_reg.exclusivity_group})",
+                            entry_type="Automatic", updated_by_id=current_user.id, serial_id=serial_id,
+                        ))
+
+        new_entry = SignalLog(
+            operator_id=current_user.id, range_state=range_state,
+            signal_name=upd.signal_name, signal_status=upd.signal_status,
+            tx_if=latest.tx_if if latest else None,
+            tx_rf=latest.tx_rf if latest else None,
+            rx_rf=latest.rx_rf if latest else None,
+            rx_if=latest.rx_if if latest else None,
+            freq_unit=latest.freq_unit if latest else "MHz",
+            band=latest.band if latest else None,
+            modulation=latest.modulation if latest else None,
+            symbol_rate=latest.symbol_rate if latest else None,
+            fec=latest.fec if latest else None,
+            power=upd.power if upd.power is not None else (latest.power if latest else None),
+            power_unit=upd.power_unit,
+            eb_no=latest.eb_no if latest else None,
+            source=latest.source if latest else None,
+            antenna=latest.antenna if latest else None,
+            entry_type="Dashboard", updated_by_id=current_user.id,
+            serial_id=serial_id if serial_id is not None else (latest.serial_id if latest else None),
+            warning_flags=warning_flags_for(
+                db, upd.signal_name,
+                upd.power if upd.power is not None else (latest.power if latest else None),
+                upd.power_unit,
+                tx_rf=latest.tx_rf if latest else None,
+                rx_rf=latest.rx_rf if latest else None,
+                freq_unit=latest.freq_unit if latest else "MHz",
+                band=latest.band if latest else None,
+            ),
+        )
+        db.add(new_entry)
+
+    db.flush()
+    for upd in body.updates:
+        db.add(AuditLog(
+            user_id=current_user.id, action_type="DASHBOARD_UPDATE",
+            entity_type="SignalLog",
+            new_value=f"{upd.signal_name}: {upd.signal_status}",
+        ))
+    db.commit()
+
+    ctx = _dashboard_ctx(db)
+    signals = _latest_signal_status(db, serial_id=serial_id)
+    return templates.TemplateResponse(request, "partials/dashboard_fragment.html", {
+        **ctx,
+        "signals": signals,
+        "buzzer_active": _buzzer_active(signals, ctx["range_state"]),
+        "serial_id": serial_id,
+        "pkg_rf": _pkg_rf_for_serial(db, serial_id) if serial_id else None,
+        "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial_id, signals) if serial_id else {},
     })
 
 

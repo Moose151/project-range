@@ -72,12 +72,6 @@
                    onchange="onQuickToggle('{{ row_id }}')">
           </div>
           <span id="status-badge-{{ row_id }}">{{ status_badge(log.signal_status) }}</span>
-          <span class="row-dirty-controls" id="dirty-{{ row_id }}" style="display:none">
-            <button type="button" class="btn btn-success btn-sm py-0 px-1" title="Submit — writes a log entry"
-                    onclick="submitQuickRow('{{ row_id }}')"><i class="bi bi-check-lg"></i></button>
-            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Cancel"
-                    onclick="cancelQuickRow('{{ row_id }}')"><i class="bi bi-x-lg"></i></button>
-          </span>
         </div>
       </td>
       <td data-col="tx_if">{{ log.tx_if if log.tx_if is not none else '—' }}</td>
@@ -252,6 +246,21 @@
     {% endfor %}
   </tbody>
 </table>
+<div class="bulk-submit-bar border-top border-secondary bg-body d-none px-3 py-2"
+     id="bulk-bar-{{ serial_id if serial_id is not none else 'legacy' }}">
+  <div class="d-flex align-items-center gap-2">
+    <i class="bi bi-pencil-square text-warning small"></i>
+    <span class="text-muted small" id="bulk-count-{{ serial_id if serial_id is not none else 'legacy' }}"></span>
+    <div class="ms-auto d-flex gap-2">
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cancelAllDirty(this)">
+        <i class="bi bi-x-lg me-1"></i>Cancel All
+      </button>
+      <button type="button" class="btn btn-success btn-sm" onclick="submitAllDirty(this)">
+        <i class="bi bi-check2-all me-1"></i>Submit All Changes
+      </button>
+    </div>
+  </div>
+</div>
 {% else %}
 <div class="text-center text-muted py-5">
   <i class="bi bi-reception-0 display-4 d-block mb-2"></i>
