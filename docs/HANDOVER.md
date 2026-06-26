@@ -3,6 +3,66 @@
 <!-- IMPORTANT: Update this file whenever features are added, changed, bugs are found, or new requirements arise.
      This is the canonical reference for any assistant continuing work on this project. -->
 
+---
+
+## ⚑ Current Status & Handover — 2026-06-26 (READ THIS FIRST)
+
+> The detailed sections **below this block predate a large body of work** and are
+> partially stale (e.g. port, model/router lists, "dark only"). For *planned* work
+> the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
+> the code. This block summarises where things actually are.
+
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.9.2` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
+**Repo:** github.com/Moose151/project-range · all work is on **`main`**.
+**Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
+**First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
+**DB:** SQLite at `/app/data/range.db` (named volume). `init_db.py` runs automatically on container start and is idempotent (migrations + new tables auto-create).
+
+### Shipped (all on `main`, in order)
+- **TxLO/RxLO rename** (was BUC/LO) everywhere incl. DB columns (migration renames in place), calculator, package/log auto-calc, exports (legacy `buc`/`lo` keys still import).
+- **Docker deployment** (`Dockerfile`, `docker-compose.yml`, `docker-entrypoint.sh`, `.dockerignore`, `.env.example`, `docs/DEPLOY.md`); `.gitattributes` keeps shell files LF for Windows.
+- **Offline/LAN fix:** all frontend assets vendored under `app/static/vendor/` (Bootstrap, Icons, HTMX, SortableJS) — **no CDN/internet needed**. Do NOT reintroduce CDN links.
+- **SEW Range logo** (`app/static/img/sew-range-logo.png`) in navbar/login/favicon; gold brand accent.
+- **Theme system** (0.9.1): two axes — `data-bs-theme` (light/dark navbar toggle) × `data-theme` (palette: classic/sew-gold/night-ops/spectrum), chosen on `/preferences`, persisted in localStorage, applied pre-paint. CSS in `app/static/css/app.css`.
+- **Preferences page** (`/preferences`, router `preferences.py`): theme, light/dark, default freq/power units (per-user on `User`).
+- **Shared templates:** `app/templating.py` exports the single `templates` instance (with `app_version` global). All routers import it — do NOT create per-router `Jinja2Templates`.
+- **Devices** (`routers/devices.py`, models `RFDevice`/`DevicePort`): registry CRUD, splitter/combiner **routing matrix** (crossbar + per-port labels), live **TCP reachability** status (`/devices/status`, polled). Nav: "Devices".
+- **Incidents** (`routers/incidents.py`, model `Incident`): log/list/update/CSV export. Nav: "Incidents".
+- **Security hardening:** `SECRET_KEY` no longer has a static default (ephemeral if unset); forced password change (`User.must_change_password`, enforced in `deps.get_current_user`, page `/account/password` via `routers/account.py`); password policy + login throttle + auth audit (`auth.py`); security headers + CSRF origin-check + `SameSite=Strict` cookies (middleware in `main.py`, knobs in `config.py`).
+- **Logs:** hard-delete added (supervisor, only on soft-deleted rows) alongside existing soft-delete/restore.
+- **Range state:** going **Live** requires safety acknowledgment + supervisor authorisation (operators enter a supervisor's credentials = two-person).
+- **0.9.2 bug fixes** (latest):
+  - Password minimum length set consistently to **6** across config, server validation (`auth.py → validate_password`), and all HTML `minlength` attributes. Previously the server enforced 10 but the form showed 8, causing confusing rejections. `MIN_PASSWORD_LENGTH` is envvar-overridable.
+  - **HTMX chaos on forced password-change page fixed:** When a new user logs in and is redirected to `/account/password`, the range-state banner in `base.html` was firing HTMX polls (`hx-trigger="load, every 10s"`) to `/status/buzzer` and `/status/serials`. Those endpoints also check `must_change_password` and redirect to `/account/password`, so HTMX was injecting the full HTML page into tiny `<span>` elements — causing the card to visually jump/break and inputs to be unresponsive. Fixed by wrapping both poller `<span>`s in `{% if not user.must_change_password %}` guards in `base.html`.
+
+### ⚠ Outstanding REQUESTED work (NOT yet done — user asked for these next)
+1. **Theme improvements** — user feedback: *"themes do not change enough / all look the same"* and *"light mode is too bright / bad contrast."* Current themes only vary the accent colour. Need to make palettes visually distinct: theme the nav background, card surfaces, and body background per palette, not just the accent. Also fix light mode — Bootstrap's default light is too bright; darken `--bs-body-bg` slightly and audit text contrast. Files: `app/static/css/app.css` (theme blocks at the bottom), pre-paint `<script>` in `base.html` and `login.html`.
+2. **Dashboard Zulu/local clock widget** — UTC clock + local time on the dashboard, implemented as an **add/drag widget like the serial cards**. Local time zone chosen from an IANA dropdown, stored per-user on the `User` model (like `default_freq_unit`). Clock ticks client-side. Must reuse the existing SortableJS drag/merge/pop-out system in `dashboard.py` + `dashboard.html`. Roadmap 0.10.0.
+3. **Create serial without starting** — let users pre-configure a serial and start it later. `Serial.is_started` (Boolean, default=False) already exists. `deps.get_active_serials()` already filters `is_started == True`, so the dashboard won't show unstarted serials. Need: create path that sets `is_started=False` (or a toggle), a list of pending/unstarted serials on `serials.html`, and a "Start" button. Check what `/serials/{id}/start` already does.
+4. **Settings area** — consolidate preferences and config under a discoverable "Settings" nav entry. Currently: themes/units are at `/preferences` (reached only by clicking the user's name in the navbar — users couldn't find it). The admin config is at `/config`. Roadmap 0.10.0 suggests a tabbed Settings page (Preferences | Admin) or a Settings dropdown grouping both. A Settings nav icon (gear) is the minimum discoverability fix.
+
+### Also pending (from ROADMAP)
+- **Scheduled backups** (script) — manual `docker compose cp` documented for now.
+- **Deferred infra (user's call):** HTTPS/TLS, PostgreSQL (+ Alembic). Cookies are TLS-ready (`SESSION_HTTPS_ONLY=1`).
+- **1.0.0 gate:** deploy validated on range server, docs complete, backups verified, security Critical items closed (most are — see ROADMAP "Security hardening").
+
+### Template/model changes the next assistant needs to know
+- `User` model needs a `timezone` column (VARCHAR, default `"UTC"`) for the Zulu clock feature — add it in `init_db.py` migration block + `models.py`.
+- `preferences.html` will need an IANA timezone dropdown saved via `POST /preferences`.
+- For Settings area: easiest approach is a `/settings` route that renders a tabbed template with Preferences and (if supervisor) Config tabs, then redirect `/preferences` there. Or just add a "Settings" nav item pointing to `/preferences` as a first step.
+
+### Caveats / verification gaps
+- Theme switching verified at **build/markup level only** — not click-tested in a real browser (no headless browser available). The palette CSS blocks are in `app.css` and the pre-paint script is in `base.html`, but the user confirmed they "don't change enough", so **theme rework is needed** (see outstanding item 1 above).
+- Login throttle is **in-memory** (per-process) — fine for single-container; revisit if multiple workers/HA.
+- The new-user forced password-change flow is now fixed (0.9.2), but hasn't been re-tested end-to-end in Docker since the fix. Recommended: create a test user, log in, verify the password-change page renders cleanly, change password, verify normal login works.
+
+### Working conventions
+- Each milestone: implement → **build+boot+smoke-test in Docker** → bump `APP_VERSION` in `app/config.py` → tick ROADMAP.md → **commit + push to `main`** (user pulls onto the range server directly; they prefer no PRs/branches — commit straight to `main`).
+- Keep everything **offline-capable** (no CDNs at all). Keep `docker-entrypoint.sh` LF.
+- `init_db.py` migration pattern: new columns use `ALTER TABLE ADD COLUMN` in try/except (silent if already exists); renames use the `_rename_column()` helper that checks existing columns first.
+
+---
+
 ## Project Summary
 
 **Project Range** is an internal RF range operations support web application.

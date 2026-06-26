@@ -21,7 +21,7 @@ if SECRET_KEY in _INSECURE_DEFAULTS:
 # Security knobs (overridable via env).
 SESSION_SAME_SITE = os.environ.get("SESSION_SAME_SITE", "strict")   # strict|lax|none
 SESSION_HTTPS_ONLY = os.environ.get("SESSION_HTTPS_ONLY", "0") == "1"  # set 1 behind TLS
-MIN_PASSWORD_LENGTH = int(os.environ.get("MIN_PASSWORD_LENGTH", "10"))
+MIN_PASSWORD_LENGTH = int(os.environ.get("MIN_PASSWORD_LENGTH", "6"))
 LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
 LOGIN_LOCKOUT_SECONDS = int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "300"))
 
@@ -33,7 +33,7 @@ SESSION_TIMEOUT_MINUTES = int(os.environ.get("SESSION_TIMEOUT_MINUTES", "480"))
 SESSION_MAX_AGE_DAYS = int(os.environ.get("SESSION_MAX_AGE_DAYS", "30"))
 # Single source of truth for the app version (shown bottom-right in the UI and
 # reported as the FastAPI app version). Bump on each release.
-APP_VERSION = "0.9.1"
+APP_VERSION = "0.9.2"
 
 FREQUENCY_BANDS = {
     "C":  {"tx_min": 5.850, "tx_max": 6.725, "rx_min": 3.625, "rx_max": 4.200},

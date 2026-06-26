@@ -26,19 +26,23 @@
     {% else %}
       <i class="bi bi-power me-1"></i> Range State: <strong>{{ range_state }}</strong>
     {% endif %}
+    {% if not user.must_change_password %}
     <span id="buzzerBadge"
           hx-get="/status/buzzer"
           hx-trigger="load, every 10s"
           hx-swap="innerHTML">
       {% if buzzer_active is defined %}{% include "partials/buzzer_badge.html" %}{% endif %}
     </span>
+    {% endif %}
   </span>
   <span class="d-flex align-items-center gap-2">
+    {% if not user.must_change_password %}
     <span id="activeSerialsBadge"
           hx-get="/status/serials"
           hx-trigger="load, every 15s"
           hx-swap="innerHTML">
     </span>
+    {% endif %}
     <a href="/range-state/change" class="btn btn-sm btn-outline-secondary py-0">Change State</a>
   </span>
 </div>

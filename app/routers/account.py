@@ -6,6 +6,7 @@ from app.database import get_db
 from app.deps import get_current_user, get_current_range_state
 from app.models import User, AuditLog
 from app.auth import hash_password, verify_password, validate_password
+from app.config import MIN_PASSWORD_LENGTH
 from app.templating import templates
 
 router = APIRouter(prefix="/account")
@@ -21,6 +22,7 @@ async def password_page(
         "user": current_user,
         "range_state": get_current_range_state(db),
         "must_change": current_user.must_change_password,
+        "config_min": MIN_PASSWORD_LENGTH,
         "error": None,
         "page": "account",
     })
@@ -40,6 +42,7 @@ async def password_save(
             "user": current_user,
             "range_state": get_current_range_state(db),
             "must_change": current_user.must_change_password,
+            "config_min": MIN_PASSWORD_LENGTH,
             "error": msg,
             "page": "account",
         }, status_code=400)
