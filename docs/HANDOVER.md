@@ -12,7 +12,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.10.1` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.11.0` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -54,10 +54,16 @@
   - **Logs are Zulu-first:** `/logs` and `/history/{serial_id}` always show timestamps with `Z`. Optional "Show local time" checkbox adds a second local-time line using the configured timezone. CSV/XLSX exports now label timestamp columns as "Timestamp (Zulu)" and include `Z`.
   - **Device type:** "Antenna" added as a selectable device type in the Devices registry and topology layering.
 - **0.10.1 — Backup script:** Added `scripts/backup_db.py`, a Docker Compose friendly SQLite backup script that copies `/app/data/range.db` to `./backups/range-<UTC>.db` and prunes old backups with `--keep`. `docs/DEPLOY.md` now documents backup scheduling and restore steps. `backups/` is gitignored.
+- **0.11.0 — Dashboard utility widgets:** Dashboard "Widgets" menu can add terminal-local widgets stored in localStorage:
+  - **Quick Notes** widget: scratch text area with "Save to PC" download as `.txt`.
+  - **Doc Reference** widget: select any published Docs page and render it in a contained dashboard reference panel via `/dashboard/doc-widget/{slug}`.
+  - **Clock widgets:** multiple extra clock widgets can be added, each selectable as Zulu + local, Zulu only, or local only. The original combined clock remains hideable/showable.
+  - **Quick Links** widget: compact shortcuts for New Log, Note, Serials, Range State, Incidents, and Handover.
+  - Utility widgets reuse the dashboard widget container: drag reorder, collapse, remove, and layout persistence.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with operator feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.
-2. **Dashboard clock browser QA** — 0.10.0 implementation was verified at compile/template level only. Needs a browser pass for drag/order persistence, hide/show, and timezone rendering.
+2. **Dashboard widget browser QA** — 0.10.0/0.11.0 dashboard widgets were verified at compile/template level only. Needs a browser pass for drag/order persistence, hide/show/remove, docs rendering, note download, and timezone rendering.
 
 ### Also pending (from ROADMAP)
 - **Deferred infra (user's call):** HTTPS/TLS, PostgreSQL (+ Alembic). Cookies are TLS-ready (`SESSION_HTTPS_ONLY=1`).

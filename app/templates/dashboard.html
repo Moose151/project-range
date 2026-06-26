@@ -6,10 +6,19 @@
   <h4 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Live Range Dashboard</h4>
   <div class="d-flex gap-2 align-items-center">
     <span class="text-muted small" id="lastRefresh">Auto-refreshing every 10s</span>
-    <button class="btn btn-sm btn-outline-secondary" type="button" id="showClockWidgetBtn"
-            onclick="showClockWidget()" title="Show the Zulu/local clock widget">
-      <i class="bi bi-clock me-1"></i>Clock
-    </button>
+    <div class="dropdown">
+      <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+              data-bs-toggle="dropdown" data-bs-auto-close="outside" title="Add dashboard widgets">
+        <i class="bi bi-grid-3x3-gap me-1"></i>Widgets
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><button type="button" class="dropdown-item" onclick="showClockWidget()"><i class="bi bi-clock-history me-2"></i>Show Combined Clock</button></li>
+        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('clock')"><i class="bi bi-clock me-2"></i>Add Clock</button></li>
+        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('notes')"><i class="bi bi-pencil-square me-2"></i>Add Quick Notes</button></li>
+        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('doc')"><i class="bi bi-file-earmark-text me-2"></i>Add Doc Reference</button></li>
+        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('links')"><i class="bi bi-lightning me-2"></i>Add Quick Links</button></li>
+      </ul>
+    </div>
     <div class="dropdown">
       <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
               data-bs-toggle="dropdown" data-bs-auto-close="outside" title="Show / hide table columns">
@@ -172,6 +181,16 @@ function updateRefreshTime() {
 
 // ── Zulu / local clock widget ─────────────────────────────────────────────
 const CLOCK_HIDDEN_KEY = 'dashboardClockHidden';
+const UTILITY_WIDGETS_KEY = 'dashboardUtilityWidgets_v1';
+const DASHBOARD_DOCS = [
+  {% for doc in doc_pages %}
+  { title: {{ doc.title | tojson }}, slug: {{ doc.slug | tojson }} },
+  {% endfor %}
+];
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 function clockFmt(timeZone, opts) {
   return new Intl.DateTimeFormat(undefined, { timeZone, ...opts });
 }
@@ -192,6 +211,33 @@ function updateClockWidget() {
     document.getElementById('clockLocalDate').textContent = clockFmt('UTC', dateOpts).format(now) + ' UTC';
   }
 }
+function updateUtilityClocks() {
+  document.querySelectorAll('.utility-clock').forEach(clock => {
+    const now = new Date();
+    const mode = clock.querySelector('[data-clock-mode]')?.value || 'both';
+    const localTz = clock.dataset.localTz || 'UTC';
+    const timeOpts = { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
+    const dateOpts = { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' };
+    const zPanel = clock.querySelector('[data-clock-panel="zulu"]');
+    const lPanel = clock.querySelector('[data-clock-panel="local"]');
+    if (zPanel) {
+      zPanel.style.display = mode === 'local' ? 'none' : '';
+      zPanel.querySelector('.clock-time').textContent = clockFmt('UTC', timeOpts).format(now);
+      zPanel.querySelector('.clock-date').textContent = clockFmt('UTC', dateOpts).format(now) + ' UTC';
+    }
+    if (lPanel) {
+      lPanel.style.display = mode === 'zulu' ? 'none' : '';
+      lPanel.querySelector('.clock-label').textContent = localTz;
+      try {
+        lPanel.querySelector('.clock-time').textContent = clockFmt(localTz, timeOpts).format(now);
+        lPanel.querySelector('.clock-date').textContent = clockFmt(localTz, dateOpts).format(now) + ' ' + localTz;
+      } catch (e) {
+        lPanel.querySelector('.clock-time').textContent = clockFmt('UTC', timeOpts).format(now);
+        lPanel.querySelector('.clock-date').textContent = clockFmt('UTC', dateOpts).format(now) + ' UTC';
+      }
+    }
+  });
+}
 function setClockHidden(hidden) {
   const group = document.querySelector('.clock-widget-group');
   const btn = document.getElementById('showClockWidgetBtn');
@@ -209,6 +255,131 @@ function restoreClockVisibility() {
   let hidden = false;
   try { hidden = localStorage.getItem(CLOCK_HIDDEN_KEY) === '1'; } catch (e) {}
   setClockHidden(hidden);
+}
+
+function utilityWidgets() {
+  try { return JSON.parse(localStorage.getItem(UTILITY_WIDGETS_KEY) || '[]'); } catch (e) { return []; }
+}
+function saveUtilityWidgets() {
+  const widgets = [...document.querySelectorAll('.utility-widget-group')].map(group => {
+    const type = group.dataset.widgetType;
+    const id = group.dataset.utilityId;
+    const config = {};
+    if (type === 'notes') config.text = group.querySelector('textarea')?.value || '';
+    if (type === 'doc') config.slug = group.querySelector('select')?.value || '';
+    if (type === 'clock') config.mode = group.querySelector('[data-clock-mode]')?.value || 'both';
+    return { id, type, config, collapsed: group.classList.contains('collapsed') };
+  });
+  localStorage.setItem(UTILITY_WIDGETS_KEY, JSON.stringify(widgets));
+}
+function utilityBody(id, type, config = {}) {
+  if (type === 'notes') {
+    return `<textarea class="form-control form-control-sm quick-notes-editor" rows="8"
+              placeholder="Scratch notes for this terminal. Use Save to PC when needed."
+              oninput="saveUtilityWidgets()">${escapeHtml(config.text || '')}</textarea>
+            <div class="d-flex justify-content-end mt-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="downloadNotes('${id}')">
+                <i class="bi bi-download me-1"></i>Save to PC
+              </button>
+            </div>`;
+  }
+  if (type === 'doc') {
+    const opts = DASHBOARD_DOCS.map(d => `<option value="${escapeHtml(d.slug)}" ${config.slug === d.slug ? 'selected' : ''}>${escapeHtml(d.title)}</option>`).join('');
+    return `<select class="form-select form-select-sm mb-2" onchange="loadDocWidget('${id}', this.value); saveUtilityWidgets()">
+              <option value="">Select a document...</option>${opts}
+            </select>
+            <div class="doc-widget-frame small" data-doc-content>${DASHBOARD_DOCS.length ? '<span class="text-muted">Select a document to show it here.</span>' : '<span class="text-muted">No published docs available.</span>'}</div>`;
+  }
+  if (type === 'links') {
+    return `<div class="quick-link-grid">
+              <a href="/logs/new" class="btn btn-sm btn-outline-success"><i class="bi bi-plus-lg me-1"></i>New Log</a>
+              <a href="/logs/note" class="btn btn-sm btn-outline-warning"><i class="bi bi-sticky me-1"></i>Note</a>
+              <a href="/serials" class="btn btn-sm btn-outline-secondary"><i class="bi bi-collection-play me-1"></i>Serials</a>
+              <a href="/range-state/change" class="btn btn-sm btn-outline-danger"><i class="bi bi-broadcast-pin me-1"></i>Range State</a>
+              <a href="/incidents" class="btn btn-sm btn-outline-secondary"><i class="bi bi-exclamation-octagon me-1"></i>Incidents</a>
+              <a href="/handover" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left-right me-1"></i>Handover</a>
+            </div>`;
+  }
+  return `<div class="utility-clock dashboard-clock" data-local-tz="{{ local_timezone or 'UTC' }}">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <label class="form-label small mb-0">Display</label>
+              <select class="form-select form-select-sm" data-clock-mode style="max-width:160px"
+                      onchange="updateUtilityClocks(); saveUtilityWidgets()">
+                <option value="both" ${config.mode === 'both' || !config.mode ? 'selected' : ''}>Zulu + local</option>
+                <option value="zulu" ${config.mode === 'zulu' ? 'selected' : ''}>Zulu only</option>
+                <option value="local" ${config.mode === 'local' ? 'selected' : ''}>Local only</option>
+              </select>
+            </div>
+            <div class="clock-panel" data-clock-panel="zulu"><div class="clock-label">Zulu</div><div class="clock-time">--:--:--</div><div class="clock-date">UTC</div></div>
+            <div class="clock-panel" data-clock-panel="local"><div class="clock-label">{{ local_timezone or 'UTC' }}</div><div class="clock-time">--:--:--</div><div class="clock-date">{{ local_timezone or 'UTC' }}</div></div>
+          </div>`;
+}
+function renderUtilityWidget(widget) {
+  const id = widget.id || ('w-' + Date.now());
+  const type = widget.type;
+  const title = { notes: 'Quick Notes', doc: 'Doc Reference', clock: 'Clock', links: 'Quick Links' }[type] || 'Widget';
+  const icon = { notes: 'bi-pencil-square', doc: 'bi-file-earmark-text', clock: 'bi-clock', links: 'bi-lightning' }[type] || 'bi-grid';
+  const group = document.createElement('div');
+  group.className = 'serial-widget-group utility-widget-group';
+  group.dataset.groupId = 'group-' + id;
+  group.dataset.serialIds = id;
+  group.dataset.activeTab = id;
+  group.dataset.utilityId = id;
+  group.dataset.widgetType = type;
+  group.innerHTML = `
+    <div class="serial-widget card border-secondary">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-grip-vertical text-muted widget-drag-handle" style="cursor:grab" title="Drag to reorder widgets"></i>
+        <div class="fw-semibold"><i class="bi ${icon} me-1"></i>${title}</div>
+        <div class="serial-group-controls d-flex gap-1 align-items-center"></div>
+        <div class="serial-actions ms-auto d-flex gap-1 align-items-center"></div>
+        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" title="Remove widget" onclick="removeUtilityWidget('${id}')"><i class="bi bi-x-lg"></i></button>
+        <button type="button" class="widget-collapse-btn btn btn-sm btn-link link-secondary p-0 ms-1" title="Minimise / expand" onclick="toggleCollapse(this)"><i class="bi bi-chevron-up"></i></button>
+      </div>
+      <div class="serial-bodies"><div class="serial-body-wrap" data-serial-body="${id}" data-serial-title="${title}">
+        <div class="serial-actions-store d-none"></div>
+        <div class="card-body">${utilityBody(id, type, widget.config || {})}</div>
+      </div></div>
+    </div>`;
+  document.getElementById('serialWidgetsContainer').appendChild(group);
+  registerGroupDnD(group);
+  initGroup(group);
+  if (widget.collapsed) setCollapsed(group, true);
+  if (type === 'doc' && widget.config?.slug) loadDocWidget(id, widget.config.slug);
+  if (type === 'clock') updateUtilityClocks();
+}
+function restoreUtilityWidgets() {
+  utilityWidgets().forEach(renderUtilityWidget);
+}
+function addUtilityWidget(type) {
+  renderUtilityWidget({ id: 'utility-' + Date.now(), type, config: type === 'doc' && DASHBOARD_DOCS[0] ? { slug: DASHBOARD_DOCS[0].slug } : {} });
+  saveUtilityWidgets();
+  saveLayout();
+}
+function removeUtilityWidget(id) {
+  document.querySelector(`.utility-widget-group[data-utility-id="${id}"]`)?.remove();
+  saveUtilityWidgets();
+  saveLayout();
+}
+function downloadNotes(id) {
+  const group = document.querySelector(`.utility-widget-group[data-utility-id="${id}"]`);
+  const text = group?.querySelector('textarea')?.value || '';
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'range-notes-' + new Date().toISOString().replace(/[:.]/g, '-') + '.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function loadDocWidget(id, slug) {
+  const group = document.querySelector(`.utility-widget-group[data-utility-id="${id}"]`);
+  const target = group?.querySelector('[data-doc-content]');
+  if (!target || !slug) return;
+  target.innerHTML = '<span class="text-muted">Loading...</span>';
+  fetch('/dashboard/doc-widget/' + encodeURIComponent(slug))
+    .then(r => r.text())
+    .then(html => { target.innerHTML = html; })
+    .catch(() => { target.innerHTML = '<span class="text-danger">Could not load document.</span>'; });
 }
 
 // ── Drag-to-reorder ────────────────────────────────────────────────────────
@@ -457,6 +628,7 @@ function toggleCollapse(btn) {
   const group = btn.closest('.serial-widget-group');
   if (!group) return;
   setCollapsed(group, !group.classList.contains('collapsed'));
+  if (group.classList.contains('utility-widget-group')) saveUtilityWidgets();
   saveLayout();
 }
 
@@ -475,6 +647,7 @@ function toggleCollapse(btn) {
 
 document.addEventListener('DOMContentLoaded', () => {
   {% if toast %}showToast({{ toast | tojson }}, 'success');{% endif %}
+  restoreUtilityWidgets();
   document.querySelectorAll('.serial-widget-group').forEach(g => { registerGroupDnD(g); initGroup(g); });
   restoreLayout();
   restoreClockVisibility();
@@ -482,7 +655,8 @@ document.addEventListener('DOMContentLoaded', () => {
   buildColumnMenu();
   applyColumnVisibility();
   updateClockWidget();
-  setInterval(updateClockWidget, 1000);
+  updateUtilityClocks();
+  setInterval(() => { updateClockWidget(); updateUtilityClocks(); }, 1000);
 });
 
 function restoreLayout() {

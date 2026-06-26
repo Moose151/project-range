@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.10.1` (beta) · shown bottom-right in the UI and in `app/config.py`.
+**Current version:** `0.11.0` (beta) · shown bottom-right in the UI and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -17,7 +17,7 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.10.1)
+## ✅ Already delivered (through 0.11.0)
 
 Core of the MVP scope is in place:
 
@@ -37,6 +37,7 @@ Core of the MVP scope is in place:
 - Dashboard Zulu/local clock widget; admin-managed local timezone; optional local-time log view
 - Device registry includes Antenna as a device type
 - SQLite backup script with documented backup/restore procedure
+- Dashboard utility widgets: quick notes, docs reference, extra clocks, quick links
 - **0.6.0:** TxLO/RxLO naming, version badge, fully offline (LAN) styling, Docker deploy on port 7474
 
 ---
@@ -122,6 +123,16 @@ Theme: close an operational release gap with a simple, schedulable backup path.
 - [x] **SQLite backup script** — `scripts/backup_db.py` copies `/app/data/range.db` out of the Docker Compose `web` service into `./backups/range-<UTC>.db`.
 - [x] **Retention option** — `--keep N` prunes older backup files, making it suitable for cron or Windows Task Scheduler.
 - [x] **Restore documentation** — `docs/DEPLOY.md` now documents stop/copy/start restore steps and backup access-control warning.
+
+## 0.11.0 — Dashboard utility widgets ✅ (shipped 2026-06-26)
+
+Theme: make the dashboard useful as an operator workspace, not only a signal table.
+
+- [x] **Quick Notes widget** — local scratchpad stored in the browser with a "Save to PC" `.txt` download action.
+- [x] **Docs Reference widget** — add a dashboard widget, select a published Docs page, and view the rendered document content in a contained reference panel. Full doc link remains available.
+- [x] **Multiple clock widgets** — add extra clocks and choose Zulu + local, Zulu only, or local only per widget. The original combined clock remains available.
+- [x] **Quick Links widget** — compact shortcuts for common operator actions: New Log, Note, Serials, Range State, Incidents, and Handover.
+- [x] **Local widget persistence** — utility widgets are terminal-local via localStorage and reuse the dashboard widget container for drag reorder, collapse, remove, and saved layout.
 
 ## 1.0.0 — Operational release
 

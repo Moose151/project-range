@@ -6,10 +6,11 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials
-from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial
+from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage
 from app.rf_config import serial_package_rf_config
 from app.signal_warnings import warning_flags_for
 from app.settings import get_local_timezone
+from app.routers.docs import _render_markdown
 
 
 class _SignalUpdate(BaseModel):
@@ -171,7 +172,12 @@ async def dashboard(
     current_user: User = Depends(get_current_user),
 ):
     ctx = _dashboard_ctx(db)
-    ctx.update({"user": current_user, "toast": toast, "page": "dashboard"})
+    ctx.update({
+        "user": current_user,
+        "toast": toast,
+        "page": "dashboard",
+        "doc_pages": db.query(DocPage).filter(DocPage.is_published == True).order_by(DocPage.title).all(),
+    })
     return templates.TemplateResponse(request, "dashboard.html", ctx)
 
 
@@ -225,6 +231,24 @@ async def dashboard_fragment(
         "pkg_rf": _pkg_rf_for_serial(db, serial_id),
         "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial_id, signals),
     })
+
+
+@router.get("/dashboard/doc-widget/{slug}", response_class=HTMLResponse)
+async def dashboard_doc_widget(
+    slug: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    doc = db.query(DocPage).filter(DocPage.slug == slug, DocPage.is_published == True).first()
+    if not doc:
+        return HTMLResponse('<div class="text-muted small p-2">Document not found.</div>')
+    html = _render_markdown(doc.content)
+    return HTMLResponse(
+        f'<div class="doc-widget-content doc-content">{html}</div>'
+        f'<div class="pt-2"><a href="/docs/{doc.slug}" class="btn btn-sm btn-outline-secondary">'
+        f'<i class="bi bi-box-arrow-up-right me-1"></i>Open full doc</a></div>'
+    )
 
 
 @router.post("/dashboard/quick-update", response_class=HTMLResponse)

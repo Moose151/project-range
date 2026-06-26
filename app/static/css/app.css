@@ -278,6 +278,29 @@ code {
   color: var(--bs-secondary-color);
   font-size: 0.78rem;
 }
+.utility-clock.dashboard-clock {
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+}
+.quick-notes-editor {
+  min-height: 12rem;
+  resize: vertical;
+}
+.doc-widget-frame {
+  max-height: 24rem;
+  overflow: auto;
+  border: 1px solid var(--range-card-border);
+  border-radius: 0.375rem;
+  background: var(--range-muted-panel);
+  padding: 0.75rem;
+}
+.doc-widget-content h1 { font-size: 1.15rem; }
+.doc-widget-content h2 { font-size: 1rem; }
+.doc-widget-content h3 { font-size: 0.92rem; }
+.quick-link-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.5rem;
+}
 @media (max-width: 575.98px) {
   .dashboard-clock {
     grid-template-columns: 1fr;
