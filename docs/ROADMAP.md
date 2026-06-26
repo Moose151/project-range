@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.9.5` (beta) · shown bottom-right in the UI and in `app/config.py`.
+**Current version:** `0.10.0` (beta) · shown bottom-right in the UI and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -17,7 +17,7 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.9.5)
+## ✅ Already delivered (through 0.10.0)
 
 Core of the MVP scope is in place:
 
@@ -34,6 +34,8 @@ Core of the MVP scope is in place:
 - Serial pending/pre-create: serials can be saved as pending before starting
 - Log readability: signal log rows identify changed parameters and history lifecycle rows use calmer colours
 - Settings dropdown and more distinct light/dark theme palettes
+- Dashboard Zulu/local clock widget; admin-managed local timezone; optional local-time log view
+- Device registry includes Antenna as a device type
 - **0.6.0:** TxLO/RxLO naming, version badge, fully offline (LAN) styling, Docker deploy on port 7474
 
 ---
@@ -100,15 +102,17 @@ See the **Security hardening** section below for the security items shipped in 0
 - [~] **PostgreSQL option** — **deferred** (your call — no infra to stand up yet). Support Postgres via `DATABASE_URL` with a real migration tool (Alembic).
 - [~] **HTTPS/TLS** — **deferred** (your call). Reverse-proxy/self-signed setup for the range network. Session cookies are already `SameSite=Strict` + ready for `Secure` (`SESSION_HTTPS_ONLY=1`).
 
-## 0.10.0 — Dashboard widgets & Settings UX (pre-1.0)
+## 0.10.0 — Dashboard widgets & Settings UX ✅ (shipped 2026-06-26)
 
 Theme: discoverability and at-a-glance ops info. *(User-requested.)*
 
 - [x] **Settings area** — a clear, discoverable **Settings** entry (nav item / gear menu) that consolidates configuration in one place:
-  - **Per-user (Preferences):** theme + light/dark, default units, time zone (below). *(These live on the existing `/preferences` page today, reached only via the user's name in the navbar — surface it as "Settings".)*
-  - **Admin (Config):** the supervisor-only `/config` page (modulation/FEC/sources/antennas/registry/freq templates).
+  - **Per-user (Preferences):** theme + light/dark, default units. *(These live on the existing `/preferences` page today, reached by Settings or the user's display name.)*
+  - **Admin (Config):** the supervisor-only `/config` page (modulation/FEC/sources/antennas/registry/freq templates, global local timezone).
   - Shipped as a Settings dropdown grouping Preferences, Password, and supervisor Admin Config. A dedicated tabbed `/settings` page remains optional if more settings are added later.
-- [ ] **Dashboard clock widget** — a **Zulu (UTC) time** clock plus **local time**, where local time follows a **time-zone chosen in Settings** (IANA tz dropdown, stored per user like default units). Implement as a **dashboard widget that can be added and dragged/arranged like the serial widgets** (reuse the existing dashboard widget drag/merge/pop-out system). Updates live (client-side tick; Zulu always shown).
+- [x] **Dashboard clock widget** — a **Zulu (UTC) time** clock plus **local time**, where local time follows a supervisor-set global IANA timezone under `/config` → System. Implemented as a dashboard widget that can be reordered, collapsed, hidden, and re-shown; updates live client-side and persists layout in localStorage.
+- [x] **Zulu-first logs with optional local time** — `/logs` and `/history/{serial_id}` always show Zulu timestamps (`Z` suffix). A "Show local time" checkbox adds a local-time line using the configured timezone. CSV/XLSX exports label timestamps as `Timestamp (Zulu)`.
+- [x] **Antenna device type** — "Antenna" added to the Devices registry type dropdown and topology renderer.
 
 ## 1.0.0 — Operational release
 

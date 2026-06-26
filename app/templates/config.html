@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-antennas" type="button"><i class="bi bi-broadcast-pin me-1"></i>Antennas</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-freq" type="button"><i class="bi bi-diagram-3 me-1"></i>Freq Templates</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-registry" type="button"><i class="bi bi-reception-4 me-1"></i>Signal Registry</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-system" type="button"><i class="bi bi-globe2 me-1"></i>System</button></li>
 </ul>
 
 <div class="tab-content">
@@ -578,6 +579,33 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="col-auto">
             <button type="submit" class="btn btn-sm btn-primary">
               <i class="bi bi-plus-lg me-1"></i>Add Signal
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- System Settings -->
+  <div class="tab-pane fade" id="cfg-system" role="tabpanel">
+    <div class="card border-secondary">
+      <div class="card-header"><i class="bi bi-globe2 me-1"></i>System Settings</div>
+      <div class="card-body">
+        <form method="post" action="/config/system" class="row g-3 align-items-end">
+          <div class="col-lg-5 col-md-7">
+            <label class="form-label small">Local time zone</label>
+            <select class="form-select form-select-sm" name="local_timezone">
+              {% for tz in time_zones %}
+              <option value="{{ tz }}" {% if local_timezone == tz %}selected{% endif %}>{{ tz }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">
+              Used by the dashboard clock and optional local-time view in logs. Logged timestamps remain Zulu/UTC.
+            </div>
+          </div>
+          <div class="col-auto">
+            <button type="submit" class="btn btn-sm btn-primary">
+              <i class="bi bi-check2 me-1"></i>Save System Settings
             </button>
           </div>
         </form>

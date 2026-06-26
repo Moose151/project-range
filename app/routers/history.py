@@ -10,6 +10,7 @@ from app.database import get_db
 from app.deps import get_current_user, get_current_range_state
 from app.models import User, Serial, SignalLog
 from app.log_changes import annotate_log_changes
+from app.settings import annotate_local_times, get_local_timezone
 
 router = APIRouter(prefix="/history")
 from app.templating import templates
@@ -49,6 +50,7 @@ async def history_detail(
     serial_id: int,
     request: Request,
     search: str = "",
+    local_time: str = "",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -64,6 +66,10 @@ async def history_detail(
         ))
     logs = q.order_by(SignalLog.timestamp.asc()).all()
     annotate_log_changes(db, logs)
+    local_timezone = get_local_timezone(db)
+    show_local_time = local_time == "1"
+    if show_local_time:
+        annotate_local_times(logs, local_timezone)
 
     return templates.TemplateResponse(request, "history_detail.html", {
         "user": current_user,
@@ -71,6 +77,8 @@ async def history_detail(
         "serial": serial,
         "logs": logs,
         "search": search,
+        "show_local_time": show_local_time,
+        "local_timezone": local_timezone,
         "page_name": "history",
     })
 
@@ -94,14 +102,14 @@ async def history_export_csv(
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([
-        "ID", "Timestamp", "Operator", "Range State", "Signal", "Status",
+        "ID", "Timestamp (Zulu)", "Operator", "Range State", "Signal", "Status",
         "TxIF", "TxRF", "RxRF", "RxIF", "Unit", "Band",
         "Modulation", "Symbol Rate", "FEC", "Source", "Antenna",
         "Power", "Power Unit", "Eb/No", "Activity Ref", "Notes", "Type",
     ])
     for log in logs:
         writer.writerow([
-            log.id, log.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            log.id, log.timestamp.strftime("%Y-%m-%d %H:%M:%SZ"),
             log.operator.username if log.operator else "",
             log.range_state, log.signal_name, log.signal_status,
             log.tx_if, log.tx_rf, log.rx_rf, log.rx_if, log.freq_unit, log.band,
@@ -138,14 +146,14 @@ async def history_export_xlsx(
     ws = wb.active
     ws.title = "Serial Log"
     ws.append([
-        "ID", "Timestamp", "Operator", "Range State", "Signal", "Status",
+        "ID", "Timestamp (Zulu)", "Operator", "Range State", "Signal", "Status",
         "TxIF", "TxRF", "RxRF", "RxIF", "Unit", "Band",
         "Modulation", "Symbol Rate", "FEC", "Source", "Antenna",
         "Power", "Power Unit", "Eb/No", "Activity Ref", "Notes", "Type",
     ])
     for log in logs:
         ws.append([
-            log.id, log.timestamp, log.operator.username if log.operator else "",
+            log.id, log.timestamp.strftime("%Y-%m-%d %H:%M:%SZ"), log.operator.username if log.operator else "",
             log.range_state, log.signal_name, log.signal_status,
             log.tx_if, log.tx_rf, log.rx_rf, log.rx_if, log.freq_unit, log.band,
             log.modulation, log.symbol_rate, log.fec, log.source, log.antenna,

@@ -92,6 +92,15 @@
         </div>
       </div>
       {% endif %}
+      <div class="col-auto">
+        <div class="form-check form-check-sm mb-0">
+          <input class="form-check-input" type="checkbox" name="local_time" value="1"
+                 id="showLocalTime" {% if show_local_time %}checked{% endif %}
+                 onchange="this.form.submit()">
+          <label class="form-check-label small" for="showLocalTime">Show local time</label>
+          <span class="text-muted small">({{ local_timezone }})</span>
+        </div>
+      </div>
     </div>
   </div>
 </form>
@@ -100,11 +109,18 @@
 {% set next_dir = 'asc' if (sort == col and sort_dir == 'desc') else 'desc' %}
 {% set icon = 'bi-sort-down' if (sort == col and sort_dir == 'desc') else ('bi-sort-up' if sort == col else 'bi-arrow-down-up text-secondary opacity-50') %}
 <th>
-  <a href="/logs?search={{ filters.search }}&status={{ filters.status }}&band={{ filters.band }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&activity={{ filters.activity }}&serial_id={{ filters.serial_id }}&signal_name={{ filters.signal_name }}&show_deleted={{ filters.show_deleted }}&sort={{ col }}&sort_dir={{ next_dir }}"
+  <a href="/logs?search={{ filters.search }}&status={{ filters.status }}&band={{ filters.band }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&activity={{ filters.activity }}&serial_id={{ filters.serial_id }}&signal_name={{ filters.signal_name }}&show_deleted={{ filters.show_deleted }}&local_time={{ filters.local_time }}&sort={{ col }}&sort_dir={{ next_dir }}"
      class="text-reset text-decoration-none text-nowrap">
     {{ label }}&nbsp;<i class="bi {{ icon }} small"></i>
   </a>
 </th>
+{% endmacro %}
+
+{% macro time_cell(log) %}
+<span class="text-nowrap">{{ log.timestamp.strftime('%d/%m/%y %H:%M') }}Z</span>
+{% if show_local_time and log.local_timestamp %}
+<span class="d-block text-muted small text-nowrap">{{ log.local_timestamp.strftime('%d/%m/%y %H:%M') }} local</span>
+{% endif %}
 {% endmacro %}
 
 {% macro change_badges(log) %}
@@ -154,7 +170,7 @@
         {% for log in logs %}
         {% if log.entry_type == 'Narrative' or log.signal_name == '[NOTE]' %}
         <tr class="{% if log.is_deleted %}opacity-50{% endif %} log-event-row {% if log.entry_type == 'SerialStart' %}log-event-start{% elif log.entry_type == 'SerialEnd' %}log-event-end{% else %}log-event-note{% endif %}">
-          <td class="text-nowrap small">{{ log.timestamp.strftime('%d/%m/%y %H:%M') }}</td>
+          <td class="small">{{ time_cell(log) }}</td>
           <td class="small">{{ log.operator.username if log.operator else '—' }}</td>
           <td class="small text-muted" style="max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
               title="{{ log.serial.title if log.serial else '' }}">
@@ -198,7 +214,7 @@
         </tr>
         {% else %}
         <tr class="{% if log.is_deleted %}text-muted opacity-50{% elif log.signal_status == 'Faulted' %}status-faulted{% elif log.signal_status == 'Up' %}status-up{% endif %}">
-          <td class="text-nowrap small">{{ log.timestamp.strftime('%d/%m/%y %H:%M') }}</td>
+          <td class="small">{{ time_cell(log) }}</td>
           <td class="small">{{ log.operator.username if log.operator else '—' }}</td>
           <td class="small text-muted" style="max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
               title="{{ log.serial.title if log.serial else '' }}">
@@ -276,7 +292,7 @@
     {% if total_pages > 1 %}
     <nav>
       <ul class="pagination pagination-sm mb-0">
-{% set pbase = '/logs?search=' ~ filters.search ~ '&status=' ~ filters.status ~ '&band=' ~ filters.band ~ '&date_from=' ~ filters.date_from ~ '&date_to=' ~ filters.date_to ~ '&activity=' ~ filters.activity ~ '&serial_id=' ~ filters.serial_id ~ '&signal_name=' ~ filters.signal_name ~ '&show_deleted=' ~ filters.show_deleted ~ '&sort=' ~ sort ~ '&sort_dir=' ~ sort_dir %}
+{% set pbase = '/logs?search=' ~ filters.search ~ '&status=' ~ filters.status ~ '&band=' ~ filters.band ~ '&date_from=' ~ filters.date_from ~ '&date_to=' ~ filters.date_to ~ '&activity=' ~ filters.activity ~ '&serial_id=' ~ filters.serial_id ~ '&signal_name=' ~ filters.signal_name ~ '&show_deleted=' ~ filters.show_deleted ~ '&local_time=' ~ filters.local_time ~ '&sort=' ~ sort ~ '&sort_dir=' ~ sort_dir %}
         <li class="page-item {% if page <= 1 %}disabled{% endif %}">
           <a class="page-link" href="{{ pbase }}&page={{ page - 1 }}">&laquo;</a>
         </li>

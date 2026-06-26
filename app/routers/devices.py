@@ -19,6 +19,7 @@ DEVICE_TYPES = [
     ("ip_switch",          "IP Switch"),
     ("spectrum_analyser",  "Spectrum Analyser"),
     ("signal_generator",   "Signal Generator"),
+    ("antenna",            "Antenna"),
     ("power_meter",        "Power Meter"),
     ("reference_10mhz",   "10MHz Reference"),
     ("sync_server",        "Sync Server"),

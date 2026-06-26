@@ -12,7 +12,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.9.5` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.10.0` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -48,10 +48,15 @@
   - **Settings discoverability:** main navbar now has a visible **Settings** dropdown with Your Preferences, Password, and supervisor-only Admin Config. User display name still links to preferences.
   - **Theme rework:** palettes now change body canvas, navbar, cards, borders, and muted panel surfaces, not just button/link accents. Light mode is softened from Bootstrap's stark white with darker text and stronger borders. CSS cache key bumped to `app.css?v=11`.
   - **Login theme toggle polish:** login page now syncs the sun/moon icon with the saved light/dark mode on load.
+- **0.10.0 — Dashboard clock + timezone/log time polish:**
+  - **Dashboard Zulu/local clock widget:** dashboard now has a draggable, hideable clock widget showing Zulu (UTC) and the configured local timezone. It uses the existing dashboard widget container, grip reorder, collapse, and localStorage layout persistence. The widget can be re-shown from the dashboard "Clock" button.
+  - **Global local timezone:** timezone is **not per-user**. Supervisors set it under `/config` → System. Stored in new `AppSetting` table (`key="local_timezone"`, default `"UTC"` seeded by `init_db.py`).
+  - **Logs are Zulu-first:** `/logs` and `/history/{serial_id}` always show timestamps with `Z`. Optional "Show local time" checkbox adds a second local-time line using the configured timezone. CSV/XLSX exports now label timestamp columns as "Timestamp (Zulu)" and include `Z`.
+  - **Device type:** "Antenna" added as a selectable device type in the Devices registry and topology layering.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
-1. **Dashboard Zulu/local clock widget** — UTC clock + local time on the dashboard as an add/drag widget (like the serial cards). Local timezone chosen from an IANA dropdown, stored per-user on `User` model. Clock ticks client-side. Must reuse the SortableJS drag/merge/pop-out system in `dashboard.py` + `dashboard.html`. Requires `User.timezone` column (see "Model changes" below). Roadmap 0.10.0.
-2. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with operator feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.
+1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with operator feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.
+2. **Dashboard clock browser QA** — 0.10.0 implementation was verified at compile/template level only. Needs a browser pass for drag/order persistence, hide/show, and timezone rendering.
 
 ### Also pending (from ROADMAP)
 - **Scheduled backups** (script) — manual `docker compose cp` documented for now.
@@ -59,9 +64,9 @@
 - **1.0.0 gate:** deploy validated on range server, docs complete, backups verified, security Critical items closed (most are — see ROADMAP "Security hardening").
 
 ### Model/template changes the next assistant needs to know
-- **`User.timezone`** — still needs adding: `VARCHAR(64)`, default `"UTC"`, in both `models.py` (`Mapped[str]`) and `init_db.py` migration block. Required for the Zulu clock widget. `preferences.html` will need an IANA timezone dropdown saved via `POST /preferences`.
+- **`AppSetting`** — new key/value table in `models.py`; `init_db.py` seeds `local_timezone=UTC`. Do not make timezone per-user unless the requirement changes.
 - **Settings area** — visible Settings dropdown is shipped in `base.html` (Preferences, Password, supervisor Admin Config). A dedicated tabbed `/settings` page is still optional if the nav dropdown is not enough.
-- **`DeviceLink` and `RFDevice` new columns are fully implemented** — `device_model`, `has_web_gui`, and the `device_links` table are all in place. No further migration needed for those.
+- **`DeviceLink` and `RFDevice` new columns are fully implemented** — `device_model`, `has_web_gui`, and the `device_links` table are all in place. Device type list now includes `antenna`. No further migration needed for those.
 
 ### Caveats / verification gaps
 - Theme switching verified at **build/markup level only** — not click-tested in a real browser. User confirmed themes "don't change enough", so **theme rework is still outstanding** (item 1 above).
@@ -208,7 +213,8 @@ project-range/
 | `Serial` | An operational run: has a title, assigned packages, open/close times, log entries |
 | `SerialPackage` | Junction: which packages are assigned to which serial |
 | `AuditLog` | System audit trail (login, edits, state changes, etc.) |
-| `RFDevice` | Range device registry (name, device_model, type, host, check_port, location, has_web_gui, port counts). Types: modem, splitter, combiner, switch, ip_switch, spectrum_analyser, signal_generator, power_meter, reference_10mhz, sync_server, dc_injector, other |
+| `RFDevice` | Range device registry (name, device_model, type, host, check_port, location, has_web_gui, port counts). Types: modem, splitter, combiner, switch, ip_switch, spectrum_analyser, signal_generator, antenna, power_meter, reference_10mhz, sync_server, dc_injector, other |
+| `AppSetting` | Global app settings, currently `local_timezone` for dashboard/log local-time display. Timezone is supervisor/admin-managed, not per-user |
 | `DevicePort` | Input/output port on a routing device (splitter/combiner/RF switch) — stores per-port label and routed_from index |
 | `DeviceLink` | Directed connection between two `RFDevice` instances (from_device → to_device). Fields: from/to port label + port index, link_type (rf/ip/clock/power), label. Port index maps to `DevicePort.idx` for routing page auto-hints |
 | `Incident` | Incident/fault report (severity, status, affected equipment, associated serial, resolution) |

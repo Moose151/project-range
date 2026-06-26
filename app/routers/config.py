@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import require_supervisor, get_current_range_state
 from app.models import ModulationType, FecType, SignalSource, AntennaType, Signal, FrequencyTemplate, User
+from app.settings import TIME_ZONES, get_local_timezone, set_setting, LOCAL_TIMEZONE_KEY
 
 router = APIRouter(prefix="/config")
 from app.templating import templates
@@ -35,9 +36,25 @@ async def config_page(
         "groups": groups,
         "freq_templates": freq_templates,
         "bands": ["C", "X", "Ku", "Ka", "Other"],
+        "time_zones": TIME_ZONES,
+        "local_timezone": get_local_timezone(db),
         "page": "config",
         "toast": request.query_params.get("toast", ""),
     })
+
+
+# ── System settings ──────────────────────────────────────────────────────────
+
+@router.post("/system")
+async def system_settings_save(
+    local_timezone: str = Form("UTC"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    if local_timezone in TIME_ZONES:
+        set_setting(db, LOCAL_TIMEZONE_KEY, local_timezone)
+        db.commit()
+    return RedirectResponse("/config?toast=System+settings+saved", status_code=302)
 
 
 # ── Modulation types ────────────────────────────────────────────────────────────

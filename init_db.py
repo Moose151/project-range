@@ -7,7 +7,7 @@ from app.database import engine, Base
 from app.models import (
     User, RangeStateLog, Signal, ModulationType, FecType, SignalSource, AntennaType,
     LogSession, SignalPackage, SignalPackageEntry, Serial, SerialPackage,
-    DocPage, DocVersion, RFDevice, DevicePort, DeviceLink,
+    DocPage, DocVersion, AppSetting, RFDevice, DevicePort, DeviceLink,
 )
 from app.auth import hash_password
 from sqlalchemy.orm import Session
@@ -384,6 +384,11 @@ def main():
             print("IMPORTANT: Change the default password immediately after first login.")
         else:
             print("Users already exist — skipping user seed.")
+
+        if not db.query(AppSetting).filter(AppSetting.key == "local_timezone").first():
+            db.add(AppSetting(key="local_timezone", value="UTC"))
+            db.commit()
+            print("Seeded default local timezone: UTC")
 
         # Seed modulation types if table is empty
         if not db.query(ModulationType).first():

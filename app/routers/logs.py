@@ -14,6 +14,7 @@ from app.models import User, SignalLog, Signal, AuditLog, SignalStatus, Role, Mo
 from app.rf_config import serial_package_rf_config
 from app.signal_warnings import warning_flags_for
 from app.log_changes import annotate_log_changes
+from app.settings import annotate_local_times, get_local_timezone
 
 router = APIRouter(prefix="/logs")
 from app.templating import templates
@@ -102,6 +103,7 @@ async def log_list(
     serial_id: str = "",
     signal_name: str = "",
     show_deleted: str = "",
+    local_time: str = "",
     toast: str = "",
     sort: str = Query(default="timestamp"),
     sort_dir: str = Query(default="desc"),
@@ -118,6 +120,10 @@ async def log_list(
     order = sort_col.asc() if sort_dir == "asc" else sort_col.desc()
     logs = q.order_by(order).offset((page - 1) * LOG_PAGE_SIZE).limit(LOG_PAGE_SIZE).all()
     annotate_log_changes(db, logs)
+    local_timezone = get_local_timezone(db)
+    show_local_time = local_time == "1"
+    if show_local_time:
+        annotate_local_times(logs, local_timezone)
     total_pages = max(1, (total + LOG_PAGE_SIZE - 1) // LOG_PAGE_SIZE)
 
     # Serial lookup for filter display
@@ -143,12 +149,15 @@ async def log_list(
         "total": total,
         "page": page,
         "total_pages": total_pages,
+        "show_local_time": show_local_time,
+        "local_timezone": local_timezone,
         "toast": toast,
         "filters": {
             "search": search, "status": status, "band": band,
             "date_from": date_from, "date_to": date_to,
             "activity": activity, "show_deleted": show_deleted,
             "serial_id": serial_id, "signal_name": signal_name,
+            "local_time": local_time,
         },
         "sort": sort,
         "sort_dir": sort_dir,
@@ -522,7 +531,7 @@ async def export_csv(
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([
-        "ID", "Timestamp", "Operator", "Session", "Range State", "Signal", "Status",
+        "ID", "Timestamp (Zulu)", "Operator", "Session", "Range State", "Signal", "Status",
         "TxIF", "TxRF", "RxRF", "RxIF", "Freq Unit", "Band",
         "Modulation", "Symbol Rate", "FEC", "Source", "Antenna",
         "Power", "Power Unit", "Eb/No",
@@ -530,7 +539,7 @@ async def export_csv(
     ])
     for log in logs:
         writer.writerow([
-            log.id, log.timestamp, log.operator.username if log.operator else "",
+            log.id, log.timestamp.strftime("%Y-%m-%d %H:%M:%SZ"), log.operator.username if log.operator else "",
             log.session.name if log.session else "",
             log.range_state, log.signal_name, log.signal_status,
             log.tx_if, log.tx_rf, log.rx_rf, log.rx_if, log.freq_unit, log.band,
@@ -565,7 +574,7 @@ async def export_xlsx(
     ws = wb.active
     ws.title = "Range Logs"
     headers = [
-        "ID", "Timestamp", "Operator", "Session", "Range State", "Signal", "Status",
+        "ID", "Timestamp (Zulu)", "Operator", "Session", "Range State", "Signal", "Status",
         "TxIF", "TxRF", "RxRF", "RxIF", "Freq Unit", "Band",
         "Modulation", "Symbol Rate", "FEC", "Source", "Antenna",
         "Power", "Power Unit", "Eb/No",
@@ -574,7 +583,7 @@ async def export_xlsx(
     ws.append(headers)
     for log in logs:
         ws.append([
-            log.id, log.timestamp, log.operator.username if log.operator else "",
+            log.id, log.timestamp.strftime("%Y-%m-%d %H:%M:%SZ"), log.operator.username if log.operator else "",
             log.session.name if log.session else "",
             log.range_state, log.signal_name, log.signal_status,
             log.tx_if, log.tx_rf, log.rx_rf, log.rx_if, log.freq_unit, log.band,

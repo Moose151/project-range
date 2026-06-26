@@ -6,6 +6,10 @@
   <h4 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Live Range Dashboard</h4>
   <div class="d-flex gap-2 align-items-center">
     <span class="text-muted small" id="lastRefresh">Auto-refreshing every 10s</span>
+    <button class="btn btn-sm btn-outline-secondary" type="button" id="showClockWidgetBtn"
+            onclick="showClockWidget()" title="Show the Zulu/local clock widget">
+      <i class="bi bi-clock me-1"></i>Clock
+    </button>
     <div class="dropdown">
       <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
               data-bs-toggle="dropdown" data-bs-auto-close="outside" title="Show / hide table columns">
@@ -49,6 +53,49 @@
 
 <!-- Serial widget container — SortableJS handles reorder; JS handles tab-merge -->
 <div id="serialWidgetsContainer" class="d-flex flex-column gap-3">
+  <div class="serial-widget-group clock-widget-group"
+       data-group-id="group-clock"
+       data-serial-ids="clock"
+       data-active-tab="clock">
+    <div class="serial-widget card border-info" data-widget-kind="clock">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-grip-vertical text-muted widget-drag-handle" style="cursor:grab"
+           title="Drag to reorder widgets"></i>
+        <div class="fw-semibold d-flex align-items-center gap-2">
+          <i class="bi bi-clock-history text-info"></i>
+          <span>Zulu / Local Clock</span>
+        </div>
+        <div class="serial-group-controls d-flex gap-1 align-items-center"></div>
+        <div class="serial-actions ms-auto d-flex gap-1 align-items-center"></div>
+        <button type="button" class="widget-collapse-btn btn btn-sm btn-link link-secondary p-0 ms-1"
+                title="Minimise / expand" onclick="toggleCollapse(this)"><i class="bi bi-chevron-up"></i></button>
+      </div>
+      <div class="serial-bodies">
+        <div class="serial-body-wrap" data-serial-body="clock" data-serial-title="Zulu / Local Clock">
+          <div class="serial-actions-store d-none">
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                    title="Hide clock widget" onclick="hideClockWidget()">
+              <i class="bi bi-eye-slash"></i>
+            </button>
+          </div>
+          <div class="card-body">
+            <div class="dashboard-clock" data-local-tz="{{ local_timezone or 'UTC' }}">
+              <div class="clock-panel">
+                <div class="clock-label">Zulu</div>
+                <div class="clock-time" id="clockZulu">--:--:--</div>
+                <div class="clock-date" id="clockZuluDate">UTC</div>
+              </div>
+              <div class="clock-panel">
+                <div class="clock-label">{{ local_timezone or 'UTC' }}</div>
+                <div class="clock-time" id="clockLocal">--:--:--</div>
+                <div class="clock-date" id="clockLocalDate">{{ local_timezone or 'UTC' }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   {% for sd in serial_data %}
   {% set serial = sd.serial %}
   {% set w_signals = sd.signals %}
@@ -121,6 +168,47 @@
 function updateRefreshTime() {
   const el = document.getElementById('lastRefresh');
   if (el) el.textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+// ── Zulu / local clock widget ─────────────────────────────────────────────
+const CLOCK_HIDDEN_KEY = 'dashboardClockHidden';
+function clockFmt(timeZone, opts) {
+  return new Intl.DateTimeFormat(undefined, { timeZone, ...opts });
+}
+function updateClockWidget() {
+  const clock = document.querySelector('.dashboard-clock');
+  if (!clock) return;
+  const now = new Date();
+  const localTz = clock.dataset.localTz || 'UTC';
+  const timeOpts = { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
+  const dateOpts = { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' };
+  document.getElementById('clockZulu').textContent = clockFmt('UTC', timeOpts).format(now);
+  document.getElementById('clockZuluDate').textContent = clockFmt('UTC', dateOpts).format(now) + ' UTC';
+  try {
+    document.getElementById('clockLocal').textContent = clockFmt(localTz, timeOpts).format(now);
+    document.getElementById('clockLocalDate').textContent = clockFmt(localTz, dateOpts).format(now) + ' ' + localTz;
+  } catch (e) {
+    document.getElementById('clockLocal').textContent = clockFmt('UTC', timeOpts).format(now);
+    document.getElementById('clockLocalDate').textContent = clockFmt('UTC', dateOpts).format(now) + ' UTC';
+  }
+}
+function setClockHidden(hidden) {
+  const group = document.querySelector('.clock-widget-group');
+  const btn = document.getElementById('showClockWidgetBtn');
+  if (group) group.style.display = hidden ? 'none' : '';
+  if (btn) {
+    btn.disabled = !hidden;
+    btn.classList.toggle('btn-outline-secondary', hidden);
+    btn.classList.toggle('btn-secondary', !hidden);
+  }
+  try { localStorage.setItem(CLOCK_HIDDEN_KEY, hidden ? '1' : '0'); } catch (e) {}
+}
+function hideClockWidget() { setClockHidden(true); saveLayout(); }
+function showClockWidget() { setClockHidden(false); saveLayout(); }
+function restoreClockVisibility() {
+  let hidden = false;
+  try { hidden = localStorage.getItem(CLOCK_HIDDEN_KEY) === '1'; } catch (e) {}
+  setClockHidden(hidden);
 }
 
 // ── Drag-to-reorder ────────────────────────────────────────────────────────
@@ -389,9 +477,12 @@ document.addEventListener('DOMContentLoaded', () => {
   {% if toast %}showToast({{ toast | tojson }}, 'success');{% endif %}
   document.querySelectorAll('.serial-widget-group').forEach(g => { registerGroupDnD(g); initGroup(g); });
   restoreLayout();
+  restoreClockVisibility();
   refreshAllControls();
   buildColumnMenu();
   applyColumnVisibility();
+  updateClockWidget();
+  setInterval(updateClockWidget, 1000);
 });
 
 function restoreLayout() {

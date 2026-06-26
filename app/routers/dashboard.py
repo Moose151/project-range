@@ -9,6 +9,7 @@ from app.deps import get_current_user, get_current_range_state, get_active_seria
 from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial
 from app.rf_config import serial_package_rf_config
 from app.signal_warnings import warning_flags_for
+from app.settings import get_local_timezone
 
 
 class _SignalUpdate(BaseModel):
@@ -158,6 +159,7 @@ def _dashboard_ctx(db: Session) -> dict:
         "antenna_types": antenna_types,
         "last_state_change": last_state_change,
         "exclusivity_map": exclusivity_map,
+        "local_timezone": get_local_timezone(db),
     }
 
 
