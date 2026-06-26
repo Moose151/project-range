@@ -12,7 +12,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.9.4` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.9.5` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -44,11 +44,14 @@
   - **Routing page auto-hints:** When a `DeviceLink` has `to_port_idx` matching a combiner/splitter port, the routing page (`/devices/{id}/routing`) pre-populates that port's label with the connected device's name and shows a "linked: DeviceName" hint. Input hints from the `to` side of links; output hints from the `from` side.
   - **Serial pending / pre-create:** The serial create form (`/serials`) now has two buttons — **Save as Pending** (creates the serial with packages attached, `is_started=False`, redirects to serials list) and **Create & Start** (existing behaviour, goes to start confirmation). Pending serials appear in a "Pending — not yet started" section at the top of the serials page with Start and Delete buttons. `Serial.is_started` and the pending/active separation already existed in the DB and router; the only change was adding the `action` form param and the second button.
 - **0.9.4 — Log readability:** `/logs` and `/history/{serial_id}` now compare each signal log entry with the previous entry for that signal in the same serial. Changed fields are summarized in a new "Changed" column and visible changed cells get a subtle accent highlight. Serial history lifecycle rows now use calmer custom colours for `SerialStart`, `SerialEnd`, and narrative notes instead of the bright warning-yellow row.
+- **0.9.5 — Settings/theme polish:**
+  - **Settings discoverability:** main navbar now has a visible **Settings** dropdown with Your Preferences, Password, and supervisor-only Admin Config. User display name still links to preferences.
+  - **Theme rework:** palettes now change body canvas, navbar, cards, borders, and muted panel surfaces, not just button/link accents. Light mode is softened from Bootstrap's stark white with darker text and stronger borders. CSS cache key bumped to `app.css?v=11`.
+  - **Login theme toggle polish:** login page now syncs the sun/moon icon with the saved light/dark mode on load.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
-1. **Theme improvements** — user feedback: *"themes do not change enough / all look the same"* and *"light mode is too bright / bad contrast."* Current themes only vary the accent colour. Need to make palettes visually distinct: theme the nav background, card surfaces, and body background per palette. Also fix light mode — Bootstrap's default light is too bright; darken `--bs-body-bg` and audit text contrast. Files: `app/static/css/app.css` (theme CSS blocks at the bottom), pre-paint `<script>` in `base.html` and `login.html`.
-2. **Dashboard Zulu/local clock widget** — UTC clock + local time on the dashboard as an add/drag widget (like the serial cards). Local timezone chosen from an IANA dropdown, stored per-user on `User` model. Clock ticks client-side. Must reuse the SortableJS drag/merge/pop-out system in `dashboard.py` + `dashboard.html`. Requires `User.timezone` column (see "Model changes" below). Roadmap 0.10.0.
-3. **Settings area** — consolidate preferences and config under a discoverable "Settings" nav entry. Currently themes/units are at `/preferences` (only reachable by clicking the user's display name — users can't find it). Minimum fix: add a gear icon "Settings" nav item pointing to `/preferences`. Better: tabbed `/settings` page (Preferences | Admin Config). Roadmap 0.10.0.
+1. **Dashboard Zulu/local clock widget** — UTC clock + local time on the dashboard as an add/drag widget (like the serial cards). Local timezone chosen from an IANA dropdown, stored per-user on `User` model. Clock ticks client-side. Must reuse the SortableJS drag/merge/pop-out system in `dashboard.py` + `dashboard.html`. Requires `User.timezone` column (see "Model changes" below). Roadmap 0.10.0.
+2. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with operator feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.
 
 ### Also pending (from ROADMAP)
 - **Scheduled backups** (script) — manual `docker compose cp` documented for now.
@@ -57,7 +60,7 @@
 
 ### Model/template changes the next assistant needs to know
 - **`User.timezone`** — still needs adding: `VARCHAR(64)`, default `"UTC"`, in both `models.py` (`Mapped[str]`) and `init_db.py` migration block. Required for the Zulu clock widget. `preferences.html` will need an IANA timezone dropdown saved via `POST /preferences`.
-- **Settings area** — easiest path: add a "Settings" nav item in `base.html` pointing to `/preferences` as an immediately visible entry point, then optionally wrap preferences + config into a tabbed `/settings` page later.
+- **Settings area** — visible Settings dropdown is shipped in `base.html` (Preferences, Password, supervisor Admin Config). A dedicated tabbed `/settings` page is still optional if the nav dropdown is not enough.
 - **`DeviceLink` and `RFDevice` new columns are fully implemented** — `device_model`, `has_web_gui`, and the `device_links` table are all in place. No further migration needed for those.
 
 ### Caveats / verification gaps

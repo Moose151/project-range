@@ -264,7 +264,6 @@ code {
   --range-silver: #c9ced6;      /* silver arrow */
   --range-ink: #0e0f12;         /* badge near-black */
 }
-/* Light brand touch now; fuller palette adoption is a roadmap item. */
 .brand-sew span { color: var(--range-gold); letter-spacing: .04em; }
 .navbar { border-bottom: 2px solid var(--range-gold) !important; }
 .app-version-badge { color: var(--range-gold); }
@@ -278,18 +277,43 @@ code {
 :root, [data-theme="classic"] {
   --range-accent: #0d6efd; --range-accent-rgb: 13,110,253;
   --range-accent-hover: #0b5ed7; --range-accent-contrast: #ffffff;
+  --range-body-bg: #0f1318; --range-card-bg: #171d24; --range-nav-bg: #101820;
+  --range-card-border: #394451; --range-muted-panel: #141a21;
 }
 [data-theme="sew-gold"] {
   --range-accent: #e0a52e; --range-accent-rgb: 224,165,46;
   --range-accent-hover: #c88f22; --range-accent-contrast: #1a1300;
+  --range-body-bg: #15130f; --range-card-bg: #211d15; --range-nav-bg: #17130b;
+  --range-card-border: #4d3a1a; --range-muted-panel: #1b1811;
 }
 [data-theme="night-ops"] {
   --range-accent: #e8603a; --range-accent-rgb: 232,96,58;
   --range-accent-hover: #cf4d2b; --range-accent-contrast: #190a06;
+  --range-body-bg: #160a07; --range-card-bg: #22100c; --range-nav-bg: #1b0d0a;
+  --range-card-border: #5a2619; --range-muted-panel: #1c0d0a;
 }
 [data-theme="spectrum"] {
   --range-accent: #19b8c9; --range-accent-rgb: 25,184,201;
   --range-accent-hover: #149aa8; --range-accent-contrast: #062225;
+  --range-body-bg: #07141a; --range-card-bg: #0d2028; --range-nav-bg: #081a21;
+  --range-card-border: #1f5360; --range-muted-panel: #0a1a21;
+}
+
+[data-bs-theme="light"][data-theme="classic"] {
+  --range-body-bg: #eef2f6; --range-card-bg: #f8fafc; --range-nav-bg: #223142;
+  --range-card-border: #b9c4d0; --range-muted-panel: #e3e9f0;
+}
+[data-bs-theme="light"][data-theme="sew-gold"] {
+  --range-body-bg: #f3f0e8; --range-card-bg: #fbfaf5; --range-nav-bg: #322816;
+  --range-card-border: #d0b982; --range-muted-panel: #ebe2cc;
+}
+[data-bs-theme="light"][data-theme="night-ops"] {
+  --range-body-bg: #f1e9e6; --range-card-bg: #fbf7f5; --range-nav-bg: #351a15;
+  --range-card-border: #d2aaa0; --range-muted-panel: #eadad5;
+}
+[data-bs-theme="light"][data-theme="spectrum"] {
+  --range-body-bg: #e8f1f3; --range-card-bg: #f7fbfc; --range-nav-bg: #12313a;
+  --range-card-border: #9fc6cf; --range-muted-panel: #d9eaee;
 }
 
 /* Map the accent onto Bootstrap's primary surfaces */
@@ -300,6 +324,40 @@ code {
   --bs-link-hover-color: var(--range-accent-hover);
   --bs-link-color-rgb: var(--range-accent-rgb);
   --bs-focus-ring-color: rgba(var(--range-accent-rgb), .35);
+}
+html[data-bs-theme] {
+  --bs-body-bg: var(--range-body-bg);
+  --bs-tertiary-bg: var(--range-muted-panel);
+  --bs-border-color: var(--range-card-border);
+}
+[data-bs-theme="light"] {
+  --bs-body-color: #17202a;
+  --bs-secondary-color: rgba(42, 52, 64, 0.82);
+  --bs-tertiary-color: rgba(42, 52, 64, 0.62);
+}
+body {
+  background-color: var(--range-body-bg) !important;
+}
+.navbar {
+  background-color: var(--range-nav-bg) !important;
+}
+.card,
+.modal-content,
+.offcanvas {
+  --bs-card-bg: var(--range-card-bg);
+  --bs-card-border-color: var(--range-card-border);
+  background-color: var(--range-card-bg);
+  border-color: var(--range-card-border);
+}
+.card-header,
+.card-footer {
+  background-color: var(--range-muted-panel);
+  border-color: var(--range-card-border);
+}
+.dropdown-menu-dark {
+  --bs-dropdown-bg: var(--range-nav-bg);
+  --bs-dropdown-border-color: var(--range-card-border);
+  --bs-dropdown-link-active-bg: rgba(var(--range-accent-rgb), 0.24);
 }
 .btn-primary {
   --bs-btn-bg: var(--range-accent); --bs-btn-border-color: var(--range-accent);
@@ -323,10 +381,6 @@ code {
 .bg-primary { background-color: var(--range-accent) !important; color: var(--range-accent-contrast) !important; }
 .navbar .nav-link.active { color: var(--range-accent) !important; }
 .form-check-input:checked { background-color: var(--range-accent); border-color: var(--range-accent); }
-
-/* Distinct canvas tints for the darkened-room palettes (dark mode only) */
-[data-theme="night-ops"][data-bs-theme="dark"] body { background-color: #160a07 !important; }
-[data-theme="spectrum"][data-bs-theme="dark"] body { background-color: #07141a !important; }
 
 /* Theme swatch buttons on the Preferences page */
 .theme-swatch { width: 1.1rem; height: 1.1rem; border-radius: 50%; display: inline-block; vertical-align: -2px; margin-right: .35rem; border: 1px solid rgba(255,255,255,.35); }

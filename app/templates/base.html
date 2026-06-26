@@ -9,7 +9,7 @@
   <!-- Vendored locally so styling works on LAN devices with no internet access -->
   <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="/static/vendor/bootstrap-icons/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=10">
+  <link rel="stylesheet" href="/static/css/app.css?v=11">
   <link rel="icon" type="image/png" href="/static/img/sew-range-logo.png">
 </head>
 <body>
@@ -113,6 +113,19 @@
           <a class="nav-link {% if page == 'docs' %}active{% endif %}" href="/docs">
             <i class="bi bi-book me-1"></i>Docs
           </a>
+        </li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle {% if page in ['preferences', 'config'] %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-gear me-1"></i>Settings
+          </a>
+          <ul class="dropdown-menu dropdown-menu-dark">
+            <li><a class="dropdown-item" href="/preferences"><i class="bi bi-person-gear me-2"></i>Your Preferences</a></li>
+            <li><a class="dropdown-item" href="/account/password"><i class="bi bi-key me-2"></i>Password</a></li>
+            {% if user.role == 'supervisor' %}
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="/config"><i class="bi bi-sliders me-2"></i>Admin Config</a></li>
+            {% endif %}
+          </ul>
         </li>
         {% if user.role == 'supervisor' %}
         <li class="nav-item dropdown">

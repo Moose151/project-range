@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.9.4` (beta) · shown bottom-right in the UI and in `app/config.py`.
+**Current version:** `0.9.5` (beta) · shown bottom-right in the UI and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -17,7 +17,7 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.9.4)
+## ✅ Already delivered (through 0.9.5)
 
 Core of the MVP scope is in place:
 
@@ -33,6 +33,7 @@ Core of the MVP scope is in place:
 - Incident/fault reporting, hard-delete for logs, security hardening (CSRF, headers, throttle, forced PW change)
 - Serial pending/pre-create: serials can be saved as pending before starting
 - Log readability: signal log rows identify changed parameters and history lifecycle rows use calmer colours
+- Settings dropdown and more distinct light/dark theme palettes
 - **0.6.0:** TxLO/RxLO naming, version badge, fully offline (LAN) styling, Docker deploy on port 7474
 
 ---
@@ -79,6 +80,14 @@ Theme: make audit trails easier to scan under pressure.
 - [x] **Changed-parameter highlighting** — `/logs` and `/history/{serial_id}` compare each signal log against the previous entry for the same signal in the same serial. A new "Changed" column summarizes changed fields, and visible changed cells are subtly highlighted.
 - [x] **Calmer history lifecycle rows** — `SerialStart`, `SerialEnd`, and narrative note rows in serial history now use custom muted colours instead of the bright Bootstrap warning row.
 
+## 0.9.5 — Settings and theme polish ✅ (shipped 2026-06-26)
+
+Theme: quick operator-facing polish before the dashboard clock work.
+
+- [x] **Settings discoverability** — main navbar now has a visible Settings dropdown with Your Preferences, Password, and supervisor-only Admin Config. This covers the immediate "where do I change themes/units/config?" issue.
+- [x] **More distinct themes** — palette selection now changes body background, navbar, cards, borders, and muted panels as well as the accent colour. Light mode now uses softer backgrounds, darker body text, and stronger borders instead of stark Bootstrap white.
+- [x] **Login theme toggle polish** — login page sun/moon icon now syncs with the saved light/dark mode on load; CSS cache key bumped to `app.css?v=11`.
+
 ## 0.9.0 — Operational hardening ✅ (security + features shipped; infra deferred)
 
 Theme: ready to trust with real operations. *(Scope §13, Phase 4.)*
@@ -95,10 +104,10 @@ See the **Security hardening** section below for the security items shipped in 0
 
 Theme: discoverability and at-a-glance ops info. *(User-requested.)*
 
-- [ ] **Settings area** — a clear, discoverable **Settings** entry (nav item / gear menu) that consolidates configuration in one place:
+- [x] **Settings area** — a clear, discoverable **Settings** entry (nav item / gear menu) that consolidates configuration in one place:
   - **Per-user (Preferences):** theme + light/dark, default units, time zone (below). *(These live on the existing `/preferences` page today, reached only via the user's name in the navbar — surface it as "Settings".)*
   - **Admin (Config):** the supervisor-only `/config` page (modulation/FEC/sources/antennas/registry/freq templates).
-  - Likely a tabbed Settings page (Preferences | Admin) or a Settings dropdown grouping both, so "where do I change X?" is obvious.
+  - Shipped as a Settings dropdown grouping Preferences, Password, and supervisor Admin Config. A dedicated tabbed `/settings` page remains optional if more settings are added later.
 - [ ] **Dashboard clock widget** — a **Zulu (UTC) time** clock plus **local time**, where local time follows a **time-zone chosen in Settings** (IANA tz dropdown, stored per user like default units). Implement as a **dashboard widget that can be added and dragged/arranged like the serial widgets** (reuse the existing dashboard widget drag/merge/pop-out system). Updates live (client-side tick; Zulu always shown).
 
 ## 1.0.0 — Operational release

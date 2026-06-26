@@ -9,10 +9,11 @@
   <!-- Vendored locally so the login page styles on LAN devices with no internet -->
   <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="/static/vendor/bootstrap-icons/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=10">
+  <link rel="stylesheet" href="/static/css/app.css?v=11">
 </head>
 <body class="d-flex align-items-center justify-content-center min-vh-100 bg-body">
 <button type="button" class="btn btn-sm btn-outline-secondary position-fixed top-0 end-0 m-3"
+        id="loginThemeToggle"
         title="Toggle light / dark"
         onclick="(function(){var c=document.documentElement.getAttribute('data-bs-theme')||'dark';var n=c==='dark'?'light':'dark';document.documentElement.setAttribute('data-bs-theme',n);try{localStorage.setItem('rangeTheme',n);}catch(e){}this.querySelector('i').className=n==='dark'?'bi bi-moon-stars':'bi bi-sun-fill';}).call(this)">
   <i class="bi bi-moon-stars"></i>
@@ -70,5 +71,12 @@
 </div>
 <div class="app-version-badge" title="Application version">v{{ app_version }}</div>
 <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script>
+  (function(){
+    var t = document.documentElement.getAttribute('data-bs-theme') || 'dark';
+    var i = document.querySelector('#loginThemeToggle i');
+    if (i) i.className = t === 'dark' ? 'bi bi-moon-stars' : 'bi bi-sun-fill';
+  })();
+</script>
 </body>
 </html>
