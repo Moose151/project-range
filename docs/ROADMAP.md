@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.10.0` (beta) · shown bottom-right in the UI and in `app/config.py`.
+**Current version:** `0.10.1` (beta) · shown bottom-right in the UI and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -17,7 +17,7 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.10.0)
+## ✅ Already delivered (through 0.10.1)
 
 Core of the MVP scope is in place:
 
@@ -36,6 +36,7 @@ Core of the MVP scope is in place:
 - Settings dropdown and more distinct light/dark theme palettes
 - Dashboard Zulu/local clock widget; admin-managed local timezone; optional local-time log view
 - Device registry includes Antenna as a device type
+- SQLite backup script with documented backup/restore procedure
 - **0.6.0:** TxLO/RxLO naming, version badge, fully offline (LAN) styling, Docker deploy on port 7474
 
 ---
@@ -98,7 +99,7 @@ See the **Security hardening** section below for the security items shipped in 0
 - [x] **Soft / hard log delete** — soft delete (recoverable) for everyone; supervisor-only restore and permanent hard-delete (two-step: only on already soft-deleted entries). Audited. Scope §4.10.
 - [x] **Supervisor approval for going Live** — going Live requires a safety acknowledgment, and a supervisor must authorise (operators supply a supervisor's credentials = two-person). Approver recorded in the state log + audit. Scope §12.2.
 - [x] **Incident / fault reporting** — log incidents (severity/status/affected/serial), update status with resolution, CSV export, audited; new "Incidents" nav with open count. Scope §12.2.
-- [ ] **Backups** — scheduled DB backup/restore procedure (scripted). *(manual `docker compose cp` documented in DEPLOY.md for now.)*
+- [x] **Backups** — scripted SQLite backup and documented restore procedure shipped in 0.10.1. Schedule with cron or Windows Task Scheduler.
 - [~] **PostgreSQL option** — **deferred** (your call — no infra to stand up yet). Support Postgres via `DATABASE_URL` with a real migration tool (Alembic).
 - [~] **HTTPS/TLS** — **deferred** (your call). Reverse-proxy/self-signed setup for the range network. Session cookies are already `SameSite=Strict` + ready for `Secure` (`SESSION_HTTPS_ONLY=1`).
 
@@ -113,6 +114,14 @@ Theme: discoverability and at-a-glance ops info. *(User-requested.)*
 - [x] **Dashboard clock widget** — a **Zulu (UTC) time** clock plus **local time**, where local time follows a supervisor-set global IANA timezone under `/config` → System. Implemented as a dashboard widget that can be reordered, collapsed, hidden, and re-shown; updates live client-side and persists layout in localStorage.
 - [x] **Zulu-first logs with optional local time** — `/logs` and `/history/{serial_id}` always show Zulu timestamps (`Z` suffix). A "Show local time" checkbox adds a local-time line using the configured timezone. CSV/XLSX exports label timestamps as `Timestamp (Zulu)`.
 - [x] **Antenna device type** — "Antenna" added to the Devices registry type dropdown and topology renderer.
+
+## 0.10.1 — Backup script ✅ (shipped 2026-06-26)
+
+Theme: close an operational release gap with a simple, schedulable backup path.
+
+- [x] **SQLite backup script** — `scripts/backup_db.py` copies `/app/data/range.db` out of the Docker Compose `web` service into `./backups/range-<UTC>.db`.
+- [x] **Retention option** — `--keep N` prunes older backup files, making it suitable for cron or Windows Task Scheduler.
+- [x] **Restore documentation** — `docs/DEPLOY.md` now documents stop/copy/start restore steps and backup access-control warning.
 
 ## 1.0.0 — Operational release
 

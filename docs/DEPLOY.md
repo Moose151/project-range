@@ -54,9 +54,32 @@ docker compose down -v                  # ALSO deletes the database volume
 The SQLite file lives in the `range-data` volume at `/app/data/range.db`:
 
 ```bash
-# Copy the DB out of the running container
-docker compose cp web:/app/data/range.db ./range-backup.db
+# One-off backup into ./backups/range-<UTC timestamp>.db
+python scripts/backup_db.py
+
+# Keep only the newest 14 backups
+python scripts/backup_db.py --keep 14
 ```
+
+Schedule that command with cron or Windows Task Scheduler from the repository
+directory. The script uses `docker compose cp`, so the app can keep using the
+named Docker volume.
+
+Restore procedure:
+
+```bash
+# Stop the app before replacing the SQLite file
+docker compose stop web
+
+# Copy a known-good backup back into the container/volume
+docker compose cp ./backups/range-YYYYMMDD-HHMMSSZ.db web:/app/data/range.db
+
+# Start the app; init_db.py will run its idempotent migrations
+docker compose start web
+```
+
+Keep backups access-controlled. They contain the operational log, audit history,
+users, and password hashes.
 
 ## Configuration
 
