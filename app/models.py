@@ -164,6 +164,7 @@ class Serial(Base):
         "SerialPackage", back_populates="serial", cascade="all, delete-orphan",
     )
     signal_logs: Mapped[list["SignalLog"]] = relationship("SignalLog", back_populates="serial")
+    cda_links: Mapped[list["SerialCDATable"]] = relationship("SerialCDATable", back_populates="serial", cascade="all, delete-orphan")
 
     @property
     def display_title(self) -> str:
@@ -452,6 +453,69 @@ class DeviceLink(Base):
 
     from_device: Mapped["RFDevice"] = relationship("RFDevice", foreign_keys=[from_device_id])
     to_device: Mapped["RFDevice"] = relationship("RFDevice", foreign_keys=[to_device_id])
+
+
+# ── CDA (Controlled Data Area) Windows ───────────────────────────────────────
+
+class CDATable(Base):
+    """A named schedule of CDA time windows (daily, Zulu). Can be assigned to many serials."""
+    __tablename__ = "cda_tables"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    created_by: Mapped["User"] = relationship("User", foreign_keys=[created_by_id])
+    windows: Mapped[list["CDAWindow"]] = relationship(
+        "CDAWindow", back_populates="cda_table",
+        cascade="all, delete-orphan",
+        order_by="CDAWindow.start_zulu",
+    )
+    serial_links: Mapped[list["SerialCDATable"]] = relationship("SerialCDATable", back_populates="cda_table")
+
+
+class CDAWindow(Base):
+    """A single time window within a CDA table.
+
+    start_zulu / end_zulu are stored as 'HH:MM' strings (always Zulu).
+    max_power_dbm == None  → no-fire window (transmit prohibited).
+    max_power_dbm == value → reduced-power window (max transmit power limit).
+    """
+    __tablename__ = "cda_windows"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    cda_table_id: Mapped[int] = mapped_column(ForeignKey("cda_tables.id"), nullable=False, index=True)
+    label: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    start_zulu: Mapped[str] = mapped_column(String(5), nullable=False)   # 'HH:MM'
+    end_zulu: Mapped[str] = mapped_column(String(5), nullable=False)     # 'HH:MM'
+    max_power_dbm: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    cda_table: Mapped["CDATable"] = relationship("CDATable", back_populates="windows")
+
+    @property
+    def window_type(self) -> str:
+        return "reduced_power" if self.max_power_dbm is not None else "no_fire"
+
+    @property
+    def window_type_label(self) -> str:
+        if self.max_power_dbm is not None:
+            return f"Reduced Power (max {self.max_power_dbm:.1f} dBm)"
+        return "No Fire"
+
+
+class SerialCDATable(Base):
+    """Junction: a CDA table assigned to a serial."""
+    __tablename__ = "serial_cda_tables"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    serial_id: Mapped[int] = mapped_column(ForeignKey("serials.id"), nullable=False, index=True)
+    cda_table_id: Mapped[int] = mapped_column(ForeignKey("cda_tables.id"), nullable=False)
+    assigned_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    serial: Mapped["Serial"] = relationship("Serial", back_populates="cda_links")
+    cda_table: Mapped["CDATable"] = relationship("CDATable", back_populates="serial_links")
 
 
 class Incident(Base):

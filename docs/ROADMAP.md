@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.11.0` (beta) · shown bottom-right in the UI and in `app/config.py`.
+**Current version:** `0.12.0` (beta) · shown bottom-right in the UI and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -123,6 +123,18 @@ Theme: close an operational release gap with a simple, schedulable backup path.
 - [x] **SQLite backup script** — `scripts/backup_db.py` copies `/app/data/range.db` out of the Docker Compose `web` service into `./backups/range-<UTC>.db`.
 - [x] **Retention option** — `--keep N` prunes older backup files, making it suitable for cron or Windows Task Scheduler.
 - [x] **Restore documentation** — `docs/DEPLOY.md` now documents stop/copy/start restore steps and backup access-control warning.
+
+## 0.12.0 — CDA Windows ✅ (shipped 2026-06-29)
+
+Theme: controlled data area time-window management and live dashboard countdown.
+
+- [x] **CDA Tables** — supervisor-managed named schedules of daily CDA time windows (Zulu). Each table holds any number of windows with a start time, end time, optional label, and optional max power (dBm). Audited CRUD at `/cda`.
+- [x] **Window types** — blank max-power = **No Fire** (transmit prohibited); a max-power value = **Reduced Power** limit. Both types displayed with colour-coded badges.
+- [x] **Serial assignment** — CDA tables are assigned to serials (many-to-many). Assignment/removal is visible on the Serials page and audited.
+- [x] **Dashboard CDA widget** — appears automatically when any active serial has CDA tables assigned. Shows a window schedule table and a live per-table countdown timer updated every second.
+- [x] **Colour-coded countdown** — green (>10 min), yellow (5–10 min), orange (2–5 min), red (<2 min). When **inside** a window the card switches to a red danger style and counts down the remaining window time. After the window the timer switches to the next upcoming window.
+- [x] **Midnight-spanning windows** and day-wrap (last window of the day → first window tomorrow) handled correctly.
+- [x] **CDA widget persistence** — hidden state persisted in `localStorage`; the widget can be shown/hidden from the Widgets dropdown or via the hide button on the widget header.
 
 ## 0.11.0 — Dashboard utility widgets ✅ (shipped 2026-06-26)
 

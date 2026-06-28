@@ -11,7 +11,7 @@ from app.config import (
 from app.templating import templates
 from app.routers import (
     auth, dashboard, calculator, logs, range_state, users, config, audit, sessions,
-    packages, serials, history, docs, handover, preferences, devices, account, incidents,
+    packages, serials, history, docs, handover, preferences, devices, account, incidents, cda,
 )
 
 app = FastAPI(title="SEW Range", version=APP_VERSION, docs_url=None, redoc_url=None)
@@ -73,6 +73,7 @@ app.include_router(preferences.router)
 app.include_router(devices.router)
 app.include_router(account.router)
 app.include_router(incidents.router)
+app.include_router(cda.router)
 
 
 @app.exception_handler(302)

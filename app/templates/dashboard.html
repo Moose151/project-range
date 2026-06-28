@@ -17,6 +17,10 @@
         <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('notes')"><i class="bi bi-pencil-square me-2"></i>Add Quick Notes</button></li>
         <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('doc')"><i class="bi bi-file-earmark-text me-2"></i>Add Doc Reference</button></li>
         <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('links')"><i class="bi bi-lightning me-2"></i>Add Quick Links</button></li>
+        {% if cda_by_serial %}
+        <li><hr class="dropdown-divider"></li>
+        <li><button type="button" class="dropdown-item" onclick="showCDAWidget()"><i class="bi bi-shield-exclamation me-2"></i>Show CDA Timer</button></li>
+        {% endif %}
       </ul>
     </div>
     <div class="dropdown">
@@ -105,6 +109,105 @@
       </div>
     </div>
   </div>
+  <!-- CDA widget — shown when any active serial has CDA tables assigned -->
+  {% if cda_by_serial %}
+  <div class="serial-widget-group cda-widget-group"
+       data-group-id="group-cda"
+       data-serial-ids="cda"
+       data-active-tab="cda">
+    <div class="serial-widget card border-warning" data-widget-kind="cda">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-grip-vertical text-muted widget-drag-handle" style="cursor:grab"
+           title="Drag to reorder widgets"></i>
+        <div class="fw-semibold d-flex align-items-center gap-2">
+          <i class="bi bi-shield-exclamation text-warning"></i>
+          <span>CDA Windows</span>
+        </div>
+        <div class="serial-group-controls d-flex gap-1 align-items-center"></div>
+        <div class="serial-actions ms-auto d-flex gap-1 align-items-center"></div>
+        <button type="button" class="widget-collapse-btn btn btn-sm btn-link link-secondary p-0 ms-1"
+                title="Minimise / expand" onclick="toggleCollapse(this)"><i class="bi bi-chevron-up"></i></button>
+      </div>
+      <div class="serial-bodies">
+        <div class="serial-body-wrap" data-serial-body="cda" data-serial-title="CDA Windows">
+          <div class="serial-actions-store d-none">
+            <a href="/cda" class="btn btn-sm btn-outline-warning py-0 px-2" title="Manage CDA tables">
+              <i class="bi bi-gear"></i>
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                    title="Hide CDA widget" onclick="hideCDAWidget()">
+              <i class="bi bi-eye-slash"></i>
+            </button>
+          </div>
+          <div class="card-body p-0">
+            <!-- Pass CDA data as JSON for client-side timer -->
+            <script id="cdaDataJson" type="application/json">{{ cda_by_serial | tojson }}</script>
+            <div id="cdaWidgetBody">
+              {% for serial_id, tables in cda_by_serial.items() %}
+              {% for t in tables %}
+              {% if t.windows %}
+              <div class="p-3 border-bottom">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                  <span class="fw-semibold small"><i class="bi bi-shield-exclamation me-1 text-warning"></i>{{ t.table_name }}</span>
+                  <span class="text-muted small">{{ t.windows | length }} window{{ 's' if t.windows | length != 1 else '' }}</span>
+                </div>
+                <!-- Window table -->
+                <table class="table table-sm table-borderless mb-2" style="font-size:0.82rem">
+                  <thead class="table-secondary">
+                    <tr>
+                      <th class="py-1">Start (Z)</th>
+                      <th class="py-1">End (Z)</th>
+                      <th class="py-1">Label</th>
+                      <th class="py-1">Type</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for w in t.windows %}
+                    <tr data-cda-window data-start="{{ w.start }}" data-end="{{ w.end }}">
+                      <td class="font-monospace py-1">{{ w.start }}</td>
+                      <td class="font-monospace py-1">{{ w.end }}</td>
+                      <td class="text-muted py-1">{{ w.label or '—' }}</td>
+                      <td class="py-1">
+                        {% if w.max_power_dbm is not none %}
+                        <span class="badge bg-warning text-dark" style="font-size:0.7rem">
+                          ≤{{ w.max_power_dbm }} dBm
+                        </span>
+                        {% else %}
+                        <span class="badge bg-danger" style="font-size:0.7rem">No Fire</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                <!-- Live countdown timer for this table -->
+                <div class="cda-timer-block" data-table-id="{{ t.table_id }}"
+                     data-windows='{{ t.windows | tojson | e }}'>
+                  <div class="d-flex align-items-center gap-3 p-2 rounded"
+                       id="cdaTimerCard-{{ t.table_id }}"
+                       style="background:rgba(var(--bs-warning-rgb),0.08);border:1px solid rgba(var(--bs-warning-rgb),0.25)">
+                    <div>
+                      <div class="text-muted" style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.05em" id="cdaTimerLabel-{{ t.table_id }}">Next CDA</div>
+                      <div class="fw-bold font-monospace" id="cdaTimerName-{{ t.table_id }}" style="font-size:0.8rem"></div>
+                    </div>
+                    <div class="ms-auto text-end">
+                      <div class="fw-bold font-monospace" id="cdaTimerCountdown-{{ t.table_id }}" style="font-size:1.5rem">--:--:--</div>
+                      <div class="text-muted" style="font-size:0.7rem" id="cdaTimerNext-{{ t.table_id }}"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {% endif %}
+              {% endfor %}
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   {% for sd in serial_data %}
   {% set serial = sd.serial %}
   {% set w_signals = sd.signals %}
@@ -632,6 +735,174 @@ function toggleCollapse(btn) {
   saveLayout();
 }
 
+// ── CDA Widget show/hide ──────────────────────────────────────────────────
+const CDA_WIDGET_HIDDEN_KEY = 'dashboardCDAWidgetHidden';
+
+function setCDAWidgetHidden(hidden) {
+  const group = document.querySelector('.cda-widget-group');
+  if (group) group.style.display = hidden ? 'none' : '';
+  try { localStorage.setItem(CDA_WIDGET_HIDDEN_KEY, hidden ? '1' : '0'); } catch (e) {}
+}
+function hideCDAWidget() { setCDAWidgetHidden(true); saveLayout(); }
+function showCDAWidget() { setCDAWidgetHidden(false); saveLayout(); }
+function restoreCDAWidgetVisibility() {
+  let hidden = false;
+  try { hidden = localStorage.getItem(CDA_WIDGET_HIDDEN_KEY) === '1'; } catch (e) {}
+  setCDAWidgetHidden(hidden);
+}
+
+// ── CDA Countdown Timer ──────────────────────────────────────────────────────
+// Windows are stored as [{start:"HH:MM", end:"HH:MM", type:"no_fire"|"reduced_power",
+//   type_label:"...", label:"...", max_power_dbm: null|number}]
+// All times are Zulu. Windows repeat daily. Midnight-spanning windows supported.
+
+function cdaTimeToMinutes(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+function cdaFmtHms(totalSeconds) {
+  if (totalSeconds < 0) totalSeconds = 0;
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = Math.floor(totalSeconds % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function updateCDATimers() {
+  document.querySelectorAll('.cda-timer-block').forEach(block => {
+    const tableId = block.dataset.tableId;
+    let windows;
+    try { windows = JSON.parse(block.dataset.windows); } catch (e) { return; }
+    if (!windows || !windows.length) return;
+
+    const countdownEl = document.getElementById('cdaTimerCountdown-' + tableId);
+    const labelEl = document.getElementById('cdaTimerLabel-' + tableId);
+    const nameEl = document.getElementById('cdaTimerName-' + tableId);
+    const nextEl = document.getElementById('cdaTimerNext-' + tableId);
+    const card = document.getElementById('cdaTimerCard-' + tableId);
+    if (!countdownEl) return;
+
+    const now = new Date();
+    const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+    const nowSeconds = nowMinutes * 60 + now.getUTCSeconds();
+
+    // Convert each window to {startMin, endMin, ...w} — handle midnight-wrap
+    const wins = windows.map(w => ({
+      ...w,
+      startMin: cdaTimeToMinutes(w.start),
+      endMin: cdaTimeToMinutes(w.end),
+    }));
+
+    // Check if currently inside a window
+    let activeWin = null;
+    for (const w of wins) {
+      const startSec = w.startMin * 60;
+      const endSec = w.endMin * 60;
+      if (w.endMin <= w.startMin) {
+        // Midnight-spanning: active if past start OR before end
+        if (nowSeconds >= startSec || nowSeconds < endSec) { activeWin = w; break; }
+      } else {
+        if (nowSeconds >= startSec && nowSeconds < endSec) { activeWin = w; break; }
+      }
+    }
+
+    if (activeWin) {
+      // In a CDA window — count down to end
+      const endSec = activeWin.endMin * 60;
+      let remainSec;
+      if (activeWin.endMin <= activeWin.startMin) {
+        // midnight-wrap
+        remainSec = endSec > nowSeconds ? endSec - nowSeconds : (86400 - nowSeconds) + endSec;
+      } else {
+        remainSec = endSec - nowSeconds;
+      }
+      const winName = activeWin.label
+        ? `${activeWin.start}–${activeWin.end} (${activeWin.label})`
+        : `${activeWin.start}–${activeWin.end}`;
+      const typeShort = activeWin.type === 'no_fire' ? 'NO FIRE' : `≤${activeWin.max_power_dbm} dBm`;
+      labelEl.textContent = `⚠ IN CDA [${typeShort}]`;
+      nameEl.textContent = winName;
+      countdownEl.textContent = cdaFmtHms(remainSec);
+      nextEl.textContent = 'Window ends';
+      // Style: danger
+      card.style.background = 'rgba(var(--bs-danger-rgb),0.15)';
+      card.style.border = '2px solid rgba(var(--bs-danger-rgb),0.7)';
+      countdownEl.style.color = 'var(--bs-danger)';
+      labelEl.style.color = 'var(--bs-danger)';
+      return;
+    }
+
+    // Not in a window — find the next upcoming window
+    // Sort by start time (today + tomorrow)
+    const SECS_IN_DAY = 86400;
+    let nextWin = null;
+    let secsUntilNext = Infinity;
+
+    for (const w of wins) {
+      const startSec = w.startMin * 60;
+      let diff;
+      if (startSec > nowSeconds) {
+        diff = startSec - nowSeconds;
+      } else {
+        // Window already started today (and isn't the active one), look for tomorrow
+        diff = (SECS_IN_DAY - nowSeconds) + startSec;
+      }
+      if (diff < secsUntilNext) {
+        secsUntilNext = diff;
+        nextWin = w;
+      }
+    }
+
+    if (!nextWin) {
+      countdownEl.textContent = '--:--:--';
+      labelEl.textContent = 'No CDA windows';
+      nameEl.textContent = '';
+      nextEl.textContent = '';
+      card.style.background = '';
+      card.style.border = '';
+      countdownEl.style.color = '';
+      labelEl.style.color = '';
+      return;
+    }
+
+    const winName = nextWin.label
+      ? `${nextWin.start}–${nextWin.end} (${nextWin.label})`
+      : `${nextWin.start}–${nextWin.end}`;
+    const typeShort = nextWin.type === 'no_fire' ? 'No Fire' : `Reduced Power ≤${nextWin.max_power_dbm} dBm`;
+
+    labelEl.textContent = 'Next CDA';
+    nameEl.textContent = `${winName} [${typeShort}]`;
+    countdownEl.textContent = cdaFmtHms(secsUntilNext);
+    nextEl.textContent = secsUntilNext >= 86400 ? 'Tomorrow' : 'Today';
+
+    // Colour-code the countdown
+    const minsUntil = secsUntilNext / 60;
+    let countdownColor, cardBg, cardBorder;
+    if (minsUntil < 2) {
+      countdownColor = 'var(--bs-danger)';
+      cardBg = 'rgba(var(--bs-danger-rgb),0.12)';
+      cardBorder = '1px solid rgba(var(--bs-danger-rgb),0.5)';
+    } else if (minsUntil < 5) {
+      countdownColor = 'var(--bs-warning)';
+      cardBg = 'rgba(var(--bs-warning-rgb),0.12)';
+      cardBorder = '1px solid rgba(var(--bs-warning-rgb),0.5)';
+    } else if (minsUntil < 10) {
+      countdownColor = 'var(--bs-warning)';
+      cardBg = 'rgba(var(--bs-warning-rgb),0.08)';
+      cardBorder = '1px solid rgba(var(--bs-warning-rgb),0.3)';
+    } else {
+      countdownColor = 'var(--bs-success)';
+      cardBg = 'rgba(var(--bs-success-rgb),0.08)';
+      cardBorder = '1px solid rgba(var(--bs-success-rgb),0.25)';
+    }
+    card.style.background = cardBg;
+    card.style.border = cardBorder;
+    countdownEl.style.color = countdownColor;
+    labelEl.style.color = minsUntil < 5 ? countdownColor : '';
+  });
+}
+
 // ── Restore saved layout on page load ────────────────────────────────────
 // Container background is the "split out" drop target (group drops stopPropagation).
 (function () {
@@ -651,12 +922,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.serial-widget-group').forEach(g => { registerGroupDnD(g); initGroup(g); });
   restoreLayout();
   restoreClockVisibility();
+  restoreCDAWidgetVisibility();
   refreshAllControls();
   buildColumnMenu();
   applyColumnVisibility();
   updateClockWidget();
   updateUtilityClocks();
-  setInterval(() => { updateClockWidget(); updateUtilityClocks(); }, 1000);
+  updateCDATimers();
+  setInterval(() => { updateClockWidget(); updateUtilityClocks(); updateCDATimers(); }, 1000);
 });
 
 function restoreLayout() {

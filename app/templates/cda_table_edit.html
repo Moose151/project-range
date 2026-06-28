@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}CDA — {{ table.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <a href="/cda" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>CDA Tables</a>
+  <h4 class="mb-0 ms-1"><i class="bi bi-shield-exclamation me-2"></i>{{ table.name }}</h4>
+</div>
+
+{% if toast %}
+<div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
+
+<div class="row g-3">
+
+  <!-- Windows list -->
+  <div class="col-lg-7">
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-clock-history me-1"></i>
+        <span class="fw-semibold">CDA Windows</span>
+        <span class="badge bg-secondary ms-1">{{ table.windows | length }}</span>
+        <span class="text-muted small ms-2">All times Zulu (UTC)</span>
+      </div>
+      {% if table.windows %}
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+          <thead class="table-secondary">
+            <tr>
+              <th>Start (Z)</th>
+              <th>End (Z)</th>
+              <th>Label</th>
+              <th>Type</th>
+              {% if user.role == 'supervisor' %}<th></th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for w in table.windows %}
+            <tr>
+              <td class="fw-semibold font-monospace">{{ w.start_zulu }}</td>
+              <td class="fw-semibold font-monospace">{{ w.end_zulu }}</td>
+              <td class="text-muted small">{{ w.label or '—' }}</td>
+              <td>
+                {% if w.max_power_dbm is not none %}
+                <span class="badge bg-warning text-dark">
+                  <i class="bi bi-lightning-charge me-1"></i>Reduced Power ≤{{ w.max_power_dbm }} dBm
+                </span>
+                {% else %}
+                <span class="badge bg-danger">
+                  <i class="bi bi-slash-circle me-1"></i>No Fire
+                </span>
+                {% endif %}
+              </td>
+              {% if user.role == 'supervisor' %}
+              <td class="text-end">
+                <form method="post" action="/cda/{{ table.id }}/windows/{{ w.id }}/delete"
+                      onsubmit="return confirm('Delete window {{ w.start_zulu }}–{{ w.end_zulu }}?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-muted fst-italic small">No windows added yet.</div>
+      {% endif %}
+    </div>
+
+    <!-- Assigned serials -->
+    <div class="card">
+      <div class="card-header"><i class="bi bi-collection-play me-1"></i>Assigned to Active Serials</div>
+      {% if assigned_serials %}
+      <ul class="list-group list-group-flush">
+        {% for serial in assigned_serials %}
+        <li class="list-group-item d-flex align-items-center gap-2">
+          <i class="bi bi-play-circle text-success"></i>
+          <span>{{ serial.title }}</span>
+          <span class="text-muted small ms-auto">Started {{ serial.opened_at.strftime('%d/%m/%y %H:%M') }}Z</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body text-muted fst-italic small">Not currently assigned to any active serial.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Right column: add window + edit/delete table -->
+  <div class="col-lg-5">
+    {% if user.role == 'supervisor' %}
+    <!-- Add window form -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-plus-circle me-1"></i>Add CDA Window</div>
+      <div class="card-body">
+        <form method="post" action="/cda/{{ table.id }}/windows/add">
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label small fw-semibold mb-1">Start (Zulu HH:MM) <span class="text-danger">*</span></label>
+              <input type="time" name="start_zulu" class="form-control form-control-sm" required
+                     placeholder="17:45" pattern="[0-2][0-9]:[0-5][0-9]">
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-semibold mb-1">End (Zulu HH:MM) <span class="text-danger">*</span></label>
+              <input type="time" name="end_zulu" class="form-control form-control-sm" required
+                     placeholder="17:55" pattern="[0-2][0-9]:[0-5][0-9]">
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1">Label <span class="text-muted fw-normal">(optional)</span></label>
+            <input type="text" name="label" class="form-control form-control-sm"
+                   placeholder="e.g. Morning pass, Midday window">
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold mb-1">
+              Max power (dBm) <span class="text-muted fw-normal">— leave blank for No Fire</span>
+            </label>
+            <input type="number" name="max_power_dbm" class="form-control form-control-sm"
+                   step="0.1" placeholder="e.g. 10.0 (blank = no fire)">
+            <div class="form-text text-muted small">
+              Blank = no-fire window. Enter a value to set a reduced-power limit instead.
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm w-100">
+            <i class="bi bi-plus-lg me-1"></i>Add Window
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Edit table name/description -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-pencil me-1"></i>Edit Table Details</div>
+      <div class="card-body">
+        <form method="post" action="/cda/{{ table.id }}/edit">
+          <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1">Name</label>
+            <input type="text" name="name" class="form-control form-control-sm"
+                   value="{{ table.name }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold mb-1">Description</label>
+            <input type="text" name="description" class="form-control form-control-sm"
+                   value="{{ table.description or '' }}">
+          </div>
+          <button type="submit" class="btn btn-outline-secondary btn-sm w-100">
+            <i class="bi bi-check2 me-1"></i>Save Changes
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete table -->
+    <div class="card border-danger">
+      <div class="card-body py-2 d-flex align-items-center gap-3">
+        <span class="text-muted small">Permanently delete this CDA table and all its windows.</span>
+        <form method="post" action="/cda/{{ table.id }}/delete" class="ms-auto"
+              onsubmit="return confirm('Delete CDA table {{ table.name | e }} and all its windows? This cannot be undone.')">
+          <button type="submit" class="btn btn-sm btn-outline-danger">
+            <i class="bi bi-trash me-1"></i>Delete Table
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

@@ -88,6 +88,41 @@
           </button>
         </form>
         {% endif %}
+
+        <!-- CDA table assignments -->
+        <div class="mt-3">
+          <div class="small text-muted mb-1"><i class="bi bi-shield-exclamation me-1"></i>CDA Tables:</div>
+          {% if serial.cda_links %}
+          <div class="d-flex flex-wrap gap-1 mb-1">
+            {% for link in serial.cda_links %}
+            <span class="badge bg-warning text-dark d-flex align-items-center gap-1">
+              <i class="bi bi-shield-exclamation"></i>{{ link.cda_table.name }}
+              <form method="post" action="/serials/{{ serial.id }}/cda/{{ link.cda_table_id }}/remove"
+                    class="d-inline ms-1" onsubmit="return confirm('Remove CDA table {{ link.cda_table.name | e }}?')">
+                <button type="submit" class="btn btn-sm p-0 border-0 bg-transparent text-dark lh-1"
+                        title="Remove CDA table" style="font-size:0.7rem">✕</button>
+              </form>
+            </span>
+            {% endfor %}
+          </div>
+          {% else %}
+          <span class="text-muted small fst-italic">None assigned</span>
+          {% endif %}
+          {% if cda_tables %}
+          <form method="post" action="/serials/{{ serial.id }}/cda/assign" class="d-flex gap-2 mt-1">
+            <select class="form-select form-select-sm" name="cda_table_id">
+              {% for ct in cda_tables %}
+              <option value="{{ ct.id }}">{{ ct.name }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-outline-warning text-nowrap">
+              <i class="bi bi-shield-exclamation me-1"></i>Assign CDA
+            </button>
+          </form>
+          {% else %}
+          <div class="text-muted small"><a href="/cda" class="text-muted">Create a CDA table</a> to assign one.</div>
+          {% endif %}
+        </div>
       </div>
       <div class="card-footer d-flex gap-2 py-2">
         <a href="/" class="btn btn-sm btn-outline-primary">

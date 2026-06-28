@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials
-from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage
+from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage, SerialCDATable, CDAWindow
 from app.rf_config import serial_package_rf_config
 from app.signal_warnings import warning_flags_for
 from app.settings import get_local_timezone
@@ -142,6 +142,34 @@ def _dashboard_ctx(db: Session) -> dict:
         all_buzzer = _buzzer_active(signals, range_state)
         serial_data = [{"serial": None, "signals": signals, "buzzer_active": all_buzzer}]
 
+    # CDA data: map serial_id → list of {table_name, windows: [{start, end, label, max_power_dbm}]}
+    cda_by_serial: dict[int, list] = {}
+    for serial in active_serials:
+        links = db.query(SerialCDATable).filter(SerialCDATable.serial_id == serial.id).all()
+        tables = []
+        for link in links:
+            windows = db.query(CDAWindow).filter(
+                CDAWindow.cda_table_id == link.cda_table_id
+            ).order_by(CDAWindow.start_zulu).all()
+            tables.append({
+                "table_id": link.cda_table_id,
+                "table_name": link.cda_table.name,
+                "windows": [
+                    {
+                        "id": w.id,
+                        "start": w.start_zulu,
+                        "end": w.end_zulu,
+                        "label": w.label or "",
+                        "max_power_dbm": w.max_power_dbm,
+                        "type": "reduced_power" if w.max_power_dbm is not None else "no_fire",
+                        "type_label": w.window_type_label,
+                    }
+                    for w in windows
+                ],
+            })
+        if tables:
+            cda_by_serial[serial.id] = tables
+
     global_signals = [s for sd in serial_data for s in sd["signals"]]
     return {
         "serial_data": serial_data,
@@ -161,6 +189,7 @@ def _dashboard_ctx(db: Session) -> dict:
         "last_state_change": last_state_change,
         "exclusivity_map": exclusivity_map,
         "local_timezone": get_local_timezone(db),
+        "cda_by_serial": cda_by_serial,
     }
 
 

@@ -8,6 +8,7 @@ from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials
 from app.models import (
     User, Serial, SerialPackage, SignalPackage, SignalLog, AuditLog,
+    CDATable, SerialCDATable,
 )
 from app.rf_config import serial_package_rf_config
 
@@ -28,12 +29,14 @@ async def serials_list(
         Serial.closed_at == None, Serial.is_started == False,
     ).order_by(Serial.opened_at.desc()).all()
     packages = db.query(SignalPackage).order_by(SignalPackage.name).all()
+    cda_tables = db.query(CDATable).order_by(CDATable.name).all()
     return templates.TemplateResponse(request, "serials.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
         "active_serials": active,
         "pending_serials": pending,
         "packages": packages,
+        "cda_tables": cda_tables,
         "toast": request.query_params.get("toast", ""),
         "page": "serials",
     })
@@ -238,6 +241,53 @@ async def serial_add_package(
             db.commit()
     return RedirectResponse(f"/serials?toast=Package+added+to+serial", status_code=302)
 
+
+
+@router.post("/{serial_id}/cda/assign")
+async def serial_assign_cda(
+    serial_id: int,
+    cda_table_id: int = Form(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    serial = db.query(Serial).filter(Serial.id == serial_id).first()
+    cda_table = db.query(CDATable).filter(CDATable.id == cda_table_id).first()
+    if serial and cda_table:
+        existing = db.query(SerialCDATable).filter(
+            SerialCDATable.serial_id == serial_id,
+            SerialCDATable.cda_table_id == cda_table_id,
+        ).first()
+        if not existing:
+            db.add(SerialCDATable(serial_id=serial_id, cda_table_id=cda_table_id))
+            db.add(AuditLog(
+                user_id=current_user.id, action_type="SERIAL_CDA_ASSIGN",
+                entity_type="Serial", entity_id=serial_id,
+                new_value=f"Assigned CDA table: {cda_table.name}",
+            ))
+            db.commit()
+    return RedirectResponse(f"/serials?toast=CDA+table+assigned", status_code=302)
+
+
+@router.post("/{serial_id}/cda/{cda_table_id}/remove")
+async def serial_remove_cda(
+    serial_id: int,
+    cda_table_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    link = db.query(SerialCDATable).filter(
+        SerialCDATable.serial_id == serial_id,
+        SerialCDATable.cda_table_id == cda_table_id,
+    ).first()
+    if link:
+        db.add(AuditLog(
+            user_id=current_user.id, action_type="SERIAL_CDA_REMOVE",
+            entity_type="Serial", entity_id=serial_id,
+            new_value=f"Removed CDA table id={cda_table_id}",
+        ))
+        db.delete(link)
+        db.commit()
+    return RedirectResponse(f"/serials?toast=CDA+table+removed", status_code=302)
 
 
 @router.get("/{serial_id}/rf-config")
