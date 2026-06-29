@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.17.5` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.17.6` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -141,6 +141,13 @@
   - CBM imports create package signals using the filename as the signal name and read only the useful Project Range fields: `TXIF_FRQ`, `RXIF_FRQ`, `TXIF_LVL`, `TX_MOD`/`RX_MOD`, `TX_SR`/`RX_SR`, `TX_CODE`/`RX_CODE`, and `CFG_NAME`. Other modem-only fields are ignored except TX/RX/ITA operation values are copied into notes.
   - Signal package export now emits CBM-style modem config files. A one-signal package exports a `.txt`; multi-signal packages export a `.zip` with one modem config text file per signal plus a `project_range_package.json` compatibility snapshot.
   - Local sample modem config exports live under `modem_configs/` and are intentionally gitignored. Do not commit real modem config exports unless explicitly cleared.
+- **0.17.6 — Chat duty-role labels + live shared state refresh:**
+  - Chat roster and group creator now show only the user's selected duty-role tag, not their account permission role. If no duty role is selected, no role badge is shown.
+  - Private chat window headers now show the other user's duty-role tag beside their display name.
+  - Range-state banners now poll `/range-state/status` every 5 seconds and update in-place for every logged-in browser. Users get a toast when another operator/admin changes state.
+  - Dashboard signal tables now auto-refresh every 5 seconds instead of 10 and also refresh immediately when the global range-state poll detects a state change. HTMX still pauses dashboard polling while a signal quick-edit row is open or staged, to avoid overwriting an operator mid-edit.
+  - Testing transitions still trigger a controlled page reload after the toast so users move into/out of the correct Testing workspace data scope automatically.
+  - Static cache keys bumped to `app.css?v=19` / `app.js?v=19`.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.
@@ -154,9 +161,19 @@
    - map real firmware statuses to Project Range states (`Up`, `Down`, `Configured`, `Standby`) and confirm whether `TX_OP=OFF` should always mean Down;
    - test `Sync Active CBMs` on a non-operational serial/package first;
    - only after proving the above, decide whether to add background polling and at what interval.
-5. **Instant chat browser QA** — open two or more logged-in users/sessions and test: presence list updates, double-click private chat, group chat creation, send/receive, minimised-window alert, unread launcher badge, dashboard chat widget, page-change notification replay, logout/age-out behaviour, and mobile bottom-right layout. Decide later whether persistent DB chat history/audit is desired; current implementation is in-memory per app process plus browser `sessionStorage` read/unread tracking.
-6. **Testing-state browser QA** — with at least one administrator and one user, test changing into/out of Testing, non-administrator state lock while Testing, creating/editing packages/serials/logs/devices/CDA/incidents/CEASE in Testing, then returning to normal states and confirming those Testing rows are hidden. Re-enter Testing and confirm they return.
-7. **Dashboard Engaged column browser QA** — with an active serial, toggle Engaged on/off from the dashboard and confirm it saves immediately without using Submit All Changes, survives the 10-second dashboard refresh, appears/disappears through the Columns menu, and remains set after a status/power update or CBM sync update.
+5. **Future: full CBM integration complete** — desired end state is live automatic modem-driven updates with a dashboard **Force CBM Update** action.
+   - Build on the existing manual `POST /devices/cbm/sync-active` foundation and package signal modem mapping (`cbm_device_id`, `cbm_path`, `cbm_carrier`).
+   - Add a controlled background poller (interval to be decided after hardware tests) that polls enabled CBMs, compares parsed modem values to the latest active serial/package signal state, and writes automatic `SignalLog` rows only when values change.
+   - Add a dashboard button for **Force CBM Update** that triggers the same sync immediately and reports per-modem success/errors without leaving the dashboard.
+   - Required before enabling: validate real CBM SSH/ICC output, status mapping, timeout/retry behavior, credential handling, ambiguous mapping safeguards, audit behavior, and how Testing-state CBM polling should behave.
+6. **Future: voice chat between single and multiple people** — requested as a possible extension to the existing instant chat.
+   - Difficulty: **moderate to high** compared with text chat. One-to-one voice can be done with browser WebRTC, but reliable group voice usually needs a Selective Forwarding Unit/media server (for example Janus, mediasoup, LiveKit, or Jitsi components) rather than only FastAPI.
+   - Project Range would need signaling endpoints/WebSockets, call UI, microphone permission handling, presence/call state, mute/deafen controls, group room membership, and network/firewall testing on the range LAN.
+   - If all clients are on the same LAN, TURN may not be needed, but STUN/TURN planning should still be considered for multi-subnet or locked-down networks. Decide whether voice should be ephemeral only like current chat, whether it needs audit metadata (call started/ended, participants), and whether recording is explicitly out of scope.
+   - Recommended implementation path: add WebSocket signaling first, prove one-to-one calls between two browser sessions, then either add small-group mesh for very small groups or introduce an SFU if multi-user voice is operationally important.
+7. **Instant chat browser QA** — open two or more logged-in users/sessions and test: presence list updates, double-click private chat, group chat creation, send/receive, minimised-window alert, unread launcher badge, dashboard chat widget, page-change notification replay, logout/age-out behaviour, and mobile bottom-right layout. Decide later whether persistent DB chat history/audit is desired; current implementation is in-memory per app process plus browser `sessionStorage` read/unread tracking.
+8. **Testing-state browser QA** — with at least one administrator and one user, test changing into/out of Testing, non-administrator state lock while Testing, creating/editing packages/serials/logs/devices/CDA/incidents/CEASE in Testing, then returning to normal states and confirming those Testing rows are hidden. Re-enter Testing and confirm they return.
+9. **Dashboard Engaged column browser QA** — with an active serial, toggle Engaged on/off from the dashboard and confirm it saves immediately without using Submit All Changes, survives the 10-second dashboard refresh, appears/disappears through the Columns menu, and remains set after a status/power update or CBM sync update.
 
 ### Also pending (from ROADMAP)
 - **Deferred infra (user's call):** HTTPS/TLS, PostgreSQL (+ Alembic). Cookies are TLS-ready (`SESSION_HTTPS_ONLY=1`).

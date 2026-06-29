@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.12.0` (beta) · shown bottom-right in the UI and in `app/config.py`.
+**Current version:** `0.17.6` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -17,7 +17,7 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.11.0)
+## ✅ Already delivered (through 0.17.6)
 
 Core of the MVP scope is in place:
 
@@ -38,6 +38,12 @@ Core of the MVP scope is in place:
 - Device registry includes Antenna as a device type
 - SQLite backup script with documented backup/restore procedure
 - Dashboard utility widgets: quick notes, docs reference, extra clocks, quick links
+- Instant text chat: online user list, private and group chats, unread alerts, minimisable chat windows, role tags, and dashboard chat widget
+- Testing range state: administrator-only Testing mode with isolated packages, serials, logs, devices, CDA windows, incidents, and CEASE records
+- Account roles renamed to Administrator/User/Observer, with account rename and archive flow
+- Dashboard Engaged signal toggle with immediate save
+- CBM-400 package import/export using modem-style text config files
+- Live shared-state refresh: range-state banner updates across logged-in browsers, and dashboard signal tables poll every 5 seconds with immediate refresh on range-state change
 - **0.6.0:** TxLO/RxLO naming, version badge, fully offline (LAN) styling, Docker deploy on port 7474
 
 ---
@@ -249,6 +255,28 @@ if the interface is friendly; later if it requires vendor support. Related Scope
 items: §12.1 (automatic status detection, power/Eb/No capture, modem lock status,
 config validation).
 
+Current foundation now in place:
+
+- CBM modem manuals and exported modem config samples have been reviewed locally.
+- Package import/export can use CBM-style modem text config files, using the
+  Project Range fields it understands and ignoring modem-only parameters.
+- Package signals can carry modem mapping metadata (`cbm_device_id`, `cbm_path`,
+  `cbm_carrier`) so a Project Range signal can be tied to a specific modem source.
+
+Future target: **full CBM integration complete**.
+
+- [ ] Add live automatic modem-driven updates so active dashboard signal values can
+  update from enabled CBM modems without operator double-entry.
+- [ ] Add a dashboard **Force CBM Update** action that runs the same sync on demand
+  and reports per-modem success/errors.
+- [ ] Build the background poller only after real hardware testing confirms the
+  CBM SSH/ICC output, status mapping, credentials, timeouts, and retry behaviour.
+- [ ] Write automatic `SignalLog` rows only when modem-derived values change, and
+  define how those rows behave while the range is in Testing mode.
+- [ ] Add safeguards for ambiguous mappings, for example when a modem changes from
+  one SOI/config to another and Project Range needs to know which package signal
+  should receive the update.
+
 ### Other future enhancements (Scope §12)
 
 - **Hardware integration:** spectrum analyser screenshot capture, RF switch matrix state, power meters, SNMP/serial/REST devices, auto power/Eb/No readings.
@@ -256,6 +284,13 @@ config validation).
 - **Advanced reporting:** formal PDF range reports, daily/per-mission summaries, signal uptime, fault history, exportable audit packages.
 - **Auth:** Active Directory / Windows integrated auth / SSO / MFA; role-based permissions beyond the two roles.
 - **UI:** large-screen operations display, customisable widgets, signal card view, range schematic view, power/Eb/No trend graphs.
+- **Voice chat:** single-user and group voice chat as an extension of instant chat.
+  Difficulty is **moderate to high**: one-to-one browser voice is feasible with
+  WebRTC and app-managed signaling, but reliable multi-user group voice usually
+  needs an SFU/media server such as Janus, mediasoup, LiveKit, or Jitsi components.
+  Required work includes WebSocket signaling, call UI, microphone permissions,
+  mute/deafen controls, group room membership, LAN/STUN/TURN testing, and a decision
+  on whether call metadata is audited while audio remains ephemeral.
 
 ---
 

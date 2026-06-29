@@ -5,7 +5,7 @@
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
   <h4 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Live Range Dashboard</h4>
   <div class="d-flex gap-2 align-items-center flex-wrap">
-    <span class="text-muted small" id="lastRefresh">Auto-refreshing every 10s</span>
+    <span class="text-muted small" id="lastRefresh">Auto-refreshing every 5s</span>
     <div class="dropdown">
       <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
               data-bs-toggle="dropdown" data-bs-auto-close="outside" title="Add dashboard widgets">
@@ -281,7 +281,8 @@
           <div class="card-body p-0 overflow-auto serial-table-body"
                id="signalTableContainer-{{ sval }}"
                {% if serial %}hx-get="/dashboard/fragment/{{ serial.id }}"{% else %}hx-get="/dashboard/fragment"{% endif %}
-               hx-trigger="every 10s" hx-swap="innerHTML" hx-on::after-request="updateRefreshTime()">
+               hx-trigger="every 5s, range-state-changed from:body"
+               hx-swap="innerHTML" hx-on::after-request="updateRefreshTime()">
             {% with signals=w_signals, buzzer_active=w_buzzer, serial_id=(serial.id if serial else none), pkg_rf_by_signal=(sd.pkg_rf_by_signal if serial else {}) %}
             {% include "partials/signal_table.html" %}
             {% endwith %}
@@ -455,9 +456,9 @@ function utilityBody(id, type, config = {}) {
     const rs = {{ range_state | tojson }};
     const cls = rs === 'Live' ? 'text-danger' : (rs === 'Closed Loop' ? 'text-info' : (rs === 'Testing' ? 'text-warning' : 'text-secondary'));
     const icon = rs === 'Live' ? 'bi-broadcast-pin blink-icon' : (rs === 'Closed Loop' ? 'bi-arrow-repeat' : (rs === 'Testing' ? 'bi-wrench-adjustable-circle' : 'bi-power'));
-    return `<div class="text-center py-2">
+    return `<div class="text-center py-2" data-live-range-state-widget>
               <div class="text-muted small mb-1">Range State</div>
-              <div class="fw-bold fs-4 ${cls}"><i class="bi ${icon} me-1"></i>${escapeHtml(rs)}</div>
+              <div class="fw-bold fs-4 ${cls}" data-live-range-state-value><i class="bi ${icon} me-1"></i>${escapeHtml(rs)}</div>
               <div class="mt-2"><a href="/range-state/change" class="btn btn-sm btn-outline-secondary">Change State</a></div>
             </div>`;
   }

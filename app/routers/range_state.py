@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -14,6 +14,17 @@ router = APIRouter(prefix="/range-state")
 from app.templating import templates
 
 VALID_STATES = [s.value for s in RangeState]
+
+
+def _state_payload(db: Session) -> dict:
+    state = get_current_range_state(db)
+    latest = db.query(RangeStateLog).order_by(RangeStateLog.timestamp.desc()).first()
+    return {
+        "state": state,
+        "is_testing": state == RangeState.TESTING.value,
+        "changed_at": latest.timestamp.isoformat() if latest else "",
+        "changed_by": latest.changed_by_user.display_name if latest and latest.changed_by_user else "",
+    }
 
 
 def _available_states(current: str, current_user: User) -> list[str]:
@@ -127,6 +138,14 @@ async def change_state_page(
         "range_state": current,
         "page": "range_state",
     })
+
+
+@router.get("/status")
+async def range_state_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return JSONResponse(_state_payload(db))
 
 
 @router.post("/change", response_class=HTMLResponse)

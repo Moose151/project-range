@@ -9,7 +9,7 @@
   <!-- Vendored locally so styling works on LAN devices with no internet access -->
   <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="/static/vendor/bootstrap-icons/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=18">
+  <link rel="stylesheet" href="/static/css/app.css?v=19">
   <link rel="icon" type="image/png" href="/static/img/sew-range-logo.png">
 </head>
 <body>
@@ -168,17 +168,21 @@
 
     <!-- Range state banner -->
     {% set state_class = "banner-live" if range_state == "Live" else ("banner-closed" if range_state == "Closed Loop" else ("banner-testing" if range_state == "Testing" else "banner-standby")) %}
-    <div class="range-banner {{ state_class }} d-flex align-items-center justify-content-between px-3 py-1">
+    <div id="rangeStateBanner"
+         data-range-state="{{ range_state }}"
+         class="range-banner {{ state_class }} d-flex align-items-center justify-content-between px-3 py-1">
       <span>
-        {% if range_state == "Live" %}
-          <i class="bi bi-broadcast-pin me-1 blink-icon"></i> <strong>RANGE IS LIVE — RF TRANSMITTING</strong>
-        {% elif range_state == "Closed Loop" %}
-          <i class="bi bi-arrow-repeat me-1"></i> Range State: <strong>Closed Loop</strong> — IF Only
-        {% elif range_state == "Testing" %}
-          <i class="bi bi-wrench-adjustable-circle me-1"></i> Range State: <strong>Testing</strong> — sandbox data only
-        {% else %}
-          <i class="bi bi-power me-1"></i> Range State: <strong>{{ range_state }}</strong>
-        {% endif %}
+        <span id="rangeStateBannerText">
+          {% if range_state == "Live" %}
+            <i class="bi bi-broadcast-pin me-1 blink-icon"></i> <strong>RANGE IS LIVE — RF TRANSMITTING</strong>
+          {% elif range_state == "Closed Loop" %}
+            <i class="bi bi-arrow-repeat me-1"></i> Range State: <strong>Closed Loop</strong> — IF Only
+          {% elif range_state == "Testing" %}
+            <i class="bi bi-wrench-adjustable-circle me-1"></i> Range State: <strong>Testing</strong> — sandbox data only
+          {% else %}
+            <i class="bi bi-power me-1"></i> Range State: <strong>{{ range_state }}</strong>
+          {% endif %}
+        </span>
         {% if not user.must_change_password %}
         <span id="buzzerBadge"
               hx-get="/status/buzzer"
@@ -288,7 +292,7 @@
 
 <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="/static/vendor/htmx/htmx.min.js"></script>
-<script src="/static/js/app.js?v=18"></script>
+<script src="/static/js/app.js?v=19"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -48,12 +48,13 @@ def touch_user(
     duty_role_color: str | None = None,
 ) -> None:
     with _lock:
+        existing = _presence.get(user_id, {})
         _presence[user_id] = {
             "id": user_id,
             "display_name": display_name,
-            "role": role or "",
-            "duty_role": duty_role or "",
-            "duty_role_color": duty_role_color or "",
+            "role": role if role is not None else existing.get("role", ""),
+            "duty_role": duty_role if duty_role is not None else existing.get("duty_role", ""),
+            "duty_role_color": duty_role_color if duty_role_color is not None else existing.get("duty_role_color", ""),
             "last_seen": datetime.utcnow(),
         }
 

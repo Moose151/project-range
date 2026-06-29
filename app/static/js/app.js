@@ -72,6 +72,80 @@ document.addEventListener('change', event => {
   }
 }, true);
 
+// ── Live range-state banner ─────────────────────────────────────────────────
+function rangeStateBannerClass(state) {
+  if (state === 'Live') return 'banner-live';
+  if (state === 'Closed Loop') return 'banner-closed';
+  if (state === 'Testing') return 'banner-testing';
+  return 'banner-standby';
+}
+
+function rangeStateIcon(state) {
+  if (state === 'Live') return 'bi-broadcast-pin blink-icon';
+  if (state === 'Closed Loop') return 'bi-arrow-repeat';
+  if (state === 'Testing') return 'bi-wrench-adjustable-circle';
+  return 'bi-power';
+}
+
+function rangeStateTextClass(state) {
+  if (state === 'Live') return 'text-danger';
+  if (state === 'Closed Loop') return 'text-info';
+  if (state === 'Testing') return 'text-warning';
+  return 'text-secondary';
+}
+
+function rangeStateBannerHtml(state) {
+  if (state === 'Live') {
+    return '<i class="bi bi-broadcast-pin me-1 blink-icon"></i> <strong>RANGE IS LIVE — RF TRANSMITTING</strong>';
+  }
+  if (state === 'Closed Loop') {
+    return '<i class="bi bi-arrow-repeat me-1"></i> Range State: <strong>Closed Loop</strong> — IF Only';
+  }
+  if (state === 'Testing') {
+    return '<i class="bi bi-wrench-adjustable-circle me-1"></i> Range State: <strong>Testing</strong> — sandbox data only';
+  }
+  return `<i class="bi bi-power me-1"></i> Range State: <strong>${escapeHtml(state)}</strong>`;
+}
+
+function updateLiveRangeStateWidgets(state) {
+  document.querySelectorAll('[data-live-range-state-value]').forEach(el => {
+    el.className = `fw-bold fs-4 ${rangeStateTextClass(state)}`;
+    el.innerHTML = `<i class="bi ${rangeStateIcon(state)} me-1"></i>${escapeHtml(state)}`;
+  });
+}
+
+async function pollRangeStateStatus() {
+  const banner = document.getElementById('rangeStateBanner');
+  if (!banner) return;
+  try {
+    const response = await fetch('/range-state/status', { headers: { 'Accept': 'application/json' } });
+    if (!response.ok) return;
+    const data = await response.json();
+    const newState = data.state || '';
+    const oldState = banner.dataset.rangeState || '';
+    if (!newState || newState === oldState) return;
+
+    banner.dataset.rangeState = newState;
+    banner.classList.remove('banner-live', 'banner-closed', 'banner-testing', 'banner-standby');
+    banner.classList.add(rangeStateBannerClass(newState));
+    const text = document.getElementById('rangeStateBannerText');
+    if (text) text.innerHTML = rangeStateBannerHtml(newState);
+    updateLiveRangeStateWidgets(newState);
+
+    document.body.dispatchEvent(new Event('range-state-changed'));
+    showToast?.(`Range state changed to ${escapeHtml(newState)}`, 'info');
+
+    if (oldState === 'Testing' || newState === 'Testing') {
+      window.setTimeout(() => window.location.reload(), 1200);
+    }
+  } catch (e) {}
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (!document.getElementById('rangeStateBanner')) return;
+  setInterval(pollRangeStateStatus, 5000);
+});
+
 // ── Light / dark theme (persisted per terminal via localStorage) ──────────────
 const RANGE_THEME_KEY = 'rangeTheme';
 function syncThemeIcon(theme) {
@@ -268,9 +342,16 @@ function renderChatRoster() {
 }
 
 function chatRoleBadge(user) {
-  const label = user.duty_role || user.role || '';
+  const label = user.duty_role || '';
   if (!label) return '';
   const colour = user.duty_role_color || '#6c757d';
+  return `<span class="badge chat-role-badge" style="background:${escapeHtml(colour)}">${escapeHtml(label)}</span>`;
+}
+
+function chatRoomDutyBadge(room) {
+  const label = room.title_duty_role || '';
+  if (!label) return '';
+  const colour = room.title_duty_role_color || '#6c757d';
   return `<span class="badge chat-role-badge" style="background:${escapeHtml(colour)}">${escapeHtml(label)}</span>`;
 }
 
@@ -350,7 +431,10 @@ function openChatWindow(roomId) {
   node.innerHTML = `
     <div class="chat-window-header" onclick="toggleChatWindowMinimised('${escapeHtml(roomId)}')" title="Click to minimise / expand">
       <i class="bi ${room.is_group ? 'bi-people-fill' : 'bi-person-fill'}"></i>
-      <div class="chat-window-title">${escapeHtml(room.title)}</div>
+      <div class="chat-window-title">
+        <span class="text-truncate">${escapeHtml(room.title)}</span>
+        ${chatRoomDutyBadge(room)}
+      </div>
       <button type="button" class="btn btn-sm btn-link link-secondary p-0 ms-auto" title="Minimise" onclick="event.stopPropagation(); toggleChatWindowMinimised('${escapeHtml(roomId)}')"><i class="bi bi-dash-lg"></i></button>
       <button type="button" class="btn btn-sm btn-link link-secondary p-0" title="Close" onclick="event.stopPropagation(); closeChatWindow('${escapeHtml(roomId)}')"><i class="bi bi-x-lg"></i></button>
     </div>

@@ -10,23 +10,34 @@ from app.models import User
 router = APIRouter(prefix="/chat")
 
 
+def _room_peer(room, current_user: User, db: Session | None = None) -> User | None:
+    if room.is_group or db is None:
+        return None
+    other_ids = [uid for uid in room.participant_ids if uid != current_user.id]
+    if not other_ids:
+        return None
+    return db.query(User).filter(User.id == other_ids[0], User.is_archived == False).first()
+
+
 def _room_title(room, current_user: User, db: Session | None = None) -> str:
     if room.is_group:
         return room.title
+    other = _room_peer(room, current_user, db)
+    if other:
+        return other.display_name
     other_ids = [uid for uid in room.participant_ids if uid != current_user.id]
     if not other_ids:
         return "Notes to self"
-    if db is not None:
-        other = db.query(User).filter(User.id == other_ids[0], User.is_archived == False).first()
-        if other:
-            return other.display_name
     return room.title
 
 
 def _room_payload(room, current_user: User, db: Session | None = None) -> dict:
+    other = _room_peer(room, current_user, db)
     return {
         "id": room.id,
-        "title": _room_title(room, current_user, db),
+        "title": other.display_name if other else _room_title(room, current_user, db),
+        "title_duty_role": other.duty_role if other else "",
+        "title_duty_role_color": other.duty_role_color if other else "",
         "is_group": room.is_group,
         "participants": sorted(room.participant_ids),
         "last_message_id": chat_state.last_message_id(room),
@@ -54,8 +65,8 @@ async def chat_state_endpoint(
         current_user.id,
         current_user.display_name,
         str(current_user.role.value if hasattr(current_user.role, "value") else current_user.role),
-        current_user.duty_role,
-        current_user.duty_role_color,
+        current_user.duty_role or "",
+        current_user.duty_role_color or "",
     )
     return JSONResponse({
         "me": {"id": current_user.id, "display_name": current_user.display_name},
