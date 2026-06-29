@@ -9,7 +9,7 @@
   <!-- Vendored locally so styling works on LAN devices with no internet access -->
   <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="/static/vendor/bootstrap-icons/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=17">
+  <link rel="stylesheet" href="/static/css/app.css?v=18">
   <link rel="icon" type="image/png" href="/static/img/sew-range-logo.png">
 </head>
 <body>
@@ -159,6 +159,7 @@
       </button>
       <span class="topbar-brand d-none d-lg-inline ms-1">SEW Range</span>
       <div class="ms-auto d-flex align-items-center gap-2">
+        <span class="app-version-badge" title="Application version">v{{ app_version }}</span>
         <button id="themeToggle" type="button" class="topbar-btn" onclick="toggleTheme()" title="Toggle light / dark">
           <i class="bi bi-moon-stars"></i>
         </button>
@@ -284,8 +285,6 @@
 <!-- Logged-out pages: toast container still available for error messages -->
 <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1100" id="toastContainer"></div>
 {% endif %}
-
-<div class="app-version-badge" title="Application version">v{{ app_version }}</div>
 
 <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="/static/vendor/htmx/htmx.min.js"></script>

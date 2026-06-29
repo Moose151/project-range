@@ -530,17 +530,17 @@ code {
   }
 }
 
-/* ── Version badge (bottom-right, subtle) ───────────────────── */
+/* ── Version badge (topbar, subtle) ─────────────────────────── */
 .app-version-badge {
-  position: fixed;
-  right: 0.5rem;
-  bottom: 0.4rem;
-  z-index: 1030;
-  font-size: 0.7rem;
-  color: #6c757d;
-  opacity: 0.6;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--range-gold);
+  opacity: 0.75;
   pointer-events: none;
   user-select: none;
+  white-space: nowrap;
 }
 
 /* ── SEW Range brand palette (sampled from the logo) ───────── */
@@ -553,7 +553,6 @@ code {
 }
 .brand-sew span { color: var(--range-gold); letter-spacing: .04em; }
 .navbar { border-bottom: 2px solid var(--range-gold) !important; }
-.app-version-badge { color: var(--range-gold); }
 
 /* ── Theme palettes ──────────────────────────────────────────
    Two independent axes:
