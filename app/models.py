@@ -11,6 +11,9 @@ from app.database import Base
 class Role(str, enum.Enum):
     OPERATOR = "operator"
     SUPERVISOR = "supervisor"
+    # Read-only account. Can view everything but cannot make any changes
+    # (enforced in the security middleware). May still raise/dismiss a CEASE.
+    SAFETY_SUPERVISOR = "safety_supervisor"
 
 
 class RangeState(str, enum.Enum):
@@ -537,3 +540,28 @@ class Incident(Base):
 
     reported_by: Mapped["User"] = relationship("User", foreign_keys="Incident.reported_by_id")
     resolved_by: Mapped["User | None"] = relationship("User", foreign_keys="Incident.resolved_by_id")
+
+
+class CeaseEvent(Base):
+    """A range-wide CEASE alert.
+
+    Any logged-in user (including a read-only Safety Supervisor) may raise one,
+    and must supply a reason. It splashes a full-screen CEASE over every user's
+    screen until any user dismisses it. Both actions are audit-logged. The
+    currently active cease is the most recent row with dismissed_at IS NULL.
+    """
+    __tablename__ = "cease_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    raised_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    raised_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    dismissed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    raised_by: Mapped["User"] = relationship("User", foreign_keys=[raised_by_id])
+    dismissed_by: Mapped["User | None"] = relationship("User", foreign_keys=[dismissed_by_id])
+
+    @property
+    def is_active(self) -> bool:
+        return self.dismissed_at is None

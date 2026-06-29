@@ -9,7 +9,7 @@
   <!-- Vendored locally so styling works on LAN devices with no internet access -->
   <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="/static/vendor/bootstrap-icons/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=12">
+  <link rel="stylesheet" href="/static/css/app.css?v=14">
   <link rel="icon" type="image/png" href="/static/img/sew-range-logo.png">
 </head>
 <body>
@@ -134,6 +134,15 @@
       </a>
     </div>
 
+    <!-- CEASE: range-wide stop alert. Any user (incl. Safety Supervisor) may raise it. -->
+    <div class="sidebar-cease">
+      <button type="button" class="cease-btn" data-bs-toggle="modal" data-bs-target="#ceaseModal"
+              title="Raise a range-wide CEASE alert">
+        <i class="bi bi-exclamation-octagon-fill"></i>
+        <span class="sidebar-label">CEASE</span>
+      </button>
+    </div>
+
   </nav><!-- /.app-sidebar -->
 
   <!-- ── MAIN AREA ─────────────────────────────────────────── -->
@@ -204,6 +213,37 @@
     </div><!-- /.app-content -->
   </div><!-- /.app-main -->
 </div><!-- /.app-layout -->
+
+<!-- CEASE modal: capture the mandatory reason before raising the alert -->
+<div class="modal fade" id="ceaseModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-danger">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="bi bi-exclamation-octagon-fill me-2"></i>Raise CEASE</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-2">
+          This puts a full-screen <strong>CEASE</strong> alert on every user's screen.
+          State the reason — it is logged against your account.
+        </p>
+        <label class="form-label small fw-semibold mb-1">Reason <span class="text-danger">*</span></label>
+        <textarea id="ceaseReason" class="form-control" rows="3"
+                  placeholder="e.g. Unsafe RF condition — all transmit stop" required></textarea>
+        <div id="ceaseError" class="text-danger small mt-1 d-none">A reason is required.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger fw-bold" onclick="raiseCease()">
+          <i class="bi bi-exclamation-octagon-fill me-1"></i>CEASE NOW
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CEASE splash mount: the full-screen overlay is injected here by app.js when active -->
+<div id="ceaseRoot"></div>
 {% else %}
 <!-- Logged-out pages: toast container still available for error messages -->
 <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1100" id="toastContainer"></div>
@@ -213,7 +253,7 @@
 
 <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="/static/vendor/htmx/htmx.min.js"></script>
-<script src="/static/js/app.js?v=13"></script>
+<script src="/static/js/app.js?v=14"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

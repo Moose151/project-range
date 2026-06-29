@@ -8,23 +8,22 @@ from app.config import (
     SECRET_KEY, APP_VERSION, SESSION_MAX_AGE_DAYS,
     SESSION_SAME_SITE, SESSION_HTTPS_ONLY,
 )
+from app.database import SessionLocal
+from app.models import User, Role
 from app.templating import templates
 from app.routers import (
     auth, dashboard, calculator, logs, range_state, users, config, audit, sessions,
     packages, serials, history, docs, handover, preferences, devices, account, incidents, cda,
+    cease,
 )
 
 app = FastAPI(title="SEW Range", version=APP_VERSION, docs_url=None, redoc_url=None)
 
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=SECRET_KEY,
-    max_age=SESSION_MAX_AGE_DAYS * 86400,
-    same_site=SESSION_SAME_SITE,
-    https_only=SESSION_HTTPS_ONLY,
-)
-
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
+
+# Write actions a read-only Safety Supervisor IS still allowed to perform:
+# raising/dismissing a CEASE, and setting their own (forced) password.
+SAFETY_SUPERVISOR_ALLOWED_WRITES = {"/cease/raise", "/cease/dismiss", "/account/password"}
 
 
 @app.middleware("http")
@@ -38,6 +37,22 @@ async def security_middleware(request: Request, call_next):
             host = urlparse(origin).netloc.split("@")[-1]
             if host and host != request.headers.get("host", ""):
                 return PlainTextResponse("Cross-origin request blocked.", status_code=403)
+
+        # Read-only enforcement: a Safety Supervisor account may not make changes,
+        # except the explicitly allowed CEASE + own-password actions above.
+        user_id = request.session.get("user_id")
+        if user_id and request.url.path not in SAFETY_SUPERVISOR_ALLOWED_WRITES:
+            db = SessionLocal()
+            try:
+                u = db.query(User).filter(User.id == user_id).first()
+                if u and u.role == Role.SAFETY_SUPERVISOR:
+                    return PlainTextResponse(
+                        "This is a read-only Safety Supervisor account — changes are not permitted.",
+                        status_code=403,
+                    )
+            finally:
+                db.close()
+
     response = await call_next(request)
     # Security headers. All assets are first-party; inline scripts/styles are used,
     # so the CSP permits 'unsafe-inline' for script/style only.
@@ -51,6 +66,18 @@ async def security_middleware(request: Request, call_next):
         "frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
     )
     return response
+
+
+# Added last so it is the OUTERMOST middleware (Starlette inserts each at index 0),
+# i.e. it runs before security_middleware — guaranteeing request.session is
+# populated when the read-only Safety Supervisor check inspects it.
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SECRET_KEY,
+    max_age=SESSION_MAX_AGE_DAYS * 86400,
+    same_site=SESSION_SAME_SITE,
+    https_only=SESSION_HTTPS_ONLY,
+)
 
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -74,6 +101,7 @@ app.include_router(devices.router)
 app.include_router(account.router)
 app.include_router(incidents.router)
 app.include_router(cda.router)
+app.include_router(cease.router)
 
 
 @app.exception_handler(302)

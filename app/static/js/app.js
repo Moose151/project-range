@@ -36,6 +36,93 @@ document.addEventListener('DOMContentLoaded', () => {
     b.classList.toggle('active', b.dataset.paletteBtn === pal));
 });
 
+// ── HTML escaping (used by dynamically-built widgets / overlays) ──────────────
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ── CEASE: range-wide stop alert ──────────────────────────────────────────────
+// Driven by a lightweight JSON poll so the full-screen overlay is only (re)built
+// when the active event id changes — no per-poll flicker. Any user can raise or
+// dismiss; the splash appears on every connected screen within the poll interval.
+let ceaseCurrentId = null;
+
+async function raiseCease() {
+  const ta = document.getElementById('ceaseReason');
+  const err = document.getElementById('ceaseError');
+  const reason = (ta?.value || '').trim();
+  if (!reason) { err?.classList.remove('d-none'); return; }
+  err?.classList.add('d-none');
+  try {
+    const r = await fetch('/cease/raise', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ reason }),
+    });
+    if (!r.ok) throw new Error();
+    const modalEl = document.getElementById('ceaseModal');
+    if (modalEl && window.bootstrap) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+    if (ta) ta.value = '';
+    pollCease();  // show it immediately for the raiser
+  } catch (e) {
+    showToast?.('Could not raise CEASE — try again', 'danger');
+  }
+}
+
+async function dismissCease() {
+  try {
+    await fetch('/cease/dismiss', { method: 'POST' });
+  } catch (e) {}
+  ceaseCurrentId = null;
+  hideCeaseSplash();
+  pollCease();
+}
+
+function showCeaseSplash(data) {
+  const root = document.getElementById('ceaseRoot');
+  if (!root) return;
+  root.innerHTML = `
+    <div class="cease-overlay" role="alertdialog" aria-label="CEASE alert">
+      <div class="cease-box">
+        <div class="cease-flash"><i class="bi bi-exclamation-octagon-fill"></i></div>
+        <div class="cease-word">CEASE</div>
+        <div class="cease-meta">Raised by <strong>${escapeHtml(data.raised_by)}</strong>${data.raised_at ? ' at ' + escapeHtml(data.raised_at) : ''}</div>
+        <div class="cease-reason">${escapeHtml(data.reason)}</div>
+        <button type="button" class="btn btn-light btn-lg mt-3 fw-bold" onclick="dismissCease()">
+          <i class="bi bi-check-lg me-1"></i>Dismiss
+        </button>
+      </div>
+    </div>`;
+}
+
+function hideCeaseSplash() {
+  const root = document.getElementById('ceaseRoot');
+  if (root) root.innerHTML = '';
+}
+
+async function pollCease() {
+  if (!document.getElementById('ceaseRoot')) return;
+  try {
+    const r = await fetch('/cease/state', { headers: { 'Accept': 'application/json' } });
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data.active) {
+      if (ceaseCurrentId !== data.id) { ceaseCurrentId = data.id; showCeaseSplash(data); }
+    } else if (ceaseCurrentId !== null) {
+      ceaseCurrentId = null;
+      hideCeaseSplash();
+    }
+  } catch (e) {}
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.getElementById('ceaseRoot')) {
+    pollCease();
+    setInterval(pollCease, 3000);
+  }
+});
+
 // ── Sidebar toggle ────────────────────────────────────────────────────────────
 const SIDEBAR_KEY = 'sidebarCollapsed';
 function toggleSidebar() {

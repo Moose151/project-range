@@ -34,6 +34,8 @@
               <td>
                 {% if u.role == 'supervisor' %}
                 <span class="badge bg-primary">Supervisor</span>
+                {% elif u.role == 'safety_supervisor' %}
+                <span class="badge bg-danger"><i class="bi bi-shield-lock me-1"></i>Safety Supervisor</span>
                 {% else %}
                 <span class="badge bg-secondary">Operator</span>
                 {% endif %}
@@ -93,9 +95,13 @@
             <label class="form-label">Role</label>
             <select class="form-select" name="role">
               {% for r in roles %}
-              <option value="{{ r }}">{{ r | title }}</option>
+              <option value="{{ r }}">{{ r.replace('_', ' ') | title }}</option>
               {% endfor %}
             </select>
+            <div class="form-text small">
+              <strong>Safety Supervisor</strong> is read-only — can view everything and
+              raise/dismiss a CEASE, but cannot make any other changes.
+            </div>
           </div>
           <div class="mb-3">
             <label class="form-label">Password</label>

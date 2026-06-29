@@ -722,3 +722,92 @@ body.sidebar-collapsed .sidebar-label {
 .calc-btn.eq    { background: var(--range-accent); color: var(--range-accent-contrast); }
 .calc-btn.eq:hover { background: var(--range-accent-hover); }
 .calc-btn.clr   { color: #dc3545; }
+
+/* ═══════════════════════════════════════════════════════════
+   CEASE — range-wide stop alert
+   ══════════════════════════════════════════════════════════ */
+
+/* Sidebar CEASE button (sits at the very bottom of the nav) */
+.sidebar-cease {
+  padding: 0.5rem 0.6rem;
+  border-top: 1px solid var(--range-card-border);
+  flex-shrink: 0;
+}
+.cease-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: #c0121f;
+  color: #fff;
+  border: 1px solid #ff4d5e;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  padding: 0.6rem 0.5rem;
+  border-radius: 0.45rem;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  animation: ceasePulse 2s infinite;
+}
+.cease-btn:hover { background: #e11d2b; }
+.cease-btn .bi { font-size: 1.15rem; flex-shrink: 0; }
+/* Collapsed sidebar: icon only, no wide letter-spacing */
+body.sidebar-collapsed .cease-btn { letter-spacing: 0; padding-left: 0; padding-right: 0; }
+@keyframes ceasePulse {
+  0%   { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.55); }
+  70%  { box-shadow: 0 0 0 9px rgba(220, 53, 69, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}
+
+/* Full-screen CEASE splash overlay (above modals, toasts, everything) */
+.cease-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  background: rgba(120, 0, 0, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  animation: ceaseIn 0.15s ease;
+}
+@keyframes ceaseIn { from { opacity: 0; } to { opacity: 1; } }
+.cease-box {
+  color: #fff;
+  padding: 2rem;
+  max-width: 760px;
+}
+.cease-flash {
+  font-size: 4rem;
+  line-height: 1;
+  animation: ceaseBlink 1s steps(1, end) infinite;
+}
+@keyframes ceaseBlink { 50% { opacity: 0.2; } }
+.cease-word {
+  font-size: clamp(4rem, 16vw, 11rem);
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  line-height: 1;
+  margin-left: 0.15em; /* optical centring for the tracked letters */
+  text-shadow: 0 0 26px rgba(0, 0, 0, 0.5);
+}
+.cease-meta {
+  font-size: 1.1rem;
+  margin-top: 1rem;
+  opacity: 0.95;
+}
+.cease-reason {
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin-top: 0.85rem;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 0.5rem;
+  padding: 0.6rem 1rem;
+  display: inline-block;
+  max-width: 100%;
+  word-break: break-word;
+}

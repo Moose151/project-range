@@ -8,7 +8,7 @@ from app.models import (
     User, RangeStateLog, Signal, ModulationType, FecType, SignalSource, AntennaType,
     LogSession, SignalPackage, SignalPackageEntry, Serial, SerialPackage,
     DocPage, DocVersion, AppSetting, RFDevice, DevicePort, DeviceLink,
-    CDATable, CDAWindow, SerialCDATable,
+    CDATable, CDAWindow, SerialCDATable, Incident, CeaseEvent,
 )
 from app.auth import hash_password
 from sqlalchemy.orm import Session
