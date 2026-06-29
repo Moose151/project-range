@@ -70,6 +70,10 @@
       </a>
 
       <div class="sidebar-section-header">Calculators</div>
+      <a href="/calculator/basic" class="sidebar-link {% if page == 'calculator' and page_name is defined and page_name == 'basic' %}active{% endif %}">
+        <i class="bi bi-calculator"></i>
+        <span class="sidebar-label">Basic Calculator</span>
+      </a>
       <a href="/calculator/rf" class="sidebar-link {% if page == 'calculator' and (page_name is not defined or page_name == 'rf') %}active{% endif %}">
         <i class="bi bi-broadcast"></i>
         <span class="sidebar-label">RF Frequency</span>
@@ -209,7 +213,7 @@
 
 <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="/static/vendor/htmx/htmx.min.js"></script>
-<script src="/static/js/app.js"></script>
+<script src="/static/js/app.js?v=13"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

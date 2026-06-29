@@ -102,6 +102,19 @@ def convert_power(value: float, from_unit: str, to_unit: str) -> float:
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
+@router.get("/basic", response_class=HTMLResponse)
+async def basic_calc_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return templates.TemplateResponse(request, "calculator_basic.html", {
+        "user": current_user,
+        "range_state": get_current_range_state(db),
+        "page": "calculator", "page_name": "basic",
+    })
+
+
 @router.get("/rf", response_class=HTMLResponse)
 async def rf_calc_page(
     request: Request,

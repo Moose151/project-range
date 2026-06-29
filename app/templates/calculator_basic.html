@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Basic Calculator{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <h4 class="mb-0"><i class="bi bi-calculator me-2"></i>Basic Calculator</h4>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/calculator/rf" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-broadcast me-1"></i>RF Freq
+    </a>
+    <a href="/calculator/power" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-lightning-charge me-1"></i>Power
+    </a>
+    <a href="/calculator/eirp" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-broadcast-pin me-1"></i>EIRP
+    </a>
+  </div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-12 col-sm-8 col-md-5 col-lg-4">
+    <div class="card border-secondary">
+      <div class="card-header"><i class="bi bi-calculator me-1"></i>Calculator</div>
+      <div class="card-body" id="basicCalcMount"></div>
+    </div>
+    <p class="text-muted small mt-2 mb-0">
+      Standard arithmetic. You can also add a calculator to the dashboard via
+      <strong>Widgets &rarr; Basic Calculator</strong>.
+    </p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  // mathCalcBody() + calcPress() are defined in app.js
+  document.getElementById('basicCalcMount').innerHTML = mathCalcBody('page');
+</script>
+{% endblock %}
