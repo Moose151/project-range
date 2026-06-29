@@ -78,7 +78,7 @@
           </td>
           <td>
             {% set action = entry.action_type %}
-            {% if 'DELETE' in action or 'LOGOUT' in action %}
+            {% if 'DELETE' in action or 'LOGOUT' in action or 'ISSUE' in action or 'FAILED' in action %}
               <span class="badge bg-danger">{{ action }}</span>
             {% elif 'CREATE' in action or 'LOGIN' in action %}
               <span class="badge bg-success">{{ action }}</span>

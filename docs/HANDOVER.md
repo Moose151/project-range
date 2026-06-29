@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.17.9` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.17.11` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -162,6 +162,14 @@
   - CBM `TX_SR/RX_SR` values are now converted from modem raw units into kbps/ksps display units on import and live CBM sync. For example, `511999.0` imports as `511.999`.
   - CBM package export converts the display value back to modem raw units.
   - Package signal edit now preserves imported dropdown values that are not yet in App Config, so imported configurations can be opened and edited instead of blanking those fields.
+- **0.17.10 — CBM force-update issue auditing:**
+  - Active CBM sync now writes detailed issue text into the `CBM_SYNC_ACTIVE` audit comment and creates a dedicated `CBM_SYNC_ISSUE` audit record when any mappings fail or are skipped due to a fault.
+  - Dashboard Force CBM Update toasts now include the first issue reason instead of only showing the issue count.
+  - Previously silent skips such as missing mapped device or CBM sync disabled are now recorded as explicit issue reasons.
+- **0.17.11 — Imported package signal edit/source fix:**
+  - Package signal edit buttons now store imported row data in a safe `data-entry` payload instead of brittle inline JSON, fixing imported signals that could not be opened for editing.
+  - When a package signal Source matches a CBM modem using punctuation-insensitive matching (`CBM400_2` vs `CBM-400-2`), saving the signal now stores the canonical modem Source name and updates the internal `cbm_device_id` mapping.
+  - This allows operators to correct imported signals that mapped to the wrong CBM by editing the signal Source and saving.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.

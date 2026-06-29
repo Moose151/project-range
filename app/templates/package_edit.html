@@ -194,7 +194,7 @@
               <td class="small text-muted">{{ entry.cbm_path or '—' }}</td>
               <td class="text-nowrap">
                 <button type="button" class="btn btn-xs btn-outline-secondary btn-sm py-0 px-1"
-                        onclick="editSignal({{ {
+                        data-entry='{{ {
                           'id': entry.id,
                           'signal_name': entry.signal_name,
                           'description': entry.description or '',
@@ -212,7 +212,8 @@
                           'source': entry.source or (entry.cbm_device.name if entry.cbm_device else ''),
                           'cbm_path': entry.cbm_path or '',
                           'notes': entry.notes or '',
-                        } | tojson }})" title="Edit">
+                        } | tojson | forceescape }}'
+                        onclick="editSignalFromButton(this)" title="Edit">
                   <i class="bi bi-pencil"></i>
                 </button>
                 <form method="post" action="/packages/{{ package.id }}/signals/{{ entry.id }}/delete" class="d-inline"
@@ -381,6 +382,14 @@ function setVal(id, val) {
     el.value = value;
   } else {
     el.value = (val !== null && val !== undefined) ? val : '';
+  }
+}
+
+function editSignalFromButton(btn) {
+  try {
+    editSignal(JSON.parse(btn.dataset.entry || '{}'));
+  } catch (e) {
+    showToast?.('Could not load imported signal for editing', 'danger');
   }
 }
 

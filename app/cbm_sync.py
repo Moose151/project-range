@@ -139,14 +139,20 @@ def sync_active_cbms(db: Session, actor_id: int) -> CBMSyncResult:
             continue
 
         device = db.query(RFDevice).filter(RFDevice.id == device_id, RFDevice.is_testing == testing).first()
-        if not device or not device.cbm_sync_enabled:
+        serial, entry = items[0]
+        if not device:
             result.skipped += 1
+            result.add_error(f"{entry.signal_name}: mapped CBM device id {device_id} was not found in this range state")
+            continue
+        if not device.cbm_sync_enabled:
+            result.skipped += 1
+            result.add_error(f"{entry.signal_name}: {device.name} has CBM read-only sync disabled")
             continue
         if device_id not in snapshots:
             password = decrypt_secret(device.cbm_password_encrypted)
             if not device.host or not device.cbm_username or not password:
                 result.skipped += 1
-                result.add_error(f"{device.name}: missing or unreadable CBM credentials")
+                result.add_error(f"{entry.signal_name}: {device.name} missing host, username, or readable CBM password")
                 continue
             try:
                 snapshots[device_id] = poll_cbm_ssh(device.host, device.cbm_username, password)
@@ -161,7 +167,6 @@ def sync_active_cbms(db: Session, actor_id: int) -> CBMSyncResult:
                 result.add_error(f"{device.name}: {exc}")
                 continue
 
-        serial, entry = items[0]
         snapshot = snapshots[device_id]
         values = _entry_values_from_snapshot(entry, snapshot)
         latest = db.query(SignalLog).filter(
@@ -212,11 +217,22 @@ def sync_active_cbms(db: Session, actor_id: int) -> CBMSyncResult:
         db.add(new_entry)
         result.updated += 1
 
+    summary = f"updated={result.updated}, skipped={result.skipped}, issues={len(result.errors or [])}"
+    issue_text = "\n".join(result.errors or [])
     db.add(AuditLog(
         user_id=actor_id,
         action_type="CBM_SYNC_ACTIVE",
         entity_type="SignalLog",
-        new_value=f"updated={result.updated}, skipped={result.skipped}",
+        new_value=summary,
+        comment=issue_text or None,
     ))
+    if result.errors:
+        db.add(AuditLog(
+            user_id=actor_id,
+            action_type="CBM_SYNC_ISSUE",
+            entity_type="RFDevice",
+            new_value=f"{len(result.errors)} issue(s) during active CBM sync",
+            comment=issue_text,
+        ))
     db.commit()
     return result

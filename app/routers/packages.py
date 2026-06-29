@@ -579,7 +579,10 @@ async def package_signal_add(
     if not pkg:
         return RedirectResponse("/packages", status_code=302)
     source_name = source.strip()
-    cbm_device_id = _cbm_source_device_id(db, source_name, testing)
+    cbm_device = _cbm_source_device(db, source_name, testing)
+    cbm_device_id = cbm_device.id if cbm_device else None
+    if cbm_device:
+        source_name = cbm_device.name
     order = len(pkg.signals)
     entry = SignalPackageEntry(
         package_id=pkg_id,
@@ -635,7 +638,10 @@ async def package_signal_update(
     testing = is_testing_state(db)
     pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id, SignalPackage.is_testing == testing).first()
     source_name = source.strip()
-    cbm_device_id = _cbm_source_device_id(db, source_name, testing)
+    cbm_device = _cbm_source_device(db, source_name, testing)
+    cbm_device_id = cbm_device.id if cbm_device else None
+    if cbm_device:
+        source_name = cbm_device.name
     entry = db.query(SignalPackageEntry).filter(
         SignalPackageEntry.id == entry_id,
         SignalPackageEntry.package_id == pkg_id,

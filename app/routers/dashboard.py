@@ -242,7 +242,8 @@ async def dashboard_cbm_sync(
     result = sync_active_cbms(db, current_user.id)
     message = f"CBM update complete: {result.updated} updated, {result.skipped} skipped"
     if result.errors:
-        message += f", {len(result.errors)} issue(s)"
+        first_issue = result.errors[0]
+        message += f", {len(result.errors)} issue(s): {first_issue[:120]}"
     return RedirectResponse(f"/?toast={quote_plus(message)}", status_code=302)
 
 
