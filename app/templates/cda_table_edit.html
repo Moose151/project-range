@@ -92,6 +92,19 @@
 
   <!-- Right column: add window + edit/delete table -->
   <div class="col-lg-5">
+    <!-- Export (all users) -->
+    <div class="card mb-3">
+      <div class="card-body py-2 d-flex align-items-center gap-3">
+        <div>
+          <div class="fw-semibold small"><i class="bi bi-download me-1"></i>Export as CSV</div>
+          <div class="text-muted small">Download all windows — opens in Excel / LibreOffice.</div>
+        </div>
+        <a href="/cda/{{ table.id }}/export.csv" class="btn btn-sm btn-outline-secondary ms-auto">
+          <i class="bi bi-filetype-csv me-1"></i>Download CSV
+        </a>
+      </div>
+    </div>
+
     {% if user.role == 'supervisor' %}
     <!-- Add window form -->
     <div class="card mb-3">
@@ -100,16 +113,17 @@
         <form method="post" action="/cda/{{ table.id }}/windows/add">
           <div class="row g-2 mb-2">
             <div class="col-6">
-              <label class="form-label small fw-semibold mb-1">Start (Zulu HH:MM) <span class="text-danger">*</span></label>
-              <input type="time" name="start_zulu" class="form-control form-control-sm" required
-                     placeholder="17:45" pattern="[0-2][0-9]:[0-5][0-9]">
+              <label class="form-label small fw-semibold mb-1">Start — Zulu <span class="text-danger">*</span></label>
+              <input type="text" name="start_zulu" class="form-control form-control-sm font-monospace cda-time-input"
+                     placeholder="1745" maxlength="5" inputmode="numeric" autocomplete="off" required>
             </div>
             <div class="col-6">
-              <label class="form-label small fw-semibold mb-1">End (Zulu HH:MM) <span class="text-danger">*</span></label>
-              <input type="time" name="end_zulu" class="form-control form-control-sm" required
-                     placeholder="17:55" pattern="[0-2][0-9]:[0-5][0-9]">
+              <label class="form-label small fw-semibold mb-1">End — Zulu <span class="text-danger">*</span></label>
+              <input type="text" name="end_zulu" class="form-control form-control-sm font-monospace cda-time-input"
+                     placeholder="1755" maxlength="5" inputmode="numeric" autocomplete="off" required>
             </div>
           </div>
+          <div class="form-text text-muted small mb-2">Type 4 digits (HHMM) — colon added automatically.</div>
           <div class="mb-2">
             <label class="form-label small fw-semibold mb-1">Label <span class="text-muted fw-normal">(optional)</span></label>
             <input type="text" name="label" class="form-control form-control-sm"
@@ -120,13 +134,30 @@
               Max power (dBm) <span class="text-muted fw-normal">— leave blank for No Fire</span>
             </label>
             <input type="number" name="max_power_dbm" class="form-control form-control-sm"
-                   step="0.1" placeholder="e.g. 10.0 (blank = no fire)">
-            <div class="form-text text-muted small">
-              Blank = no-fire window. Enter a value to set a reduced-power limit instead.
-            </div>
+                   step="0.1" placeholder="blank = No Fire">
           </div>
           <button type="submit" class="btn btn-primary btn-sm w-100">
             <i class="bi bi-plus-lg me-1"></i>Add Window
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Import from CSV -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-upload me-1"></i>Import from CSV</div>
+      <div class="card-body">
+        <form method="post" action="/cda/{{ table.id }}/import" enctype="multipart/form-data">
+          <div class="mb-2">
+            <input type="file" name="file" class="form-control form-control-sm" accept=".csv,.txt" required>
+          </div>
+          <div class="form-text text-muted small mb-3">
+            CSV columns: <span class="font-monospace">Label, Start (Z), End (Z), Max Power dBm</span>.
+            Times as HHMM or HH:MM. Leave Max Power blank for No Fire.
+            Existing windows are kept — import adds to them.
+          </div>
+          <button type="submit" class="btn btn-outline-secondary btn-sm w-100">
+            <i class="bi bi-upload me-1"></i>Import Windows
           </button>
         </form>
       </div>
@@ -170,4 +201,23 @@
   </div>
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+// Auto-format CDA time inputs: digits only, insert colon after HH as you type.
+document.querySelectorAll('.cda-time-input').forEach(inp => {
+  inp.addEventListener('input', () => {
+    let v = inp.value.replace(/\D/g, '');
+    if (v.length > 4) v = v.slice(0, 4);
+    if (v.length > 2) v = v.slice(0, 2) + ':' + v.slice(2);
+    inp.value = v;
+  });
+  inp.addEventListener('blur', () => {
+    const m = inp.value.match(/^(\d):(\d{2})$/);
+    if (m) inp.value = '0' + m[1] + ':' + m[2];
+  });
+});
+</script>
 {% endblock %}

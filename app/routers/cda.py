@@ -1,6 +1,8 @@
+import csv
+import io
 from typing import Optional
-from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, require_supervisor, get_current_range_state
@@ -8,6 +10,21 @@ from app.models import User, CDATable, CDAWindow, SerialCDATable, Serial, AuditL
 
 router = APIRouter(prefix="/cda")
 from app.templating import templates
+
+
+def _parse_zulu_time(t: str) -> str:
+    """Accept HHMM, HH:MM, or H:MM (Zulu) → normalise to HH:MM. Raises ValueError."""
+    t = t.strip().replace(":", "").replace(" ", "")
+    if not t.isdigit():
+        raise ValueError(f"Not a valid time: {t!r}")
+    if len(t) == 3:
+        t = "0" + t
+    if len(t) == 4:
+        h, m = int(t[:2]), int(t[2:])
+        if h > 23 or m > 59:
+            raise ValueError(f"Time out of range: {t!r}")
+        return f"{h:02d}:{m:02d}"
+    raise ValueError(f"Invalid time format: {t!r}")
 
 
 @router.get("", response_class=HTMLResponse)
@@ -130,9 +147,11 @@ async def cda_window_add(
     if not table:
         return RedirectResponse("/cda", status_code=302)
 
-    # Normalise HH:MM
-    start_zulu = start_zulu.strip()
-    end_zulu = end_zulu.strip()
+    try:
+        start_zulu = _parse_zulu_time(start_zulu)
+        end_zulu = _parse_zulu_time(end_zulu)
+    except ValueError as e:
+        return RedirectResponse(f"/cda/{table_id}?toast=Invalid+time+format:+{e}", status_code=302)
 
     window = CDAWindow(
         cda_table_id=table_id,
@@ -150,6 +169,94 @@ async def cda_window_add(
     ))
     db.commit()
     return RedirectResponse(f"/cda/{table_id}?toast=Window+added", status_code=302)
+
+
+@router.get("/{table_id}/export.csv")
+async def cda_export_csv(
+    table_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    table = db.query(CDATable).filter(CDATable.id == table_id).first()
+    if not table:
+        return RedirectResponse("/cda", status_code=302)
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["Label", "Start (Z)", "End (Z)", "Max Power dBm"])
+    for w in table.windows:
+        writer.writerow([
+            w.label or "",
+            w.start_zulu,
+            w.end_zulu,
+            "" if w.max_power_dbm is None else w.max_power_dbm,
+        ])
+    buf.seek(0)
+    safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in table.name)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}_CDA.csv"'},
+    )
+
+
+@router.post("/{table_id}/import")
+async def cda_import_csv(
+    table_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    table = db.query(CDATable).filter(CDATable.id == table_id).first()
+    if not table:
+        return RedirectResponse("/cda", status_code=302)
+
+    raw = await file.read()
+    try:
+        text = raw.decode("utf-8-sig")  # strip Excel BOM if present
+    except Exception:
+        return RedirectResponse(f"/cda/{table_id}?toast=Could+not+read+file", status_code=302)
+
+    reader = csv.reader(io.StringIO(text))
+    added = skipped = 0
+    for i, row in enumerate(reader):
+        if not row or all(c.strip() == "" for c in row):
+            continue
+        # Skip header row (first row where column 2 isn't a digit string)
+        if i == 0 and len(row) >= 2 and not row[1].strip().replace(":", "").isdigit():
+            continue
+        try:
+            label = row[0].strip() if len(row) > 0 else ""
+            start = _parse_zulu_time(row[1]) if len(row) > 1 else None
+            end = _parse_zulu_time(row[2]) if len(row) > 2 else None
+            max_pwr = None
+            if len(row) > 3 and row[3].strip():
+                max_pwr = float(row[3].strip())
+            if start and end:
+                db.add(CDAWindow(
+                    cda_table_id=table_id,
+                    label=label or None,
+                    start_zulu=start,
+                    end_zulu=end,
+                    max_power_dbm=max_pwr,
+                ))
+                added += 1
+            else:
+                skipped += 1
+        except (ValueError, IndexError):
+            skipped += 1
+
+    if added:
+        db.add(AuditLog(
+            user_id=current_user.id, action_type="CDA_WINDOWS_IMPORT",
+            entity_type="CDATable", entity_id=table_id,
+            new_value=f"Imported {added} windows from CSV",
+        ))
+        db.commit()
+
+    msg = f"{added}+window{'s' if added != 1 else ''}+imported"
+    if skipped:
+        msg += f",+{skipped}+row{'s' if skipped != 1 else ''}+skipped"
+    return RedirectResponse(f"/cda/{table_id}?toast={msg}", status_code=302)
 
 
 @router.post("/{table_id}/windows/{window_id}/delete")
