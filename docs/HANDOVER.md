@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.17.7` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.17.8` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -154,6 +154,10 @@
   - Package signal add/edit now has separate FEC, Inner Code, and Symbol Rate fields. Carrier Label was removed from the UI/export naming path.
   - Eb/No was removed from package signal configuration and serial-start package loading. It remains a signal-log/display field intended to be populated from EBEM/modem reads as an indication of Tx/Rx strength. CBM sync now writes only the FEC rate portion (for example `1/2`) into signal logs when modem codes include inner-code text.
   - Additive migration adds `signal_package_entries.inner_code VARCHAR(32)`.
+- **0.17.8 — Dashboard Force CBM Update button:**
+  - Active serial dashboard widgets now show a compact **CBM** force-update button when the serial has any package signal mapped to a CBM source/device.
+  - The button calls `POST /dashboard/cbm-sync`, runs the existing read-only active CBM sync, writes any automatic signal-log changes, and returns to the dashboard with an update/skipped/issues toast.
+  - This dashboard action is available to normal logged-in Users and Administrators; Observer accounts remain blocked by the global read-only middleware.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.

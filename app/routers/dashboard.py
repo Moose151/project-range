@@ -1,12 +1,14 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from urllib.parse import quote_plus
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials, is_testing_state
 from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage, SerialCDATable, CDAWindow, RFDevice
+from app.cbm_sync import sync_active_cbms
 from app.rf_config import serial_package_rf_config
 from app.signal_warnings import warning_flags_for
 from app.settings import get_local_timezone
@@ -152,12 +154,17 @@ def _dashboard_ctx(db: Session) -> dict:
                 "signals": signals,
                 "buzzer_active": buzzer,
                 "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial.id, signals),
+                "has_cbm_mapping": any(
+                    entry.cbm_device_id
+                    for link in serial.package_links
+                    for entry in link.package.signals
+                ),
             })
     else:
         # No serials running — show all logs (legacy / no-serial mode)
         signals = _latest_signal_status(db)
         all_buzzer = _buzzer_active(signals, range_state)
-        serial_data = [{"serial": None, "signals": signals, "buzzer_active": all_buzzer}]
+        serial_data = [{"serial": None, "signals": signals, "buzzer_active": all_buzzer, "has_cbm_mapping": False}]
 
     # CDA data: map serial_id → list of {table_name, windows: [{start, end, label, max_power_dbm}]}
     cda_by_serial: dict[int, list] = {}
@@ -225,6 +232,18 @@ async def dashboard(
         "doc_pages": db.query(DocPage).filter(DocPage.is_published == True).order_by(DocPage.title).all(),
     })
     return templates.TemplateResponse(request, "dashboard.html", ctx)
+
+
+@router.post("/dashboard/cbm-sync")
+async def dashboard_cbm_sync(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = sync_active_cbms(db, current_user.id)
+    message = f"CBM update complete: {result.updated} updated, {result.skipped} skipped"
+    if result.errors:
+        message += f", {len(result.errors)} issue(s)"
+    return RedirectResponse(f"/?toast={quote_plus(message)}", status_code=302)
 
 
 @router.get("/dashboard/fragment", response_class=HTMLResponse)

@@ -268,6 +268,14 @@
             <span class="text-muted small me-1">Started {{ serial.opened_at.strftime('%H:%M %d/%m') }}</span>
             <span class="htmx-indicator spinner-border spinner-border-sm text-secondary me-1" role="status" style="width:0.7rem;height:0.7rem"></span>
             <span id="widgetBuzzer-{{ serial.id }}">{% if w_buzzer %}<span class="badge bg-danger">BUZZER</span>{% endif %}</span>
+            {% if sd.has_cbm_mapping %}
+            <form method="post" action="/dashboard/cbm-sync" class="d-inline">
+              <button type="submit" class="btn btn-sm btn-outline-info py-0 px-2"
+                      title="Force read-only CBM update for active mapped signals">
+                <i class="bi bi-arrow-repeat me-1"></i>CBM
+              </button>
+            </form>
+            {% endif %}
             <a href="/logs/new?serial_id={{ serial.id }}" class="btn btn-sm btn-outline-success py-0 px-2" title="Add signal log"><i class="bi bi-plus-lg"></i></a>
             <a href="/logs?serial_id={{ serial.id }}" class="btn btn-sm btn-outline-secondary py-0 px-2" title="View logs"><i class="bi bi-journal-text"></i></a>
             <form method="post" action="/serials/{{ serial.id }}/end" class="d-inline"
