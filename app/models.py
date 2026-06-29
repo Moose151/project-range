@@ -52,6 +52,12 @@ class User(Base):
     default_power_unit: Mapped[str] = mapped_column(String(4), default="dBm")
     # Force a password change at next login (e.g. seeded/reset accounts)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Current duty-role tag (a visual position indicator, separate from the
+    # permission `role` above). Self-selected by the user from the admin-managed
+    # DutyRole list; name + colour are denormalised here so the badge can render
+    # anywhere without a lookup. Cleared = no tag shown.
+    duty_role: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    duty_role_color: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     signal_logs: Mapped[list["SignalLog"]] = relationship("SignalLog", foreign_keys="SignalLog.operator_id", back_populates="operator")
     range_state_changes: Mapped[list["RangeStateLog"]] = relationship("RangeStateLog", back_populates="changed_by_user")
@@ -370,6 +376,22 @@ class AntennaType(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     description: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    display_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class DutyRole(Base):
+    """An admin-configurable duty-position tag (e.g. Operator, Supervisor,
+    EA Safety). Purely a visual indicator of what position a user is filling
+    right now — it grants no permissions. Users pick their own from the active
+    list; the chosen name + colour are copied onto the User row.
+    """
+    __tablename__ = "duty_roles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    color: Mapped[str] = mapped_column(String(16), nullable=False, default="#0d6efd")
     display_order: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

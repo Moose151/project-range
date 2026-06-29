@@ -5,7 +5,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import require_supervisor, get_current_range_state
-from app.models import ModulationType, FecType, SignalSource, AntennaType, Signal, FrequencyTemplate, User
+from app.models import ModulationType, FecType, SignalSource, AntennaType, Signal, FrequencyTemplate, User, DutyRole
 from app.settings import TIME_ZONES, get_local_timezone, set_setting, LOCAL_TIMEZONE_KEY
 
 router = APIRouter(prefix="/config")
@@ -25,6 +25,7 @@ async def config_page(
     signals = db.query(Signal).order_by(Signal.name).all()
     groups = sorted(set(s.exclusivity_group for s in signals if s.exclusivity_group))
     freq_templates = db.query(FrequencyTemplate).order_by(FrequencyTemplate.name).all()
+    duty_roles = db.query(DutyRole).order_by(DutyRole.display_order, DutyRole.name).all()
     return templates.TemplateResponse(request, "config.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
@@ -35,6 +36,7 @@ async def config_page(
         "signals": signals,
         "groups": groups,
         "freq_templates": freq_templates,
+        "duty_roles": duty_roles,
         "bands": ["C", "X", "Ku", "Ka", "Other"],
         "time_zones": TIME_ZONES,
         "local_timezone": get_local_timezone(db),
@@ -178,6 +180,96 @@ async def antenna_reorder(
                     pass
     db.commit()
     return RedirectResponse("/config?toast=Order+saved", status_code=302)
+
+
+# ── Duty roles (visual position tags) ───────────────────────────────────────────
+
+@router.post("/duty-roles/add")
+async def duty_role_add(
+    name: str = Form(...),
+    color: str = Form("#0d6efd"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    name = name.strip()
+    color = (color.strip() or "#0d6efd")
+    if name and not db.query(DutyRole).filter(DutyRole.name == name).first():
+        max_order = db.query(DutyRole).count()
+        db.add(DutyRole(name=name, color=color, display_order=max_order))
+        db.commit()
+    return RedirectResponse("/config?toast=Duty+role+added#cfg-roles", status_code=302)
+
+
+@router.post("/duty-roles/{role_id}/update")
+async def duty_role_update(
+    role_id: int,
+    name: str = Form(...),
+    color: str = Form("#0d6efd"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    role = db.query(DutyRole).filter(DutyRole.id == role_id).first()
+    if role:
+        old_name = role.name
+        new_name = name.strip() or role.name
+        role.name = new_name
+        role.color = color.strip() or role.color
+        # Keep the denormalised tag on any user currently wearing this role in sync.
+        for u in db.query(User).filter(User.duty_role == old_name).all():
+            u.duty_role = new_name
+            u.duty_role_color = role.color
+        db.commit()
+    return RedirectResponse("/config?toast=Duty+role+updated#cfg-roles", status_code=302)
+
+
+@router.post("/duty-roles/{role_id}/toggle")
+async def duty_role_toggle(
+    role_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    role = db.query(DutyRole).filter(DutyRole.id == role_id).first()
+    if role:
+        role.is_active = not role.is_active
+        db.commit()
+    return RedirectResponse("/config#cfg-roles", status_code=302)
+
+
+@router.post("/duty-roles/{role_id}/delete")
+async def duty_role_delete(
+    role_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    role = db.query(DutyRole).filter(DutyRole.id == role_id).first()
+    if role:
+        # Clear the tag from anyone currently wearing it.
+        for u in db.query(User).filter(User.duty_role == role.name).all():
+            u.duty_role = None
+            u.duty_role_color = None
+        db.delete(role)
+        db.commit()
+    return RedirectResponse("/config?toast=Duty+role+deleted#cfg-roles", status_code=302)
+
+
+@router.post("/duty-roles/reorder")
+async def duty_role_reorder(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    form = await request.form()
+    for key, val in form.items():
+        if key.startswith("order_"):
+            role_id = int(key.split("_")[1])
+            role = db.query(DutyRole).filter(DutyRole.id == role_id).first()
+            if role:
+                try:
+                    role.display_order = int(val)
+                except ValueError:
+                    pass
+    db.commit()
+    return RedirectResponse("/config?toast=Order+saved#cfg-roles", status_code=302)
 
 
 # ── Signal registry ─────────────────────────────────────────────────────────────

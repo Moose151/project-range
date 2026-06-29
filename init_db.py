@@ -8,7 +8,7 @@ from app.models import (
     User, RangeStateLog, Signal, ModulationType, FecType, SignalSource, AntennaType,
     LogSession, SignalPackage, SignalPackageEntry, Serial, SerialPackage,
     DocPage, DocVersion, AppSetting, RFDevice, DevicePort, DeviceLink,
-    CDATable, CDAWindow, SerialCDATable, Incident, CeaseEvent,
+    CDATable, CDAWindow, SerialCDATable, Incident, CeaseEvent, DutyRole,
 )
 from app.auth import hash_password
 from sqlalchemy.orm import Session
@@ -30,6 +30,14 @@ DEFAULT_FEC_TYPES = [
     ("7/8",  4),
     ("8/9",  5),
     ("9/10", 6),
+]
+
+# (name, colour, display_order) — admin-editable duty-position tags.
+DEFAULT_DUTY_ROLES = [
+    ("Operator",   "#0d6efd", 0),
+    ("Supervisor", "#198754", 1),
+    ("EA Safety",  "#dc3545", 2),
+    ("Observer",   "#6c757d", 3),
 ]
 
 def _columns(conn, table):
@@ -76,6 +84,8 @@ def _migrate(conn):
         "ALTER TABLE users ADD COLUMN must_change_password BOOLEAN DEFAULT 0",
         "ALTER TABLE rf_devices ADD COLUMN device_model VARCHAR(128)",
         "ALTER TABLE rf_devices ADD COLUMN has_web_gui BOOLEAN DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN duty_role VARCHAR(64)",
+        "ALTER TABLE users ADD COLUMN duty_role_color VARCHAR(16)",
     ]
     for sql in migrations:
         try:
@@ -408,6 +418,15 @@ def main():
             print(f"Seeded {len(DEFAULT_FEC_TYPES)} FEC types.")
         else:
             print("FEC types already seeded — skipping.")
+
+        # Seed duty-role tags if table is empty
+        if not db.query(DutyRole).first():
+            for name, color, order in DEFAULT_DUTY_ROLES:
+                db.add(DutyRole(name=name, color=color, display_order=order))
+            db.commit()
+            print(f"Seeded {len(DEFAULT_DUTY_ROLES)} duty roles.")
+        else:
+            print("Duty roles already seeded — skipping.")
 
         # Seed initial documentation pages if none exist
         if not db.query(DocPage).first():

@@ -22,8 +22,11 @@ app = FastAPI(title="SEW Range", version=APP_VERSION, docs_url=None, redoc_url=N
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 
 # Write actions a read-only Safety Supervisor IS still allowed to perform:
-# raising/dismissing a CEASE, and setting their own (forced) password.
-SAFETY_SUPERVISOR_ALLOWED_WRITES = {"/cease/raise", "/cease/dismiss", "/account/password"}
+# raising/dismissing a CEASE, setting their own (forced) password, and choosing
+# their own duty-role tag (a personal display setting, not operational data).
+SAFETY_SUPERVISOR_ALLOWED_WRITES = {
+    "/cease/raise", "/cease/dismiss", "/account/password", "/preferences/duty-role",
+}
 
 
 @app.middleware("http")

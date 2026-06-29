@@ -122,6 +122,7 @@
         <span class="sidebar-label">
           {{ user.display_name }}
           {% if user.role == 'supervisor' %}<span class="badge bg-primary ms-1" style="font-size:.6rem;vertical-align:middle">SUP</span>{% endif %}
+          {% if user.duty_role %}<span class="badge duty-badge ms-1" style="font-size:.6rem;vertical-align:middle;background:{{ user.duty_role_color or '#6c757d' }}">{{ user.duty_role }}</span>{% endif %}
         </span>
       </a>
       <a href="/account/password" class="sidebar-link {% if page == 'account' %}active{% endif %}">

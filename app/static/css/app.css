@@ -811,3 +811,10 @@ body.sidebar-collapsed .cease-btn { letter-spacing: 0; padding-left: 0; padding-
   max-width: 100%;
   word-break: break-word;
 }
+
+/* ── Duty-role tags (configurable colour, kept legible) ─────── */
+.duty-badge {
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+  font-weight: 600;
+}

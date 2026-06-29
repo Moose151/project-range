@@ -19,7 +19,8 @@
             <tr>
               <th>Username</th>
               <th>Display Name</th>
-              <th>Role</th>
+              <th>Account</th>
+              <th>Duty Role</th>
               <th>Status</th>
               <th>Created</th>
               <th>Last Login</th>
@@ -38,6 +39,13 @@
                 <span class="badge bg-danger"><i class="bi bi-shield-lock me-1"></i>Safety Supervisor</span>
                 {% else %}
                 <span class="badge bg-secondary">Operator</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if u.duty_role %}
+                <span class="badge duty-badge" style="background:{{ u.duty_role_color or '#6c757d' }}">{{ u.duty_role }}</span>
+                {% else %}
+                <span class="text-muted small">—</span>
                 {% endif %}
               </td>
               <td>

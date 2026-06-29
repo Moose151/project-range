@@ -10,6 +10,35 @@
 
 <div class="row g-4">
   <div class="col-lg-6">
+    <div class="card border-secondary mb-4">
+      <div class="card-header"><i class="bi bi-person-badge me-1"></i>Your Current Role</div>
+      <div class="card-body">
+        <p class="text-muted small">
+          A visual tag shown next to your name so others can see what position you're
+          filling right now. It does not change your permissions. Set by you; the list
+          is managed by an admin.
+        </p>
+        <form method="post" action="/preferences/duty-role" class="d-flex align-items-end gap-2 flex-wrap">
+          <div>
+            <label class="form-label small mb-1">Current role</label>
+            <select class="form-select form-select-sm" name="duty_role" style="min-width:200px">
+              <option value="">— None —</option>
+              {% for r in duty_roles %}
+              <option value="{{ r.name }}" {% if user.duty_role == r.name %}selected{% endif %}>{{ r.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check2 me-1"></i>Set</button>
+          {% if user.duty_role %}
+          <span class="ms-1">Now: <span class="badge duty-badge" style="background:{{ user.duty_role_color or '#6c757d' }}">{{ user.duty_role }}</span></span>
+          {% endif %}
+        </form>
+        {% if not duty_roles %}
+        <div class="form-text text-muted">No roles configured yet — ask an admin to add some under Admin → Config → Duty Roles.</div>
+        {% endif %}
+      </div>
+    </div>
+
     <div class="card border-secondary">
       <div class="card-header"><i class="bi bi-rulers me-1"></i>Default Units</div>
       <div class="card-body">

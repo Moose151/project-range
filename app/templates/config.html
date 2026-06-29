@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
   makeSortable('tbody-fec',     '/config/fec/reorder');
   makeSortable('tbody-sources', '/config/sources/reorder');
   makeSortable('tbody-antennas','/config/antennas/reorder');
+  makeSortable('tbody-roles',   '/config/duty-roles/reorder');
 });
 </script>
 {% endblock %}
@@ -44,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-antennas" type="button"><i class="bi bi-broadcast-pin me-1"></i>Antennas</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-freq" type="button"><i class="bi bi-diagram-3 me-1"></i>Freq Templates</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-registry" type="button"><i class="bi bi-reception-4 me-1"></i>Signal Registry</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-roles" type="button"><i class="bi bi-person-badge me-1"></i>Duty Roles</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-system" type="button"><i class="bi bi-globe2 me-1"></i>System</button></li>
 </ul>
 
@@ -580,6 +582,72 @@ document.addEventListener('DOMContentLoaded', () => {
             <button type="submit" class="btn btn-sm btn-primary">
               <i class="bi bi-plus-lg me-1"></i>Add Signal
             </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Duty Roles -->
+  <div class="tab-pane fade" id="cfg-roles" role="tabpanel">
+    <div class="card border-secondary">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-person-badge me-1"></i>Duty Roles</span>
+        <span class="text-muted small">Position tags users can wear (e.g. Operator, EA Safety) — display only, no permissions</span>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-dark table-sm align-middle mb-0">
+          <thead class="table-secondary">
+            <tr><th style="width:28px"></th><th>Name</th><th>Colour</th><th>Preview</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="tbody-roles">
+            {% for r in duty_roles %}
+            <tr class="{% if not r.is_active %}opacity-50{% endif %}" data-id="{{ r.id }}">
+              <td class="drag-handle text-muted ps-2" style="cursor:grab" title="Drag to reorder"><i class="bi bi-grip-vertical"></i></td>
+              <td colspan="3" class="py-1">
+                <form method="post" action="/config/duty-roles/{{ r.id }}/update" class="d-flex align-items-center gap-2">
+                  <input type="text" class="form-control form-control-sm" name="name" value="{{ r.name }}" required style="max-width:180px">
+                  <input type="color" class="form-control form-control-color form-control-sm" name="color" value="{{ r.color }}" title="Badge colour">
+                  <span class="badge duty-badge" style="background:{{ r.color }}">{{ r.name }}</span>
+                  <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Save changes"><i class="bi bi-check2"></i></button>
+                </form>
+              </td>
+              <td>
+                {% if r.is_active %}<span class="badge bg-success">Active</span>
+                {% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
+              </td>
+              <td class="text-nowrap">
+                <form method="post" action="/config/duty-roles/{{ r.id }}/toggle" class="d-inline">
+                  <button type="submit" class="btn btn-sm py-0 px-1 {% if r.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                          title="{{ 'Disable' if r.is_active else 'Enable' }}">
+                    <i class="bi bi-{% if r.is_active %}eye-slash{% else %}eye{% endif %}"></i>
+                  </button>
+                </form>
+                <form method="post" action="/config/duty-roles/{{ r.id }}/delete" class="d-inline"
+                      onsubmit="return confirm('Delete duty role {{ r.name }}? It will be removed from anyone currently wearing it.')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+            {% if not duty_roles %}
+            <tr><td colspan="6" class="text-muted fst-italic small ps-3 py-2">No duty roles yet — add one below.</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer">
+        <form method="post" action="/config/duty-roles/add" class="row g-2 align-items-end">
+          <div class="col-auto">
+            <label class="form-label small mb-1">Name</label>
+            <input type="text" class="form-control form-control-sm" name="name" placeholder="e.g. EA Safety" required style="width:180px">
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-1">Colour</label>
+            <input type="color" class="form-control form-control-color form-control-sm" name="color" value="#0d6efd">
+          </div>
+          <div class="col-auto">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Add Role</button>
           </div>
         </form>
       </div>
