@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.17.6` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.17.7` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -84,7 +84,7 @@
 - **CBM-400 read-only sync foundation (in progress, not versioned yet):**
   - Manuals confirmed EBEM supports read/monitor via ICC command messages over SSH/Telnet/serial and SNMPv3. Current implementation targets **SSH/ICC** first.
   - Four CBMs are idempotently seeded into the device registry: `CBM-400-1` → `10.74.10.61`, `CBM-400-2` → `.62`, `CBM-400-3` → `.63`, `CBM-400-4` → `.64`; check port `22`; web GUI enabled.
-  - Package signals now carry an explicit modem mapping: `cbm_device_id`, `cbm_path` (`tx`/`rx`/`tx_rx`/`dvb`), and optional `cbm_carrier`. This is how Project Range knows which planned signal corresponds to which modem; it does **not** guess from modem state alone.
+  - Package signals now carry an explicit modem mapping: `cbm_device_id` plus `cbm_path` (`tx`/`rx`/`tx_rx`/`dvb`). Operators select the modem through the normal **Source** field; if the Source matches an active modem device, Project Range links the signal to that modem internally. This is how Project Range knows which planned signal corresponds to which modem; it does **not** guess from modem state alone.
   - Devices page now has administrator-only EBEM credential fields (`cbm_username`, encrypted `cbm_password_encrypted`, `cbm_sync_enabled`) plus a per-device **Test CBM poll** action. Passwords are write-only in the GUI and encrypted at rest with a key derived from `SECRET_KEY`.
     - **Operational caveat:** because modem passwords are encrypted from `SECRET_KEY`, changing `SECRET_KEY` makes stored EBEM passwords unreadable. Production must use a stable `.env` `SECRET_KEY`; if it changes, re-enter modem passwords in Devices.
   - New modules: `app/crypto.py` (Fernet wrapper), `app/cbm.py` (read-only SSH/ICC client + parser), `app/cbm_sync.py` (manual active-serial sync). `requirements.txt` now includes `paramiko`.
@@ -148,6 +148,12 @@
   - Dashboard signal tables now auto-refresh every 5 seconds instead of 10 and also refresh immediately when the global range-state poll detects a state change. HTMX still pauses dashboard polling while a signal quick-edit row is open or staged, to avoid overwriting an operator mid-edit.
   - Testing transitions still trigger a controlled page reload after the toast so users move into/out of the correct Testing workspace data scope automatically.
   - Static cache keys bumped to `app.css?v=19` / `app.js?v=19`.
+- **0.17.7 — Source/CBM package import cleanup:**
+  - CBM modem devices now appear as automatic Source options in App Config, package signal forms, log forms, and dashboard quick-edit source lists. Package signals no longer have a separate CBM Modem selector; selecting a Source that matches an active modem device links the signal to that modem internally.
+  - CBM imports split modem coding fields into separate package columns: `TX_SR/RX_SR` → Symbol Rate, `TX_CODE/RX_CODE` → FEC rate, and `TX_SMOP/RX_SMOP` → Inner Code. Legacy combined values like `1/2TURBO:1024` are split on import.
+  - Package signal add/edit now has separate FEC, Inner Code, and Symbol Rate fields. Carrier Label was removed from the UI/export naming path.
+  - Eb/No was removed from package signal configuration and serial-start package loading. It remains a signal-log/display field intended to be populated from EBEM/modem reads as an indication of Tx/Rx strength. CBM sync now writes only the FEC rate portion (for example `1/2`) into signal logs when modem codes include inner-code text.
+  - Additive migration adds `signal_package_entries.inner_code VARCHAR(32)`.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.
@@ -162,7 +168,7 @@
    - test `Sync Active CBMs` on a non-operational serial/package first;
    - only after proving the above, decide whether to add background polling and at what interval.
 5. **Future: full CBM integration complete** — desired end state is live automatic modem-driven updates with a dashboard **Force CBM Update** action.
-   - Build on the existing manual `POST /devices/cbm/sync-active` foundation and package signal modem mapping (`cbm_device_id`, `cbm_path`, `cbm_carrier`).
+   - Build on the existing manual `POST /devices/cbm/sync-active` foundation and package signal modem mapping (`cbm_device_id`, `cbm_path`; Source is the operator-facing modem selector).
    - Add a controlled background poller (interval to be decided after hardware tests) that polls enabled CBMs, compares parsed modem values to the latest active serial/package signal state, and writes automatic `SignalLog` rows only when values change.
    - Add a dashboard button for **Force CBM Update** that triggers the same sync immediately and reports per-modem success/errors without leaving the dashboard.
    - Required before enabling: validate real CBM SSH/ICC output, status mapping, timeout/retry behavior, credential handling, ambiguous mapping safeguards, audit behavior, and how Testing-state CBM polling should behave.
@@ -189,7 +195,7 @@
 - **`partials/dashboard_summary.html` is now dead code** (the hardcoded summary row was removed in 0.13.0). Safe to delete; left in place for now.
 - **Settings area** — now reached via the sidebar (user footer → Preferences/Password; administrator → Admin → App Config). The old Settings dropdown is gone.
 - **`DeviceLink` and `RFDevice` new columns are fully implemented** — `device_model`, `has_web_gui`, and the `device_links` table are all in place. Device type list now includes `antenna`. No further migration needed for those.
-- **CBM sync columns:** `signal_package_entries.cbm_device_id` / `cbm_path` / `cbm_carrier`; `rf_devices.cbm_sync_enabled` / `cbm_username` / `cbm_password_encrypted` / `cbm_last_sync_*`. Additive migrations are in `init_db.py`.
+- **CBM sync columns:** `signal_package_entries.cbm_device_id` / `cbm_path` / legacy `cbm_carrier`; `rf_devices.cbm_sync_enabled` / `cbm_username` / `cbm_password_encrypted` / `cbm_last_sync_*`. `cbm_carrier` remains in the DB for backward compatibility but is no longer shown in package signal parameters. Additive migrations are in `init_db.py`.
 - **Dashboard Engaged column:** `SignalLog.engaged` is a per-signal visual flag used by operators to mark whether mission systems are affecting that signal. It is intentionally not part of the status enum and should not drive buzzer/range-state behavior.
 
 ### Caveats / verification gaps

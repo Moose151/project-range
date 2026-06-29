@@ -4,8 +4,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.deps import require_supervisor, get_current_range_state
-from app.models import ModulationType, FecType, SignalSource, AntennaType, Signal, FrequencyTemplate, User, DutyRole
+from app.deps import require_supervisor, get_current_range_state, is_testing_state
+from app.models import ModulationType, FecType, SignalSource, AntennaType, Signal, FrequencyTemplate, User, DutyRole, RFDevice
 from app.settings import TIME_ZONES, get_local_timezone, set_setting, LOCAL_TIMEZONE_KEY
 
 router = APIRouter(prefix="/config")
@@ -21,6 +21,18 @@ async def config_page(
     mod_types = db.query(ModulationType).order_by(ModulationType.display_order, ModulationType.name).all()
     fec_types = db.query(FecType).order_by(FecType.display_order, FecType.name).all()
     signal_sources = db.query(SignalSource).order_by(SignalSource.display_order, SignalSource.name).all()
+    signal_source_names = {s.name for s in signal_sources}
+    cbm_source_devices = (
+        db.query(RFDevice)
+        .filter(
+            RFDevice.is_active == True,
+            RFDevice.device_type == "modem",
+            RFDevice.is_testing == is_testing_state(db),
+        )
+        .order_by(RFDevice.name)
+        .all()
+    )
+    cbm_source_devices = [d for d in cbm_source_devices if d.name not in signal_source_names]
     antenna_types = db.query(AntennaType).order_by(AntennaType.display_order, AntennaType.name).all()
     signals = db.query(Signal).order_by(Signal.name).all()
     groups = sorted(set(s.exclusivity_group for s in signals if s.exclusivity_group))
@@ -32,6 +44,7 @@ async def config_page(
         "mod_types": mod_types,
         "fec_types": fec_types,
         "signal_sources": signal_sources,
+        "cbm_source_devices": cbm_source_devices,
         "antenna_types": antenna_types,
         "signals": signals,
         "groups": groups,

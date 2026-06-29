@@ -164,6 +164,7 @@ class SignalPackageEntry(Base):
     freq_unit: Mapped[str] = mapped_column(String(4), default="MHz")
     modulation: Mapped[str | None] = mapped_column(String(64), nullable=True)
     fec: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    inner_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     symbol_rate: Mapped[str | None] = mapped_column(String(32), nullable=True)
     power: Mapped[float | None] = mapped_column(Float, nullable=True)
     power_unit: Mapped[str] = mapped_column(String(8), default="dBm")

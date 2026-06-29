@@ -203,6 +203,20 @@ document.addEventListener('DOMContentLoaded', () => {
               </td>
             </tr>
             {% endfor %}
+            {% for d in cbm_source_devices %}
+            <tr class="table-active">
+              <td class="text-muted ps-2"><i class="bi bi-hdd-network"></i></td>
+              <td class="fw-semibold">{{ d.name }}</td>
+              <td class="text-muted small">
+                Auto source from CBM modem device{% if d.host %} · {{ d.host }}{% endif %}
+              </td>
+              <td>
+                <span class="badge bg-info text-dark">CBM modem</span>
+                {% if d.cbm_sync_enabled %}<span class="badge bg-success">Sync enabled</span>{% endif %}
+              </td>
+              <td class="text-muted small">Managed in Devices</td>
+            </tr>
+            {% endfor %}
           </tbody>
         </table>
       </div>
@@ -210,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <form method="post" action="/config/sources/add" class="row g-2 align-items-end">
           <div class="col-auto">
             <input type="text" class="form-control form-control-sm" name="name"
-                   placeholder="e.g. CBM400-1" required style="width:130px">
+                   placeholder="e.g. Signal Gen 1" required style="width:130px">
           </div>
           <div class="col-auto">
             <input type="text" class="form-control form-control-sm" name="description"

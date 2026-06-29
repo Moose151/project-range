@@ -41,6 +41,18 @@ def _float_text(value: str | None) -> float | None:
         return None
 
 
+def _fec_rate_from_cbm_code(value: str | None) -> str | None:
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    base = raw.split(":", 1)[0]
+    for marker in ("TURBO", "LDPC", "VITERBI", "RS", "TPC"):
+        idx = base.upper().find(marker)
+        if idx > 0:
+            return base[:idx].strip() or None
+    return base.strip() or None
+
+
 def _status_from_snapshot(snapshot: CBMSnapshot, path: str | None) -> str:
     if path in ("rx", "dvb"):
         lock = snapshot.status.get("ACQ_STATE") or snapshot.status.get("LINK_STAT")
@@ -65,7 +77,7 @@ def _entry_values_from_snapshot(entry: SignalPackageEntry, snapshot: CBMSnapshot
         values.update({
             "modulation": summary.get("tx_modulation") or entry.modulation,
             "symbol_rate": summary.get("tx_symbol_rate") or entry.symbol_rate,
-            "fec": summary.get("tx_code") or entry.fec,
+            "fec": _fec_rate_from_cbm_code(summary.get("tx_code")) or entry.fec,
             "power": _float_text(summary.get("tx_if_power_dbm")),
             "tx_if": _mhz_from_khz_text(summary.get("tx_if_frequency_khz")),
         })
@@ -78,7 +90,7 @@ def _entry_values_from_snapshot(entry: SignalPackageEntry, snapshot: CBMSnapshot
             values.update({
                 "modulation": summary.get("rx_modulation") or entry.modulation,
                 "symbol_rate": summary.get("rx_symbol_rate") or entry.symbol_rate,
-                "fec": summary.get("rx_code") or entry.fec,
+                "fec": _fec_rate_from_cbm_code(summary.get("rx_code")) or entry.fec,
             })
     return values
 

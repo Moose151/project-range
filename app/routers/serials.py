@@ -155,7 +155,7 @@ async def serial_start(
                 symbol_rate=entry.symbol_rate,
                 power=entry.power,
                 power_unit=entry.power_unit or "dBm",
-                eb_no=entry.eb_no,
+                eb_no=None,
                 source=entry.source,
                 antenna=pkg.antenna or entry.antenna,
                 notes=f"Initial load from package: {pkg.name}",

@@ -10,7 +10,7 @@ import io
 import openpyxl
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials, is_testing_state
-from app.models import User, SignalLog, Signal, AuditLog, SignalStatus, Role, ModulationType, FecType, SignalSource, AntennaType, LogSession, Serial
+from app.models import User, SignalLog, Signal, AuditLog, SignalStatus, Role, ModulationType, FecType, SignalSource, AntennaType, LogSession, Serial, RFDevice
 from app.rf_config import serial_package_rf_config
 from app.signal_warnings import warning_flags_for
 from app.log_changes import annotate_log_changes
@@ -38,7 +38,17 @@ def _db_fec_types(db: Session) -> list[str]:
 
 
 def _db_sources(db: Session) -> list[str]:
-    return [r.name for r in db.query(SignalSource).filter(SignalSource.is_active == True).order_by(SignalSource.display_order, SignalSource.name).all()]
+    names = [r.name for r in db.query(SignalSource).filter(SignalSource.is_active == True).order_by(SignalSource.display_order, SignalSource.name).all()]
+    modems = (
+        db.query(RFDevice)
+        .filter(RFDevice.is_active == True, RFDevice.device_type == "modem", RFDevice.is_testing == is_testing_state(db))
+        .order_by(RFDevice.name)
+        .all()
+    )
+    for modem in modems:
+        if modem.name not in names:
+            names.append(modem.name)
+    return names
 
 
 def _db_antennas(db: Session) -> list[str]:

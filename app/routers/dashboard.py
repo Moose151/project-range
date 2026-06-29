@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials, is_testing_state
-from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage, SerialCDATable, CDAWindow
+from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage, SerialCDATable, CDAWindow, RFDevice
 from app.rf_config import serial_package_rf_config
 from app.signal_warnings import warning_flags_for
 from app.settings import get_local_timezone
@@ -83,12 +83,22 @@ def _get_fec_types(db: Session) -> list[str]:
 
 
 def _get_sources(db: Session) -> list[str]:
-    return [
+    names = [
         s.name for s in db.query(SignalSource)
         .filter(SignalSource.is_active == True)
         .order_by(SignalSource.display_order, SignalSource.name)
         .all()
     ]
+    modems = (
+        db.query(RFDevice)
+        .filter(RFDevice.is_active == True, RFDevice.device_type == "modem", RFDevice.is_testing == is_testing_state(db))
+        .order_by(RFDevice.name)
+        .all()
+    )
+    for modem in modems:
+        if modem.name not in names:
+            names.append(modem.name)
+    return names
 
 
 def _get_antennas(db: Session) -> list[str]:

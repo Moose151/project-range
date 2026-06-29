@@ -92,6 +92,7 @@ def _migrate(conn):
         "ALTER TABLE signal_package_entries ADD COLUMN cbm_device_id INTEGER REFERENCES rf_devices(id)",
         "ALTER TABLE signal_package_entries ADD COLUMN cbm_path VARCHAR(16)",
         "ALTER TABLE signal_package_entries ADD COLUMN cbm_carrier VARCHAR(64)",
+        "ALTER TABLE signal_package_entries ADD COLUMN inner_code VARCHAR(32)",
         "ALTER TABLE signals ADD COLUMN max_power_dbm FLOAT",
         "ALTER TABLE users ADD COLUMN default_freq_unit VARCHAR(4) DEFAULT 'MHz'",
         "ALTER TABLE users ADD COLUMN default_power_unit VARCHAR(4) DEFAULT 'dBm'",
@@ -394,17 +395,18 @@ The integration is **read-only by policy**. Operators should continue to configu
 
 Project Range does not guess from modem state alone.
 
-Each signal in a **Signal Package** can be mapped to a CBM modem:
+Each signal in a **Signal Package** can be mapped to a CBM modem through its
+Source:
 
-- **CBM Modem**: the physical modem, such as `CBM-400-1`.
+- **Source**: select the physical CBM modem source, such as `CBM-400-1`.
+  CBM modem devices automatically appear in the Source list.
 - **CBM Path**: which part of the modem to read, such as `Tx`, `Rx`, `Tx/Rx`, or `DVB`.
-- **Carrier Label**: optional free text for local clarity.
 
 When a serial starts, Project Range creates the dashboard signals from the package. The CBM sync then only updates the active signal that has a matching package mapping.
 
 Example:
 
-| Package Signal | CBM Modem | CBM Path |
+| Package Signal | Source | CBM Path |
 |---|---|---|
 | S101 | CBM-400-1 | Tx |
 | S102 | CBM-400-2 | Tx |
@@ -445,7 +447,7 @@ Important: the server `SECRET_KEY` must remain stable. If `SECRET_KEY` changes, 
 1. Go to **Packages**.
 2. Open the relevant package.
 3. For each signal, use the edit pencil.
-4. Set **CBM Modem** to the modem that carries that planned signal.
+4. Set **Source** to the modem that carries that planned signal.
 5. Set **CBM Path** to the path Project Range should read.
 6. Save the signal.
 

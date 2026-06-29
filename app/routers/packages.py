@@ -131,7 +131,6 @@ def _dropdown_lists(db: Session) -> dict:
     testing = is_testing_state(db)
     mod_types = [m.name for m in db.query(ModulationType).filter(ModulationType.is_active == True).order_by(ModulationType.display_order).all()]
     fec_types = [f.name for f in db.query(FecType).filter(FecType.is_active == True).order_by(FecType.display_order).all()]
-    sources = [s.name for s in db.query(SignalSource).filter(SignalSource.is_active == True).order_by(SignalSource.display_order).all()]
     antennas = [a.name for a in db.query(AntennaType).filter(AntennaType.is_active == True).order_by(AntennaType.display_order).all()]
     signals = [s.name for s in db.query(Signal).filter(Signal.is_active == True).order_by(Signal.name).all()]
     cbm_devices = (
@@ -144,10 +143,14 @@ def _dropdown_lists(db: Session) -> dict:
         .order_by(RFDevice.name)
         .all()
     )
+    source_names = [s.name for s in db.query(SignalSource).filter(SignalSource.is_active == True).order_by(SignalSource.display_order).all()]
+    for device in cbm_devices:
+        if device.name not in source_names:
+            source_names.append(device.name)
     return {
         "mod_types": mod_types or ["BPSK", "QPSK", "8PSK", "16APSK", "32APSK"],
         "fec_types": fec_types or ["1/2", "2/3", "3/4", "5/6", "7/8", "8/9", "9/10"],
-        "signal_sources": sources,
+        "signal_sources": source_names,
         "antenna_types": antennas,
         "registry_signals": signals,
         "cbm_devices": cbm_devices,
@@ -184,15 +187,14 @@ def _package_to_dict(pkg: SignalPackage) -> dict:
                 "freq_unit": e.freq_unit,
                 "modulation": e.modulation or "",
                 "fec": e.fec or "",
+                "inner_code": e.inner_code or "",
                 "symbol_rate": e.symbol_rate or "",
                 "power": e.power,
                 "power_unit": e.power_unit,
-                "eb_no": e.eb_no,
                 "source": e.source or "",
                 "antenna": e.antenna or "",
                 "cbm_device": e.cbm_device.name if e.cbm_device else "",
                 "cbm_path": e.cbm_path or "",
-                "cbm_carrier": e.cbm_carrier or "",
                 "notes": e.notes or "",
             }
             for e in pkg.signals
@@ -204,6 +206,10 @@ def _dict_to_entries(data: dict) -> list[dict]:
     """Parse a JSON package dict and return a list of entry field dicts."""
     entries = []
     for i, s in enumerate(data.get("signals", [])):
+        fec, inner_code = _split_cbm_code(
+            str(s.get("fec", "")).strip(),
+            str(s.get("inner_code", "")).strip(),
+        )
         entries.append({
             "signal_name": str(s.get("name", "")).strip(),
             "description": str(s.get("description", "")).strip() or None,
@@ -214,15 +220,14 @@ def _dict_to_entries(data: dict) -> list[dict]:
             "rx_if": _float_or_none(s.get("rx_if")),
             "freq_unit": str(s.get("freq_unit", "MHz")).strip() or "MHz",
             "modulation": str(s.get("modulation", "")).strip() or None,
-            "fec": str(s.get("fec", "")).strip() or None,
+            "fec": fec,
+            "inner_code": inner_code,
             "symbol_rate": str(s.get("symbol_rate", "")).strip() or None,
             "power": _float_or_none(s.get("power")),
             "power_unit": str(s.get("power_unit", "dBm")).strip() or "dBm",
-            "eb_no": _float_or_none(s.get("eb_no")),
             "source": str(s.get("source", "")).strip() or None,
             "antenna": str(s.get("antenna", "")).strip() or None,
             "cbm_path": str(s.get("cbm_path", "")).strip() or None,
-            "cbm_carrier": str(s.get("cbm_carrier", "")).strip() or None,
             "notes": str(s.get("notes", "")).strip() or None,
             "display_order": i,
         })
@@ -283,6 +288,59 @@ def _project_mod_to_cbm(value: str | None) -> str:
     return mapping.get(value.strip().upper(), value.strip())
 
 
+def _split_cbm_code(code: str | None, smop: str | None = None) -> tuple[str | None, str | None]:
+    raw = (code or "").strip()
+    inner = (smop or "").strip() or None
+    if not raw:
+        return None, inner
+    base = raw.split(":", 1)[0].strip()
+    if inner and base.upper().endswith(inner.upper()):
+        fec = base[: -len(inner)].strip()
+        return fec or None, inner
+    for marker in ("TURBO", "LDPC", "VITERBI", "RS", "TPC"):
+        idx = base.upper().find(marker)
+        if idx > 0:
+            return base[:idx].strip() or None, inner or base[idx:].strip()
+    return base or None, inner
+
+
+def _cbm_code_from_fields(fec: str | None, inner_code: str | None) -> str:
+    rate = (fec or "").strip()
+    inner = (inner_code or "").strip()
+    if not rate:
+        return ""
+    if not inner:
+        return rate
+    suffix = inner if ":" in inner else f"{inner}:1024"
+    return f"{rate}{suffix}"
+
+
+def _source_key(value: str) -> str:
+    return "".join(ch for ch in value.lower() if ch.isalnum())
+
+
+def _cbm_source_device(db: Session, source: str, testing: bool) -> RFDevice | None:
+    name = source.strip()
+    if not name:
+        return None
+    devices = (
+        db.query(RFDevice)
+        .filter(RFDevice.is_active == True, RFDevice.device_type == "modem", RFDevice.is_testing == testing)
+        .order_by(RFDevice.name)
+        .all()
+    )
+    key = _source_key(name)
+    for device in devices:
+        if device.name == name or _source_key(device.name) == key:
+            return device
+    return None
+
+
+def _cbm_source_device_id(db: Session, source: str, testing: bool) -> int | None:
+    device = _cbm_source_device(db, source, testing)
+    return device.id if device else None
+
+
 def _cbm_entry_from_text(text: str, filename: str, display_order: int = 0) -> dict:
     pairs = _cbm_pairs_from_text(text)
     stem = (filename.rsplit("/", 1)[-1] or "").rsplit(".", 1)[0]
@@ -291,7 +349,8 @@ def _cbm_entry_from_text(text: str, filename: str, display_order: int = 0) -> di
     rx_if = _cbm_if_to_mhz(pairs.get("RXIF_FRQ"))
     modulation = _cbm_mod_to_project(pairs.get("TX_MOD") or pairs.get("RX_MOD"))
     symbol_rate = pairs.get("TX_SR") or pairs.get("RX_SR")
-    fec = pairs.get("TX_CODE") or pairs.get("RX_CODE")
+    inner_code = pairs.get("TX_SMOP") or pairs.get("RX_SMOP")
+    fec, inner_code = _split_cbm_code(pairs.get("TX_CODE") or pairs.get("RX_CODE"), inner_code)
     power = _float_or_none(pairs.get("TXIF_LVL"))
     notes = "Imported from CBM-400 config"
     if pairs.get("TX_OP") or pairs.get("RX_OP") or pairs.get("ITA_ENGAGE"):
@@ -307,6 +366,7 @@ def _cbm_entry_from_text(text: str, filename: str, display_order: int = 0) -> di
         "freq_unit": "MHz",
         "modulation": modulation,
         "fec": fec,
+        "inner_code": inner_code,
         "symbol_rate": symbol_rate,
         "power": power,
         "power_unit": "dBm",
@@ -314,7 +374,6 @@ def _cbm_entry_from_text(text: str, filename: str, display_order: int = 0) -> di
         "source": pairs.get("CFG_NAME") or None,
         "antenna": None,
         "cbm_path": "tx_rx" if tx_if is not None and rx_if is not None else ("tx" if tx_if is not None else "rx"),
-        "cbm_carrier": signal_name.strip(),
         "notes": notes,
         "display_order": display_order,
     }
@@ -325,14 +384,16 @@ def _cbm_text_from_entry(entry: SignalPackageEntry) -> str:
     values.update({
         "TXIF_FRQ": _mhz_to_cbm_if(entry.tx_if),
         "RXIF_FRQ": _mhz_to_cbm_if(entry.rx_if if entry.rx_if is not None else entry.tx_if),
+        "TX_SMOP": str(entry.inner_code or CBM_DEFAULTS["TX_SMOP"]),
+        "RX_SMOP": str(entry.inner_code or CBM_DEFAULTS["RX_SMOP"]),
         "TX_MOD": _project_mod_to_cbm(entry.modulation),
         "RX_MOD": _project_mod_to_cbm(entry.modulation),
         "TX_SR": str(entry.symbol_rate or "0"),
         "RX_SR": str(entry.symbol_rate or "0"),
-        "TX_CODE": str(entry.fec or ""),
-        "RX_CODE": str(entry.fec or ""),
+        "TX_CODE": _cbm_code_from_fields(entry.fec, entry.inner_code),
+        "RX_CODE": _cbm_code_from_fields(entry.fec, entry.inner_code),
         "TXIF_LVL": str(entry.power if entry.power is not None else -30.0),
-        "CFG_NAME": _safe_filename(entry.cbm_carrier or entry.signal_name, "ProjectRange"),
+        "CFG_NAME": _safe_filename(entry.source or entry.signal_name, "ProjectRange"),
     })
     parts = [f"{key}={values[key]}" for key in CBM_EXPORT_ORDER if values.get(key) is not None]
     return "STR_CFG 2," + ",".join(parts) + "\r\n"
@@ -486,15 +547,13 @@ async def package_signal_add(
     freq_unit: str = Form("MHz"),
     modulation: str = Form(""),
     fec: str = Form(""),
+    inner_code: str = Form(""),
     symbol_rate: str = Form(""),
     power: Optional[float] = Form(None),
     power_unit: str = Form("dBm"),
-    eb_no: Optional[float] = Form(None),
     source: str = Form(""),
     antenna: str = Form(""),
-    cbm_device_id: Optional[int] = Form(None),
     cbm_path: str = Form(""),
-    cbm_carrier: str = Form(""),
     notes: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -503,9 +562,8 @@ async def package_signal_add(
     pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id, SignalPackage.is_testing == testing).first()
     if not pkg:
         return RedirectResponse("/packages", status_code=302)
-    if cbm_device_id:
-        device = db.query(RFDevice).filter(RFDevice.id == cbm_device_id, RFDevice.is_testing == testing).first()
-        cbm_device_id = device.id if device else None
+    source_name = source.strip()
+    cbm_device_id = _cbm_source_device_id(db, source_name, testing)
     order = len(pkg.signals)
     entry = SignalPackageEntry(
         package_id=pkg_id,
@@ -517,14 +575,14 @@ async def package_signal_add(
         freq_unit=freq_unit or "MHz",
         modulation=modulation or None,
         fec=fec or None,
+        inner_code=inner_code.strip() or None,
         symbol_rate=symbol_rate or None,
         power=power, power_unit=power_unit or "dBm",
-        eb_no=eb_no,
-        source=source.strip() or None,
+        eb_no=None,
+        source=source_name or None,
         antenna=antenna.strip() or None,
         cbm_device_id=cbm_device_id,
         cbm_path=cbm_path or None,
-        cbm_carrier=cbm_carrier.strip() or None,
         notes=notes.strip() or None,
     )
     pkg.updated_at = datetime.utcnow()
@@ -547,24 +605,21 @@ async def package_signal_update(
     freq_unit: str = Form("MHz"),
     modulation: str = Form(""),
     fec: str = Form(""),
+    inner_code: str = Form(""),
     symbol_rate: str = Form(""),
     power: Optional[float] = Form(None),
     power_unit: str = Form("dBm"),
-    eb_no: Optional[float] = Form(None),
     source: str = Form(""),
     antenna: str = Form(""),
-    cbm_device_id: Optional[int] = Form(None),
     cbm_path: str = Form(""),
-    cbm_carrier: str = Form(""),
     notes: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     testing = is_testing_state(db)
     pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id, SignalPackage.is_testing == testing).first()
-    if cbm_device_id:
-        device = db.query(RFDevice).filter(RFDevice.id == cbm_device_id, RFDevice.is_testing == testing).first()
-        cbm_device_id = device.id if device else None
+    source_name = source.strip()
+    cbm_device_id = _cbm_source_device_id(db, source_name, testing)
     entry = db.query(SignalPackageEntry).filter(
         SignalPackageEntry.id == entry_id,
         SignalPackageEntry.package_id == pkg_id,
@@ -578,14 +633,14 @@ async def package_signal_update(
         entry.freq_unit = freq_unit or "MHz"
         entry.modulation = modulation or None
         entry.fec = fec or None
+        entry.inner_code = inner_code.strip() or None
         entry.symbol_rate = symbol_rate or None
         entry.power = power; entry.power_unit = power_unit or "dBm"
-        entry.eb_no = eb_no
-        entry.source = source.strip() or None
+        entry.eb_no = None
+        entry.source = source_name or None
         entry.antenna = antenna.strip() or None
         entry.cbm_device_id = cbm_device_id
         entry.cbm_path = cbm_path or None
-        entry.cbm_carrier = cbm_carrier.strip() or None
         entry.notes = notes.strip() or None
         pkg.updated_at = datetime.utcnow()
         db.commit()
@@ -648,14 +703,14 @@ async def package_duplicate(
             freq_unit=entry.freq_unit,
             modulation=entry.modulation,
             fec=entry.fec,
+            inner_code=entry.inner_code,
             symbol_rate=entry.symbol_rate,
             power=entry.power, power_unit=entry.power_unit,
-            eb_no=entry.eb_no,
+            eb_no=None,
             source=entry.source,
             antenna=entry.antenna,
             cbm_device_id=entry.cbm_device_id,
             cbm_path=entry.cbm_path,
-            cbm_carrier=entry.cbm_carrier,
             notes=entry.notes,
         ))
     db.add(AuditLog(user_id=current_user.id, action_type="PACKAGE_DUPLICATE",
@@ -724,7 +779,7 @@ async def package_export(
     if len(pkg.signals) == 1:
         entry = pkg.signals[0]
         data = _cbm_text_from_entry(entry)
-        filename = _safe_filename(entry.cbm_carrier or entry.signal_name or pkg.name, "signal") + ".txt"
+        filename = _safe_filename(entry.signal_name or pkg.name, "signal") + ".txt"
         return StreamingResponse(
             iter([data]),
             media_type="text/plain",
@@ -734,7 +789,7 @@ async def package_export(
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for i, entry in enumerate(pkg.signals, start=1):
-            filename = _safe_filename(entry.cbm_carrier or entry.signal_name or f"signal_{i}", f"signal_{i}") + ".txt"
+            filename = _safe_filename(entry.signal_name or f"signal_{i}", f"signal_{i}") + ".txt"
             zf.writestr(filename, _cbm_text_from_entry(entry))
         zf.writestr(
             "project_range_package.json",
@@ -817,8 +872,13 @@ async def package_import_submit(
         )
         db.add(pkg)
         db.flush()
+        testing = is_testing_state(db)
         for fields in entries:
             if fields["signal_name"]:
+                device = _cbm_source_device(db, fields.get("source") or "", testing)
+                if device:
+                    fields["source"] = device.name
+                    fields["cbm_device_id"] = device.id
                 db.add(SignalPackageEntry(package_id=pkg.id, **fields))
         db.add(AuditLog(user_id=current_user.id, action_type="PACKAGE_IMPORT",
                         entity_type="SignalPackage", entity_id=pkg.id, new_value=pkg.name))
@@ -854,9 +914,14 @@ def _import_json_package(data: dict, filename: str, db: Session, current_user: U
         )
         db.add(pkg)
         db.flush()
+        testing = is_testing_state(db)
         for fields in _dict_to_entries(data):
             if not fields["signal_name"]:
                 continue
+            device = _cbm_source_device(db, fields.get("source") or "", testing)
+            if device:
+                fields["source"] = device.name
+                fields["cbm_device_id"] = device.id
             db.add(SignalPackageEntry(package_id=pkg.id, **fields))
         db.add(AuditLog(user_id=current_user.id, action_type="PACKAGE_IMPORT",
                         entity_type="SignalPackage", entity_id=pkg.id, new_value=pkg.name))

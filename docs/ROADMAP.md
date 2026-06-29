@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.17.6` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.17.7` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -17,7 +17,7 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.17.6)
+## ✅ Already delivered (through 0.17.7)
 
 Core of the MVP scope is in place:
 
@@ -44,6 +44,7 @@ Core of the MVP scope is in place:
 - Dashboard Engaged signal toggle with immediate save
 - CBM-400 package import/export using modem-style text config files
 - Live shared-state refresh: range-state banner updates across logged-in browsers, and dashboard signal tables poll every 5 seconds with immediate refresh on range-state change
+- Source/CBM package cleanup: CBM modems appear as Sources, package imports split FEC/Inner Code/Symbol Rate, Carrier Label removed, and Eb/No is reserved for modem-derived reads
 - **0.6.0:** TxLO/RxLO naming, version badge, fully offline (LAN) styling, Docker deploy on port 7474
 
 ---
@@ -260,8 +261,9 @@ Current foundation now in place:
 - CBM modem manuals and exported modem config samples have been reviewed locally.
 - Package import/export can use CBM-style modem text config files, using the
   Project Range fields it understands and ignoring modem-only parameters.
-- Package signals can carry modem mapping metadata (`cbm_device_id`, `cbm_path`,
-  `cbm_carrier`) so a Project Range signal can be tied to a specific modem source.
+- Package signals can carry modem mapping metadata (`cbm_device_id`, `cbm_path`)
+  so a Project Range signal can be tied to a specific modem source. The selected
+  Source is now the user-facing modem selector when it matches a CBM modem device.
 
 Future target: **full CBM integration complete**.
 
