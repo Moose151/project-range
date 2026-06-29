@@ -82,7 +82,7 @@
         </button>
         <a href="/logs" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
       </div>
-      {% if user.role == 'supervisor' %}
+      {% if user.role == 'administrator' %}
       <div class="col-auto">
         <div class="form-check form-check-sm mb-0">
           <input class="form-check-input" type="checkbox" name="show_deleted" value="1"
@@ -146,7 +146,7 @@
       <thead class="table-secondary">
         <tr>
           {{ sort_th('timestamp', 'Time') }}
-          <th>Operator</th>
+          <th>User</th>
           <th>Serial</th>
           {{ sort_th('signal_name', 'Signal') }}
           {{ sort_th('signal_status', 'Status') }}
@@ -197,7 +197,7 @@
                     onclick="confirmDelete(this)">
               <i class="bi bi-trash"></i>
             </button>
-            {% elif user.role == 'supervisor' %}
+            {% elif user.role == 'administrator' %}
             <form method="post" action="/logs/{{ log.id }}/restore" class="d-inline">
               <button type="submit" class="btn btn-xs btn-outline-warning btn-sm py-0 px-1" title="Restore">
                 <i class="bi bi-arrow-counterclockwise"></i>
@@ -261,7 +261,7 @@
                     onclick="confirmDelete(this)">
               <i class="bi bi-trash"></i>
             </button>
-            {% elif user.role == 'supervisor' %}
+            {% elif user.role == 'administrator' %}
             <form method="post" action="/logs/{{ log.id }}/restore" class="d-inline">
               <button type="submit" class="btn btn-xs btn-outline-warning btn-sm py-0 px-1"
                       title="Restore">
@@ -329,7 +329,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body small">
-        Delete log entry for <strong id="deleteEntryName"></strong>? The entry will be hidden but can be restored by a supervisor.
+        Delete log entry for <strong id="deleteEntryName"></strong>? The entry will be hidden but can be restored by an administrator.
       </div>
       <div class="modal-footer border-secondary py-2">
         <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>

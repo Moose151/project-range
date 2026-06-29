@@ -102,7 +102,7 @@
   <a href="/devices/topology" class="btn btn-sm btn-outline-info ms-2">
     <i class="bi bi-diagram-3 me-1"></i>Topology
   </a>
-  {% if user.role == 'supervisor' %}
+  {% if user.role == 'administrator' %}
   <form method="post" action="/devices/cbm/sync-active" class="ms-auto">
     <button type="submit" class="btn btn-sm btn-outline-success">
       <i class="bi bi-arrow-repeat me-1"></i>Sync Active CBMs
@@ -185,7 +185,7 @@
               <i class="bi bi-diagram-3"></i> Routing
             </a>
             {% endif %}
-            {% if user.role == 'supervisor' %}
+            {% if user.role == 'administrator' %}
             {% if d.device_type == 'modem' %}
             <form method="post" action="/devices/{{ d.id }}/cbm/test" class="d-inline">
               <button type="submit" class="btn btn-sm btn-outline-success py-0 px-1" title="Test read-only CBM poll">
@@ -204,7 +204,7 @@
             {% endif %}
           </td>
         </tr>
-        {% if user.role == 'supervisor' %}
+        {% if user.role == 'administrator' %}
         <tr class="collapse" id="edit-{{ d.id }}">
           <td colspan="9" class="p-2 bg-body-tertiary">
             {{ device_form(d, device_types, '/devices/' ~ d.id ~ '/update', 'Save') }}
@@ -219,7 +219,7 @@
   </div>
 </div>
 
-{% if user.role == 'supervisor' %}
+{% if user.role == 'administrator' %}
 <div class="card border-secondary">
   <div class="card-header"><i class="bi bi-plus-lg me-1"></i>Add Device</div>
   <div class="card-body">
@@ -227,7 +227,7 @@
   </div>
 </div>
 {% else %}
-<p class="text-muted small">Device registry is managed by supervisors. Status updates automatically.</p>
+<p class="text-muted small">Device registry is managed by administrators. Status updates automatically.</p>
 {% endif %}
 {% endblock %}
 

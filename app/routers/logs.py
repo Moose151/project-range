@@ -458,7 +458,7 @@ async def log_hard_delete(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Permanently delete a log entry. Supervisor only, and only on already
+    """Permanently delete a log entry. Administrator only, and only on already
     soft-deleted entries (so it's a deliberate two-step action)."""
     if current_user.role != Role.SUPERVISOR:
         return RedirectResponse("/logs", status_code=302)

@@ -5,7 +5,7 @@
 <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
   <h4 class="mb-0"><i class="bi bi-book me-2"></i>Documentation</h4>
   <div class="ms-auto d-flex gap-2">
-    {% if user.role == 'supervisor' %}
+    {% if user.role == 'administrator' %}
     <a href="/docs/proposals" class="btn btn-sm btn-outline-warning position-relative">
       <i class="bi bi-hourglass-split me-1"></i>Approval Queue
       {% if pending_count > 0 %}
@@ -51,7 +51,7 @@
 <div class="text-center text-muted py-5">
   <i class="bi bi-book display-4 d-block mb-3"></i>
   {% if q %}No pages match "{{ q }}".{% else %}No documentation pages yet.{% endif %}
-  {% if user.role == 'supervisor' %}<br><a href="/docs/new" class="btn btn-success mt-3">Create the first page</a>{% endif %}
+  {% if user.role == 'administrator' %}<br><a href="/docs/new" class="btn btn-success mt-3">Create the first page</a>{% endif %}
 </div>
 {% endif %}
 {% endblock %}

@@ -9,11 +9,13 @@ from app.database import Base
 
 
 class Role(str, enum.Enum):
-    OPERATOR = "operator"
-    SUPERVISOR = "supervisor"
-    # Read-only account. Can view everything but cannot make any changes
-    # (enforced in the security middleware). May still raise/dismiss a CEASE.
-    SAFETY_SUPERVISOR = "safety_supervisor"
+    ADMINISTRATOR = "administrator"
+    USER = "user"
+    OBSERVER = "observer"
+    # Backwards-compatible internal aliases for older permission checks.
+    SUPERVISOR = "administrator"
+    OPERATOR = "user"
+    SAFETY_SUPERVISOR = "observer"
 
 
 class RangeState(str, enum.Enum):
@@ -44,8 +46,17 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
     display_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    role: Mapped[Role] = mapped_column(Enum(Role), nullable=False, default=Role.OPERATOR)
+    role: Mapped[Role] = mapped_column(
+        Enum(
+            Role,
+            values_callable=lambda enum_cls: [role.value for role in enum_cls],
+            native_enum=False,
+        ),
+        nullable=False,
+        default=Role.USER,
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # User preferences
@@ -63,6 +74,15 @@ class User(Base):
     signal_logs: Mapped[list["SignalLog"]] = relationship("SignalLog", foreign_keys="SignalLog.operator_id", back_populates="operator")
     range_state_changes: Mapped[list["RangeStateLog"]] = relationship("RangeStateLog", back_populates="changed_by_user")
     audit_entries: Mapped[list["AuditLog"]] = relationship("AuditLog", back_populates="user")
+
+    @property
+    def role_label(self) -> str:
+        labels = {
+            Role.ADMINISTRATOR: "Administrator",
+            Role.USER: "User",
+            Role.OBSERVER: "Observer",
+        }
+        return labels.get(self.role, str(self.role).replace("_", " ").title())
 
 
 class RangeStateLog(Base):
@@ -586,7 +606,7 @@ class Incident(Base):
 class CeaseEvent(Base):
     """A range-wide CEASE alert.
 
-    Any logged-in user (including a read-only Safety Supervisor) may raise one,
+    Any logged-in user (including a read-only Observer) may raise one,
     and must supply a reason. It splashes a full-screen CEASE over every user's
     screen until any user dismisses it. Both actions are audit-logged. The
     currently active cease is the most recent row with dismissed_at IS NULL.

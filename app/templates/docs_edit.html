@@ -22,14 +22,14 @@
 {% if mode == 'propose' %}
 <div class="alert alert-info py-2 mb-3">
   <i class="bi bi-info-circle me-1"></i>
-  Your edit will be submitted for supervisor review. It will not appear on the page until approved.
+  Your edit will be submitted for administrator review. It will not appear on the page until approved.
 </div>
 {% endif %}
 
 <form method="post" action="{% if mode == 'new' %}/docs/new{% else %}/docs/{{ doc_page.slug }}/edit{% endif %}">
   <div class="row g-4">
     <div class="col-lg-8">
-      {% if mode == 'new' or user.role == 'supervisor' %}
+      {% if mode == 'new' or user.role == 'administrator' %}
       <div class="mb-3">
         <label class="form-label fw-semibold">Page Title</label>
         <input type="text" class="form-control" name="title" required

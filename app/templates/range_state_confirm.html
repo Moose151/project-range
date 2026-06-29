@@ -25,7 +25,7 @@
         {% if not valid_states %}
         <div class="alert alert-warning d-flex align-items-center gap-2 py-2">
           <i class="bi bi-lock-fill"></i>
-          Only a supervisor can change the range out of Testing.
+          Only an administrator can change the range out of Testing.
         </div>
         <a href="/" class="btn btn-outline-secondary w-100">Back to Dashboard</a>
         {% else %}
@@ -50,7 +50,7 @@
             <strong>Testing:</strong> operational data and configuration changes are kept in the Testing workspace and hidden from other range states.
           </div>
 
-          <!-- Live authorisation: safety acknowledgment + (if operator) supervisor sign-off -->
+          <!-- Live authorisation: safety acknowledgment + (if user) administrator sign-off -->
           <div id="liveAuth" class="border border-danger rounded p-2 mb-3 d-none">
             <div class="form-check mb-2">
               <input class="form-check-input" type="checkbox" name="acknowledge" value="1" id="ackChk">
@@ -58,14 +58,14 @@
                 I confirm all personnel are clear of the aperture and safety procedures are followed.
               </label>
             </div>
-            {% if user.role != 'supervisor' %}
-            <div class="small text-warning mb-2"><i class="bi bi-shield-lock me-1"></i>A supervisor must authorise going Live.</div>
+            {% if user.role != 'administrator' %}
+            <div class="small text-warning mb-2"><i class="bi bi-shield-lock me-1"></i>An administrator must authorise going Live.</div>
             <div class="row g-2">
               <div class="col-6">
-                <input type="text" class="form-control form-control-sm" name="supervisor_username" placeholder="Supervisor username" autocomplete="off">
+                <input type="text" class="form-control form-control-sm" name="supervisor_username" placeholder="Administrator username" autocomplete="off">
               </div>
               <div class="col-6">
-                <input type="password" class="form-control form-control-sm" name="supervisor_password" placeholder="Supervisor password" autocomplete="off">
+                <input type="password" class="form-control form-control-sm" name="supervisor_password" placeholder="Administrator password" autocomplete="off">
               </div>
             </div>
             {% endif %}

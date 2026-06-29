@@ -55,7 +55,7 @@ async def duty_role_save(
     current_user: User = Depends(get_current_user),
 ):
     """Set the current user's own duty-role tag. Available to every account type
-    (including read-only Safety Supervisors) — it's a personal display setting."""
+    (including read-only Observers) — it's a personal display setting."""
     name = duty_role.strip()
     if not name:
         current_user.duty_role = None

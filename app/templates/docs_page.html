@@ -26,10 +26,10 @@
     <a href="/docs/{{ doc_page.slug }}/print" target="_blank" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-printer me-1"></i>Print
     </a>
-    <a href="/docs/{{ doc_page.slug }}/edit" class="btn btn-sm {% if user.role == 'supervisor' %}btn-outline-primary{% else %}btn-outline-secondary{% endif %}">
-      <i class="bi bi-pencil me-1"></i>{% if user.role == 'supervisor' %}Edit{% else %}Propose Edit{% endif %}
+    <a href="/docs/{{ doc_page.slug }}/edit" class="btn btn-sm {% if user.role == 'administrator' %}btn-outline-primary{% else %}btn-outline-secondary{% endif %}">
+      <i class="bi bi-pencil me-1"></i>{% if user.role == 'administrator' %}Edit{% else %}Propose Edit{% endif %}
     </a>
-    {% if user.role == 'supervisor' %}
+    {% if user.role == 'administrator' %}
     <a href="/docs/{{ doc_page.slug }}/history" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-clock-history me-1"></i>History
     </a>

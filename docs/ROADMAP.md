@@ -25,10 +25,10 @@ Core of the MVP scope is in place:
 - Power converter (dBm/dBW/W), gain/loss chain, EIRP
 - Signal logging with per-signal power-warning thresholds + band/frequency validation
 - Live dashboard (status, buzzer, drag-tab merge/split, steppers, column toggles, bulk-submit)
-- Range state management (Standby/Closed Loop/Live) with reason + two-person supervisor auth
+- Range state management (Standby/Closed Loop/Live) with reason + two-person administrator auth
 - Package-level RF config (TxLO/RxLO/TTF) with one-frequency auto-calc across signals
 - Documentation/wiki module, structured XLSX export, shift handover
-- User auth (operator/supervisor), audit log, "remember this terminal"
+- User auth (user/administrator), audit log, "remember this terminal"
 - Device registry with TCP reachability, routing matrix (splitter/combiner), topology view
 - Incident/fault reporting, hard-delete for logs, security hardening (CSRF, headers, throttle, forced PW change)
 - Serial pending/pre-create: serials can be saved as pending before starting
@@ -63,7 +63,7 @@ Theme: visibility of the physical signal path. *(User-requested splitter page + 
 
 - [x] **Splitter / combiner routing page** — crossbar matrix (each output routed from an input) **plus** a free-text label on every input/output port. Port counts configurable per device (default 16/16). Persisted and audited (`DEVICE_ROUTING`).
 - [x] **Basic device status checks** — live up/down/no-check badges via a non-blocking concurrent TCP reachability probe (`/devices/status`, polled every 15s); no hardware control. Scope §11.9.
-- [x] **Device registry** (name, type, host/IP, check port, location, port counts) — supervisor-managed CRUD, audited; underpins both of the above. New "Devices" nav entry.
+- [x] **Device registry** (name, type, host/IP, check port, location, port counts) — administrator-managed CRUD, audited; underpins both of the above. New "Devices" nav entry.
 
 ## 0.9.3 — Device enhancements + serial pre-create ✅ (shipped 2026-06-26)
 
@@ -72,7 +72,7 @@ Theme: richer device modelling and operational pre-planning.
 - [x] **Extended device types** — IP Switch, 10MHz Reference, Sync Server, DC Injector added to the registry dropdown. IP Switch is intentionally *not* a routing device (no crossbar matrix) — it gets topology links only.
 - [x] **Device name vs model** — `RFDevice` now has `name` (instance, e.g. `CBM-400-1`) and `device_model` (product, e.g. `CBM-400`) as separate fields. Both shown in the devices table. Migration: `ALTER TABLE rf_devices ADD COLUMN device_model VARCHAR(128)`.
 - [x] **Web GUI link** — `has_web_gui` boolean per device (checkbox in add/edit). When set, an "Open" link button appears in the devices table pointing to `http://<host>/`. Migration: `ALTER TABLE rf_devices ADD COLUMN has_web_gui BOOLEAN DEFAULT 0`.
-- [x] **Topology view** (`/devices/topology`) — tabbed RF / IP / Clock / All views. SVG diagram auto-positioned by device layer type. Colour-coded links (RF=gold, IP=teal, Clock=purple, Power=red). Connection list with delete for supervisors. Supervisor add-connection form with port labels + port index for routing integration.
+- [x] **Topology view** (`/devices/topology`) — tabbed RF / IP / Clock / All views. SVG diagram auto-positioned by device layer type. Colour-coded links (RF=gold, IP=teal, Clock=purple, Power=red). Connection list with delete for administrators. Administrator add-connection form with port labels + port index for routing integration.
 - [x] **`DeviceLink` model** — directed connection between two RFDevices (from/to device, port label, port index, link_type, label). Port index enables routing page auto-hints.
 - [x] **Routing page auto-hints** — the combiner/splitter routing page reads `DeviceLink` records and pre-populates port label fields with the name of the connected device (and shows a "linked: DeviceName" hint below unlabelled ports).
 - [x] **Serial pre-create / pending serials** — "Save as Pending" button on the serial create form saves a serial with `is_started=False`. Pending serials appear in their own section at the top of `/serials` with Start and Delete buttons. Serials can now be prepared in advance and started when needed.
@@ -86,9 +86,9 @@ Theme: make audit trails easier to scan under pressure.
 
 ## 0.9.5 — Settings and theme polish ✅ (shipped 2026-06-26)
 
-Theme: quick operator-facing polish before the dashboard clock work.
+Theme: quick user-facing polish before the dashboard clock work.
 
-- [x] **Settings discoverability** — main navbar now has a visible Settings dropdown with Your Preferences, Password, and supervisor-only Admin Config. This covers the immediate "where do I change themes/units/config?" issue.
+- [x] **Settings discoverability** — main navbar now has a visible Settings dropdown with Your Preferences, Password, and administrator-only Admin Config. This covers the immediate "where do I change themes/units/config?" issue.
 - [x] **More distinct themes** — palette selection now changes body background, navbar, cards, borders, and muted panels as well as the accent colour. Light mode now uses softer backgrounds, darker body text, and stronger borders instead of stark Bootstrap white.
 - [x] **Login theme toggle polish** — login page sun/moon icon now syncs with the saved light/dark mode on load; CSS cache key bumped to `app.css?v=11`.
 
@@ -97,8 +97,8 @@ Theme: quick operator-facing polish before the dashboard clock work.
 Theme: ready to trust with real operations. *(Scope §13, Phase 4.)*
 See the **Security hardening** section below for the security items shipped in 0.9.0.
 
-- [x] **Soft / hard log delete** — soft delete (recoverable) for everyone; supervisor-only restore and permanent hard-delete (two-step: only on already soft-deleted entries). Audited. Scope §4.10.
-- [x] **Supervisor approval for going Live** — going Live requires a safety acknowledgment, and a supervisor must authorise (operators supply a supervisor's credentials = two-person). Approver recorded in the state log + audit. Scope §12.2.
+- [x] **Soft / hard log delete** — soft delete (recoverable) for everyone; administrator-only restore and permanent hard-delete (two-step: only on already soft-deleted entries). Audited. Scope §4.10.
+- [x] **Administrator approval for going Live** — going Live requires a safety acknowledgment, and an administrator must authorise (users supply an administrator's credentials = two-person). Approver recorded in the state log + audit. Scope §12.2.
 - [x] **Incident / fault reporting** — log incidents (severity/status/affected/serial), update status with resolution, CSV export, audited; new "Incidents" nav with open count. Scope §12.2.
 - [x] **Backups** — scripted SQLite backup and documented restore procedure shipped in 0.10.1. Schedule with cron or Windows Task Scheduler.
 - [~] **PostgreSQL option** — **deferred** (your call — no infra to stand up yet). Support Postgres via `DATABASE_URL` with a real migration tool (Alembic).
@@ -110,9 +110,9 @@ Theme: discoverability and at-a-glance ops info. *(User-requested.)*
 
 - [x] **Settings area** — a clear, discoverable **Settings** entry (nav item / gear menu) that consolidates configuration in one place:
   - **Per-user (Preferences):** theme + light/dark, default units. *(These live on the existing `/preferences` page today, reached by Settings or the user's display name.)*
-  - **Admin (Config):** the supervisor-only `/config` page (modulation/FEC/sources/antennas/registry/freq templates, global local timezone).
-  - Shipped as a Settings dropdown grouping Preferences, Password, and supervisor Admin Config. A dedicated tabbed `/settings` page remains optional if more settings are added later.
-- [x] **Dashboard clock widget** — a **Zulu (UTC) time** clock plus **local time**, where local time follows a supervisor-set global IANA timezone under `/config` → System. Implemented as a dashboard widget that can be reordered, collapsed, hidden, and re-shown; updates live client-side and persists layout in localStorage.
+  - **Admin (Config):** the administrator-only `/config` page (modulation/FEC/sources/antennas/registry/freq templates, global local timezone).
+  - Shipped as a Settings dropdown grouping Preferences, Password, and administrator Admin Config. A dedicated tabbed `/settings` page remains optional if more settings are added later.
+- [x] **Dashboard clock widget** — a **Zulu (UTC) time** clock plus **local time**, where local time follows an administrator-set global IANA timezone under `/config` → System. Implemented as a dashboard widget that can be reordered, collapsed, hidden, and re-shown; updates live client-side and persists layout in localStorage.
 - [x] **Zulu-first logs with optional local time** — `/logs` and `/history/{serial_id}` always show Zulu timestamps (`Z` suffix). A "Show local time" checkbox adds a local-time line using the configured timezone. CSV/XLSX exports label timestamps as `Timestamp (Zulu)`.
 - [x] **Antenna device type** — "Antenna" added to the Devices registry type dropdown and topology renderer.
 
@@ -128,7 +128,7 @@ Theme: close an operational release gap with a simple, schedulable backup path.
 
 Theme: controlled data area time-window management and live dashboard countdown.
 
-- [x] **CDA Tables** — supervisor-managed named schedules of daily CDA time windows (Zulu). Each table holds any number of windows with a start time, end time, optional label, and optional max power (dBm). Audited CRUD at `/cda`.
+- [x] **CDA Tables** — administrator-managed named schedules of daily CDA time windows (Zulu). Each table holds any number of windows with a start time, end time, optional label, and optional max power (dBm). Audited CRUD at `/cda`.
 - [x] **Window types** — blank max-power = **No Fire** (transmit prohibited); a max-power value = **Reduced Power** limit. Both types displayed with colour-coded badges.
 - [x] **Serial assignment** — CDA tables are assigned to serials (many-to-many). Assignment/removal is visible on the Serials page and audited.
 - [x] **Dashboard CDA widget** — appears automatically when any active serial has CDA tables assigned. Shows a window schedule table and a live per-table countdown timer updated every second.
@@ -138,12 +138,12 @@ Theme: controlled data area time-window management and live dashboard countdown.
 
 ## 0.11.0 — Dashboard utility widgets ✅ (shipped 2026-06-26)
 
-Theme: make the dashboard useful as an operator workspace, not only a signal table.
+Theme: make the dashboard useful as a user workspace, not only a signal table.
 
 - [x] **Quick Notes widget** — local scratchpad stored in the browser with a "Save to PC" `.txt` download action.
 - [x] **Docs Reference widget** — add a dashboard widget, select a published Docs page, and view the rendered document content in a contained reference panel. Full doc link remains available.
 - [x] **Multiple clock widgets** — add extra clocks and choose Zulu + local, Zulu only, or local only per widget. The original combined clock remains available.
-- [x] **Quick Links widget** — compact shortcuts for common operator actions: New Log, Note, Serials, Range State, Incidents, and Handover.
+- [x] **Quick Links widget** — compact shortcuts for common user actions: New Log, Note, Serials, Range State, Incidents, and Handover.
 - [x] **Local widget persistence** — utility widgets are terminal-local via localStorage and reuse the dashboard widget container for drag reorder, collapse, remove, and saved layout.
 
 ## 1.0.0 — Operational release
@@ -153,7 +153,7 @@ Theme: blessed for use. Gate criteria:
 - [ ] Deployed and validated on the target Windows Server / range network (Docker or direct).
 - [ ] All MVP success criteria in Scope §19 met and signed off.
 - [ ] Backups, user accounts, and audit verified in the live environment.
-- [ ] Operator + supervisor documentation complete in the wiki module.
+- [ ] User + administrator documentation complete in the wiki module.
 - [ ] Password/secret hygiene enforced (no default `admin/changeme`, real `SECRET_KEY`).
 - [ ] **Critical** security items below are closed (they gate 1.0.0).
 

@@ -97,7 +97,7 @@
         <span class="sidebar-label">Documentation</span>
       </a>
 
-      {% if user.role == 'supervisor' %}
+      {% if user.role == 'administrator' %}
       <div class="sidebar-section-header">Admin</div>
       <a href="/users" class="sidebar-link {% if page == 'users' %}active{% endif %}">
         <i class="bi bi-people"></i>
@@ -121,7 +121,7 @@
         <i class="bi bi-person-gear"></i>
         <span class="sidebar-label">
           {{ user.display_name }}
-          {% if user.role == 'supervisor' %}<span class="badge bg-primary ms-1" style="font-size:.6rem;vertical-align:middle">SUP</span>{% endif %}
+          {% if user.role == 'administrator' %}<span class="badge bg-primary ms-1" style="font-size:.6rem;vertical-align:middle">ADMIN</span>{% endif %}
           {% if user.duty_role %}<span class="badge duty-badge ms-1" style="font-size:.6rem;vertical-align:middle;background:{{ user.duty_role_color or '#6c757d' }}">{{ user.duty_role }}</span>{% endif %}
         </span>
       </a>
@@ -135,7 +135,7 @@
       </a>
     </div>
 
-    <!-- CEASE: range-wide stop alert. Any user (incl. Safety Supervisor) may raise it. -->
+    <!-- CEASE: range-wide stop alert. Any user (incl. Observer) may raise it. -->
     <div class="sidebar-cease">
       <button type="button" class="cease-btn" data-bs-toggle="modal" data-bs-target="#ceaseModal"
               title="Raise a range-wide CEASE alert">

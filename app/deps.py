@@ -12,7 +12,11 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     if not user_id or session_is_expired(request.session):
         request.session.clear()
         raise HTTPException(status_code=302, headers={"Location": "/login?timeout=1"})
-    user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+    user = db.query(User).filter(
+        User.id == user_id,
+        User.is_active == True,
+        User.is_archived == False,
+    ).first()
     if not user:
         request.session.clear()
         raise HTTPException(status_code=302, headers={"Location": "/login"})
@@ -26,7 +30,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
 
 def require_supervisor(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role != Role.SUPERVISOR:
-        raise HTTPException(status_code=403, detail="Supervisor access required")
+        raise HTTPException(status_code=403, detail="Administrator access required")
     return current_user
 
 

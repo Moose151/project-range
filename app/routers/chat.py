@@ -17,7 +17,7 @@ def _room_title(room, current_user: User, db: Session | None = None) -> str:
     if not other_ids:
         return "Notes to self"
     if db is not None:
-        other = db.query(User).filter(User.id == other_ids[0]).first()
+        other = db.query(User).filter(User.id == other_ids[0], User.is_archived == False).first()
         if other:
             return other.display_name
     return room.title
@@ -70,7 +70,7 @@ async def chat_private_room(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    other = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+    other = db.query(User).filter(User.id == user_id, User.is_active == True, User.is_archived == False).first()
     if not other:
         return JSONResponse({"error": "User not found"}, status_code=404)
     room = chat_state.ensure_private_room(
@@ -95,7 +95,7 @@ async def chat_group_room(
             ids.append(int(raw))
     active_ids = [
         uid for (uid,) in db.query(User.id)
-        .filter(User.id.in_(ids), User.is_active == True)
+        .filter(User.id.in_(ids), User.is_active == True, User.is_archived == False)
         .all()
     ] if ids else []
     room = chat_state.create_group_room(current_user.id, active_ids, title)

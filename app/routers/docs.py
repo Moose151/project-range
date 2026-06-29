@@ -75,7 +75,7 @@ async def docs_home(
     pages = query.order_by(DocPage.title).all()
 
     pending_count = 0
-    if current_user.role == "supervisor":
+    if current_user.role == "administrator":
         pending_count = db.query(DocVersion).filter(DocVersion.approval_status == "pending").count()
 
     return templates.TemplateResponse(request, "docs_home.html", {
@@ -88,7 +88,7 @@ async def docs_home(
     })
 
 
-# ── New page (supervisor only) ─────────────────────────────────────────────────
+# ── New page (administrator only) ─────────────────────────────────────────────────
 
 @router.get("/new", response_class=HTMLResponse)
 async def docs_new_page(
@@ -156,7 +156,7 @@ async def docs_create_page(
     return RedirectResponse(f"/docs/{slug}?toast=Page+created", status_code=302)
 
 
-# ── Proposals / approval queue (supervisor only) ───────────────────────────────
+# ── Proposals / approval queue (administrator only) ───────────────────────────────
 
 @router.get("/proposals", response_class=HTMLResponse)
 async def docs_proposals(
@@ -328,7 +328,7 @@ async def docs_edit_page(
     doc = db.query(DocPage).filter(DocPage.slug == slug).first()
     if not doc:
         return RedirectResponse("/docs", status_code=302)
-    mode = "edit" if current_user.role == "supervisor" else "propose"
+    mode = "edit" if current_user.role == "administrator" else "propose"
     return templates.TemplateResponse(request, "docs_edit.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
@@ -355,7 +355,7 @@ async def docs_submit_edit(
     now = datetime.utcnow()
     next_ver = _next_version(db, doc.id)
 
-    if current_user.role == "supervisor":
+    if current_user.role == "administrator":
         # Direct publish
         if title.strip():
             doc.title = title.strip()
@@ -382,7 +382,7 @@ async def docs_submit_edit(
         db.commit()
         return RedirectResponse(f"/docs/{slug}?toast=Page+updated", status_code=302)
     else:
-        # Operator — goes to approval queue
+        # User — goes to approval queue
         db.add(DocVersion(
             page_id=doc.id,
             version_number=next_ver,
@@ -399,10 +399,10 @@ async def docs_submit_edit(
             comment=change_summary.strip() or None,
         ))
         db.commit()
-        return RedirectResponse(f"/docs/{slug}?toast=Edit+submitted+for+supervisor+approval", status_code=302)
+        return RedirectResponse(f"/docs/{slug}?toast=Edit+submitted+for+administrator+approval", status_code=302)
 
 
-# ── Version history (supervisor only) ────────────────────────────────────────
+# ── Version history (administrator only) ────────────────────────────────────────
 
 @router.get("/{slug}/history", response_class=HTMLResponse)
 async def docs_history(

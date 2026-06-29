@@ -1,5 +1,5 @@
 """
-Initialise the database and create a default supervisor account.
+Initialise the database and create a default administrator account.
 Run once: python init_db.py
 Re-running is safe — it skips existing data and only adds missing tables/seed rows.
 """
@@ -106,6 +106,7 @@ def _migrate(conn):
         "ALTER TABLE rf_devices ADD COLUMN cbm_last_sync_error TEXT",
         "ALTER TABLE users ADD COLUMN duty_role VARCHAR(64)",
         "ALTER TABLE users ADD COLUMN duty_role_color VARCHAR(16)",
+        "ALTER TABLE users ADD COLUMN is_archived BOOLEAN DEFAULT 0",
         "ALTER TABLE signal_packages ADD COLUMN is_testing BOOLEAN DEFAULT 0",
         "ALTER TABLE serials ADD COLUMN is_testing BOOLEAN DEFAULT 0",
         "ALTER TABLE signal_logs ADD COLUMN is_testing BOOLEAN DEFAULT 0",
@@ -122,6 +123,13 @@ def _migrate(conn):
             conn.commit()
         except Exception:
             pass  # column already exists
+    try:
+        conn.execute(text("UPDATE users SET role = 'administrator' WHERE role IN ('SUPERVISOR', 'supervisor')"))
+        conn.execute(text("UPDATE users SET role = 'user' WHERE role IN ('OPERATOR', 'operator')"))
+        conn.execute(text("UPDATE users SET role = 'observer' WHERE role IN ('SAFETY_SUPERVISOR', 'safety_supervisor')"))
+        conn.commit()
+    except Exception:
+        pass
 
 
 INITIAL_DOCS = [
@@ -172,7 +180,7 @@ Moving the range from Closed Loop to Live means RF will begin transmitting. Foll
 - All signals must be verified at IF (Closed Loop) before going Live.
 - Confirm all personnel are clear of the antenna aperture.
 - Confirm the target receiver is ready and expecting signal.
-- Supervisor must be aware and approve (verbal confirmation required in the MVP).
+- Administrator must be aware and approve (verbal confirmation required in the MVP).
 
 ## Procedure
 
@@ -286,7 +294,7 @@ Where:
 
 ## Frequency Templates
 
-Common TxLO/RxLO/TTF configurations can be saved as **Frequency Templates** on the Config page (supervisor only). Templates appear in the dropdown above the calculator and pre-fill all conversion values with a single click.
+Common TxLO/RxLO/TTF configurations can be saved as **Frequency Templates** on the Config page (administrator only). Templates appear in the dropdown above the calculator and pre-fill all conversion values with a single click.
 
 ## Creating a Log Entry from the Calculator
 
@@ -352,7 +360,7 @@ In an emergency requiring immediate cessation of RF transmission, follow your si
 
 ## Reporting
 
-- Notify the Range Supervisor immediately.
+- Notify the Range Administrator immediately.
 - Complete any required incident reports per site procedures.
 - The Signal Logs and audit trail in this system can be exported to support any formal incident review.
 """,
@@ -417,7 +425,7 @@ The following CBMs are seeded into **Devices**:
 
 The reachability check uses port `22` because the first implementation targets SSH/ICC polling.
 
-## Supervisor Setup
+## Administrator Setup
 
 1. Go to **Devices**.
 2. Confirm each CBM is present and has the correct IP address.
@@ -549,13 +557,13 @@ def main():
         _migrate(conn)
 
     with Session(engine) as db:
-        # Default supervisor
+        # Default administrator
         if not db.query(User).first():
             admin = User(
                 username="admin",
                 password_hash=hash_password("changeme"),
                 display_name="Administrator",
-                role="supervisor",
+                role="administrator",
                 must_change_password=True,  # force a real password at first login
             )
             db.add(admin)
@@ -575,7 +583,7 @@ def main():
                 db.add(Signal(name=name, description=desc))
 
             db.commit()
-            print("Created default supervisor account: admin / changeme")
+            print("Created default administrator account: admin / changeme")
             print("IMPORTANT: Change the default password immediately after first login.")
         else:
             print("Users already exist — skipping user seed.")

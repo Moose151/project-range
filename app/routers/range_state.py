@@ -148,15 +148,15 @@ async def change_state_submit(
         return RedirectResponse("/", status_code=302)
     if current == RangeState.TESTING.value and current_user.role != Role.SUPERVISOR:
         return _render_change(request, db, current_user, current,
-                              "Only a supervisor can change the range out of Testing.")
+                              "Only an administrator can change the range out of Testing.")
     if new_state == RangeState.TESTING.value and current_user.role != Role.SUPERVISOR:
         return _render_change(request, db, current_user, current,
-                              "Only a supervisor can place the range into Testing.")
+                              "Only an administrator can place the range into Testing.")
 
     reason = reason.strip()
     approver = current_user  # who authorised the change
 
-    # Going Live requires a safety acknowledgment and supervisor authorisation.
+    # Going Live requires a safety acknowledgment and administrator authorisation.
     if new_state == "Live":
         if acknowledge != "1":
             return _render_change(request, db, current_user, current,
@@ -164,11 +164,13 @@ async def change_state_submit(
         if current_user.role != Role.SUPERVISOR:
             sup = db.query(User).filter(
                 User.username == supervisor_username.strip().lower(),
-                User.is_active == True, User.role == Role.SUPERVISOR,
+                User.is_active == True,
+                User.is_archived == False,
+                User.role == Role.SUPERVISOR,
             ).first()
             if not sup or not verify_password(supervisor_password, sup.password_hash):
                 return _render_change(request, db, current_user, current,
-                                      "A valid supervisor username and password are required to go Live.")
+                                      "A valid administrator username and password are required to go Live.")
             approver = sup
             reason = f"{reason} [Authorised by {sup.display_name}; initiated by {current_user.display_name}]"
 

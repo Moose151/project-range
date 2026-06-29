@@ -38,8 +38,8 @@
     {% endif %}
   </div>
 
-  <!-- Create form (supervisor only) -->
-  {% if user.role == 'supervisor' %}
+  <!-- Create form (administrator only) -->
+  {% if user.role == 'administrator' %}
   <div class="col-lg-4">
     <div class="card">
       <div class="card-header"><i class="bi bi-plus-circle me-1"></i>New CDA Table</div>

@@ -31,7 +31,7 @@
               <th>End (Z)</th>
               <th>Label</th>
               <th>Type</th>
-              {% if user.role != 'safety_supervisor' %}<th></th>{% endif %}
+              {% if user.role != 'observer' %}<th></th>{% endif %}
             </tr>
           </thead>
           <tbody>
@@ -51,7 +51,7 @@
                 </span>
                 {% endif %}
               </td>
-              {% if user.role != 'safety_supervisor' %}
+              {% if user.role != 'observer' %}
               <td class="text-end">
                 <div class="d-flex justify-content-end gap-1">
                   <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
@@ -68,7 +68,7 @@
               </td>
               {% endif %}
             </tr>
-            {% if user.role != 'safety_supervisor' %}
+            {% if user.role != 'observer' %}
             <tr class="collapse" id="editWindow{{ w.id }}">
               <td colspan="5" class="bg-body-tertiary">
                 <form method="post" action="/cda/{{ table.id }}/windows/{{ w.id }}/edit" class="row g-2 align-items-end">
@@ -143,7 +143,7 @@
       </div>
     </div>
 
-    {% if user.role != 'safety_supervisor' %}
+    {% if user.role != 'observer' %}
     <!-- Add window form -->
     <div class="card mb-3">
       <div class="card-header"><i class="bi bi-plus-circle me-1"></i>Add CDA Window</div>
@@ -201,7 +201,7 @@
       </div>
     </div>
     {% endif %}
-    {% if user.role == 'supervisor' %}
+    {% if user.role == 'administrator' %}
 
     <!-- Edit table name/description -->
     <div class="card mb-3">

@@ -60,7 +60,7 @@
           <th>To Port</th>
           <th>Type</th>
           <th>Label</th>
-          {% if user.role == 'supervisor' %}<th></th>{% endif %}
+          {% if user.role == 'administrator' %}<th></th>{% endif %}
         </tr>
       </thead>
       <tbody id="linkTableBody">
@@ -84,7 +84,7 @@
             <span class="badge link-type-badge" data-lt="{{ lnk.link_type }}">{{ lnk.link_type.upper() }}</span>
           </td>
           <td class="text-muted small">{{ lnk.label or '—' }}</td>
-          {% if user.role == 'supervisor' %}
+          {% if user.role == 'administrator' %}
           <td>
             <form method="post" action="/devices/links/{{ lnk.id }}/delete" class="d-inline"
                   onsubmit="return confirm('Remove this connection?')">
@@ -102,8 +102,8 @@
   </div>
 </div>
 
-{# ── Add connection form (supervisor only) ── #}
-{% if user.role == 'supervisor' %}
+{# ── Add connection form (administrator only) ── #}
+{% if user.role == 'administrator' %}
 <div class="card border-secondary">
   <div class="card-header"><i class="bi bi-plus-lg me-1"></i>Add Connection</div>
   <div class="card-body">

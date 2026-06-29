@@ -53,7 +53,11 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def authenticate_user(db: Session, username: str, password: str) -> User | None:
-    user = db.query(User).filter(User.username == username, User.is_active == True).first()
+    user = db.query(User).filter(
+        User.username == username,
+        User.is_active == True,
+        User.is_archived == False,
+    ).first()
     if not user or not verify_password(password, user.password_hash):
         return None
     user.last_login = datetime.utcnow()

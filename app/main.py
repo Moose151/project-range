@@ -22,7 +22,7 @@ app = FastAPI(title="SEW Range", version=APP_VERSION, docs_url=None, redoc_url=N
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 
-# Write actions a read-only Safety Supervisor IS still allowed to perform:
+# Write actions a read-only Observer IS still allowed to perform:
 # raising/dismissing a CEASE, setting their own (forced) password, and choosing
 # their own duty-role tag (a personal display setting, not operational data).
 SAFETY_SUPERVISOR_ALLOWED_WRITES = {
@@ -42,16 +42,16 @@ async def security_middleware(request: Request, call_next):
             if host and host != request.headers.get("host", ""):
                 return PlainTextResponse("Cross-origin request blocked.", status_code=403)
 
-        # Read-only enforcement: a Safety Supervisor account may not make changes,
+        # Read-only enforcement: an Observer account may not make changes,
         # except the explicitly allowed CEASE + own-password actions above.
         user_id = request.session.get("user_id")
         if user_id and request.url.path not in SAFETY_SUPERVISOR_ALLOWED_WRITES and not request.url.path.startswith("/chat/"):
             db = SessionLocal()
             try:
-                u = db.query(User).filter(User.id == user_id).first()
+                u = db.query(User).filter(User.id == user_id, User.is_archived == False).first()
                 if u and u.role == Role.SAFETY_SUPERVISOR:
                     return PlainTextResponse(
-                        "This is a read-only Safety Supervisor account — changes are not permitted.",
+                        "This is a read-only Observer account — changes are not permitted.",
                         status_code=403,
                     )
             finally:
@@ -80,7 +80,7 @@ async def security_middleware(request: Request, call_next):
 
 # Added last so it is the OUTERMOST middleware (Starlette inserts each at index 0),
 # i.e. it runs before security_middleware — guaranteeing request.session is
-# populated when the read-only Safety Supervisor check inspects it.
+# populated when the read-only Observer check inspects it.
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,

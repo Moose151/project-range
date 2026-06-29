@@ -67,7 +67,7 @@ async def login_submit(
     request.session["user_id"] = user.id
     request.session["username"] = user.username
     request.session["display_name"] = user.display_name
-    request.session["role"] = user.role
+    request.session["role"] = user.role.value if hasattr(user.role, "value") else str(user.role)
     request.session["logged_in_at"] = datetime.utcnow().isoformat()
     request.session["remember"] = bool(remember)
     return RedirectResponse("/", status_code=302)
