@@ -374,7 +374,11 @@ function setVal(id, val) {
   const el = document.getElementById(id);
   if (!el) return;
   if (el.tagName === 'SELECT') {
-    el.value = val || '';
+    const value = val || '';
+    if (value && ![...el.options].some(opt => opt.value === value)) {
+      el.add(new Option(value, value));
+    }
+    el.value = value;
   } else {
     el.value = (val !== null && val !== undefined) ? val : '';
   }

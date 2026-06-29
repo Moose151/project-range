@@ -41,6 +41,13 @@ def _float_text(value: str | None) -> float | None:
         return None
 
 
+def _symbol_rate_from_cbm(value: str | None) -> str | None:
+    raw = _float_text(value)
+    if raw is None:
+        return None
+    return f"{raw / 1000.0:.6f}".rstrip("0").rstrip(".")
+
+
 def _fec_rate_from_cbm_code(value: str | None) -> str | None:
     raw = (value or "").strip()
     if not raw:
@@ -76,7 +83,7 @@ def _entry_values_from_snapshot(entry: SignalPackageEntry, snapshot: CBMSnapshot
     if path in ("tx", "tx_rx"):
         values.update({
             "modulation": summary.get("tx_modulation") or entry.modulation,
-            "symbol_rate": summary.get("tx_symbol_rate") or entry.symbol_rate,
+            "symbol_rate": _symbol_rate_from_cbm(summary.get("tx_symbol_rate")) or entry.symbol_rate,
             "fec": _fec_rate_from_cbm_code(summary.get("tx_code")) or entry.fec,
             "power": _float_text(summary.get("tx_if_power_dbm")),
             "tx_if": _mhz_from_khz_text(summary.get("tx_if_frequency_khz")),
@@ -89,7 +96,7 @@ def _entry_values_from_snapshot(entry: SignalPackageEntry, snapshot: CBMSnapshot
         if path in ("rx", "dvb"):
             values.update({
                 "modulation": summary.get("rx_modulation") or entry.modulation,
-                "symbol_rate": summary.get("rx_symbol_rate") or entry.symbol_rate,
+                "symbol_rate": _symbol_rate_from_cbm(summary.get("rx_symbol_rate")) or entry.symbol_rate,
                 "fec": _fec_rate_from_cbm_code(summary.get("rx_code")) or entry.fec,
             })
     return values

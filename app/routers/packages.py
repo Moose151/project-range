@@ -274,6 +274,22 @@ def _mhz_to_cbm_if(value: float | None) -> str:
     return str(int(round(cbm_value))) if abs(cbm_value - round(cbm_value)) < 0.001 else f"{cbm_value:.3f}".rstrip("0").rstrip(".")
 
 
+def _cbm_symbol_to_project(value: str | None) -> str | None:
+    raw = _float_or_none(value)
+    if raw is None:
+        return None
+    scaled = raw / 1000.0
+    return f"{scaled:.6f}".rstrip("0").rstrip(".")
+
+
+def _project_symbol_to_cbm(value: str | None) -> str:
+    raw = _float_or_none(value)
+    if raw is None:
+        return "0"
+    scaled = raw * 1000.0
+    return str(int(round(scaled))) if abs(scaled - round(scaled)) < 0.001 else f"{scaled:.3f}".rstrip("0").rstrip(".")
+
+
 def _cbm_mod_to_project(value: str | None) -> str | None:
     if not value:
         return None
@@ -348,7 +364,7 @@ def _cbm_entry_from_text(text: str, filename: str, display_order: int = 0) -> di
     tx_if = _cbm_if_to_mhz(pairs.get("TXIF_FRQ"))
     rx_if = _cbm_if_to_mhz(pairs.get("RXIF_FRQ"))
     modulation = _cbm_mod_to_project(pairs.get("TX_MOD") or pairs.get("RX_MOD"))
-    symbol_rate = pairs.get("TX_SR") or pairs.get("RX_SR")
+    symbol_rate = _cbm_symbol_to_project(pairs.get("TX_SR") or pairs.get("RX_SR"))
     inner_code = pairs.get("TX_SMOP") or pairs.get("RX_SMOP")
     fec, inner_code = _split_cbm_code(pairs.get("TX_CODE") or pairs.get("RX_CODE"), inner_code)
     power = _float_or_none(pairs.get("TXIF_LVL"))
@@ -388,8 +404,8 @@ def _cbm_text_from_entry(entry: SignalPackageEntry) -> str:
         "RX_SMOP": str(entry.inner_code or CBM_DEFAULTS["RX_SMOP"]),
         "TX_MOD": _project_mod_to_cbm(entry.modulation),
         "RX_MOD": _project_mod_to_cbm(entry.modulation),
-        "TX_SR": str(entry.symbol_rate or "0"),
-        "RX_SR": str(entry.symbol_rate or "0"),
+        "TX_SR": _project_symbol_to_cbm(entry.symbol_rate),
+        "RX_SR": _project_symbol_to_cbm(entry.symbol_rate),
         "TX_CODE": _cbm_code_from_fields(entry.fec, entry.inner_code),
         "RX_CODE": _cbm_code_from_fields(entry.fec, entry.inner_code),
         "TXIF_LVL": str(entry.power if entry.power is not None else -30.0),
