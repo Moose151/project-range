@@ -16,12 +16,21 @@
 <div class="row justify-content-center">
   <div class="col-lg-7">
     <div class="card border-secondary">
-      <div class="card-header">Upload JSON Package File</div>
+      <div class="card-header">Upload CBM-400 Config File(s)</div>
       <div class="card-body">
         <form method="post" action="/packages/import" enctype="multipart/form-data">
           <div class="mb-3">
-            <label class="form-label">Select .json file</label>
-            <input type="file" class="form-control" name="file" accept=".json,application/json" required>
+            <label class="form-label">Package name (optional)</label>
+            <input type="text" class="form-control" name="package_name"
+                   placeholder="Defaults to signal name, or CBM Import timestamp for multiple files">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Select CBM .txt file(s), a .zip of CBM configs, or legacy Project Range .json</label>
+            <input type="file" class="form-control" name="files"
+                   accept=".txt,.cfg,.conf,.zip,.json,text/plain,application/json,application/zip" multiple required>
+            <div class="form-text">
+              CBM imports use the modem's <code>STR_CFG</code> text export. Extra modem fields are ignored.
+            </div>
           </div>
           <button type="submit" class="btn btn-primary">
             <i class="bi bi-upload me-1"></i>Import Package
@@ -31,32 +40,19 @@
     </div>
 
     <div class="card border-secondary mt-3">
-      <div class="card-header small text-muted"><i class="bi bi-file-earmark-code me-1"></i>Expected file format</div>
+      <div class="card-header small text-muted"><i class="bi bi-file-earmark-code me-1"></i>CBM fields Project Range imports</div>
       <div class="card-body">
-        <pre class="text-muted small mb-0" style="white-space:pre-wrap">{
-  "name": "My Signal Package",
-  "description": "Optional description",
-  "signals": [
-    {
-      "name": "S101",
-      "description": "Uplink 1",
-      "band": "Ku",
-      "tx_if": 70.0,
-      "tx_rf": 14450.0,
-      "rx_rf": 11700.0,
-      "rx_if": 70.0,
-      "freq_unit": "MHz",
-      "modulation": "QPSK",
-      "fec": "3/4",
-      "symbol_rate": "7500",
-      "power": 15.0,
-      "power_unit": "dBm",
-      "source": "CBM400-1",
-      "antenna": "ANT-1",
-      "notes": ""
-    }
-  ]
-}</pre>
+        <p class="text-muted small mb-2">
+          The signal name comes from the filename. Project Range reads:
+        </p>
+        <pre class="text-muted small mb-0" style="white-space:pre-wrap">TXIF_FRQ → TxIF MHz
+RXIF_FRQ → RxIF MHz
+TXIF_LVL → Power dBm
+TX_MOD/RX_MOD → Modulation
+TX_SR/RX_SR → Symbol rate
+TX_CODE/RX_CODE → FEC
+CFG_NAME → Source
+TX_OP/RX_OP/ITA_ENGAGE → Notes only</pre>
       </div>
     </div>
   </div>

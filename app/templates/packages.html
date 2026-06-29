@@ -6,7 +6,7 @@
   <h4 class="mb-0"><i class="bi bi-box-seam me-2"></i>Signal Packages</h4>
   <div class="ms-auto d-flex gap-2">
     <a href="/packages/import" class="btn btn-sm btn-outline-secondary">
-      <i class="bi bi-upload me-1"></i>Import JSON
+      <i class="bi bi-upload me-1"></i>Import CBM
     </a>
     <a href="/packages/new" class="btn btn-sm btn-success">
       <i class="bi bi-plus-lg me-1"></i>New Package
@@ -28,7 +28,7 @@
         <span class="fw-semibold">{{ pkg.name }}</span>
         <span class="badge bg-secondary ms-1">{{ pkg.signals | length }} signal{{ 's' if pkg.signals | length != 1 }}</span>
         <div class="ms-auto d-flex gap-1">
-          <a href="/packages/{{ pkg.id }}/export" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Export JSON">
+          <a href="/packages/{{ pkg.id }}/export" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Export CBM config">
             <i class="bi bi-download"></i>
           </a>
           <a href="/packages/{{ pkg.id }}" class="btn btn-sm btn-outline-primary py-0 px-2">
@@ -71,7 +71,7 @@
   No signal packages yet.<br>
   <a href="/packages/new" class="btn btn-success mt-3">Create your first package</a>
   <span class="text-muted mx-2">or</span>
-  <a href="/packages/import" class="btn btn-outline-secondary mt-3">Import from JSON file</a>
+  <a href="/packages/import" class="btn btn-outline-secondary mt-3">Import from CBM config</a>
 </div>
 {% endif %}
 {% endblock %}

@@ -1,6 +1,8 @@
 import json
+import io
+import zipfile
 from datetime import datetime
-from fastapi import APIRouter, Depends, Form, File, UploadFile, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -24,6 +26,104 @@ CBM_PATHS = [
     ("rx", "Rx"),
     ("tx_rx", "Tx/Rx"),
     ("dvb", "DVB"),
+]
+
+CBM_WMASK_DEFAULT = (
+    "BPSK:1/2TURBO+BPSK:2/3TURBO+BPSK:3/4TURBO+BPSK:7/8TURBO+BPSK:19/20TURBO+"
+    "QPSK:1/2TURBO+QPSK:2/3TURBO+QPSK:3/4TURBO+QPSK:7/8TURBO+QPSK:19/20TURBO+"
+    "8-PSK:1/2TURBO+8-PSK:2/3TURBO+8-PSK:3/4TURBO+8-PSK:7/8TURBO+8-PSK:19/20TURBO+"
+    "16-APSK:1/2TURBO+16-APSK:2/3TURBO+16-APSK:3/4TURBO+16-APSK:7/8TURBO+16-APSK:19/20TURBO"
+)
+
+CBM_DEFAULTS = {
+    "TX_OP": "OFF",
+    "TXIF_LVL": "-30.0",
+    "TX_MOP": "EBEM",
+    "TX_SMOP": "TURBO",
+    "TX_DR": "0",
+    "TX_SCR": "OFF",
+    "TX_EMBCH": "ON",
+    "ITA_ENGAGE": "AUTO",
+    "ITT_OP": "disable",
+    "ITT_WMASK": CBM_WMASK_DEFAULT,
+    "ITR_OP": "disable",
+    "ITR_WMASK": CBM_WMASK_DEFAULT,
+    "ITR_MRGN": "0.25",
+    "ITR_HYST": "0.5",
+    "AUPC_OP": "disable",
+    "AUPC_PWR_RNG": "default",
+    "AUPC_DESNO_RNG": "default",
+    "TXPI_OP": "disable",
+    "TXPI_INH_DLY": "0",
+    "TXPI_REAC_STEP": "1.0",
+    "TXPI_REAC_MODE": "auto",
+    "TXPI_REAC_DLY": "0",
+    "AUPC_TGT_DESNO_CFG": "default",
+    "AUPC_MAX_PWR_CFG": "default",
+    "RX_OP": "OFF",
+    "RX_MOP": "EBEM",
+    "RX_SMOP": "TURBO",
+    "RX_DR": "0",
+    "RX_SCR": "OFF",
+    "RX_EMBCH": "ON",
+    "EQUAL_OP": "OFF",
+    "CFG_NAME": "ProjectRange",
+    "CFG_VER": "9",
+    "FRQ_REF": "INTERNAL",
+    "LBK_CFG": "NONE",
+    "MDM_ADDR": "0",
+    "TX_LNKID": "PUBLIC",
+    "RX_LNKID": "PUBLIC",
+    "IP_ADDR": "192.168.1.1",
+    "SUB_MSK": "255.255.255.0",
+    "IP_GWY": "0.0.0.0",
+    "BB_INTF": "EIA-422/530",
+    "SNMP_COMM": "PUBLIC",
+    "TRAP_ADDR": "192.168.1.1",
+    "DEM_OP": "Off",
+    "BERT_TXPAT": "ALL_MARK",
+    "BERT_RXPAT": "ALL_MARK",
+    "BERT_SLD": "1",
+    "BERT_SLOP": "MEDIUM",
+    "EBNO_LVL": "OFF",
+    "EBNOTRAP_CFG": "1/4SEC",
+    "EBNOTRAP_THRESH": "DEFAULT",
+    "BBI_CFG": "NORMAL",
+    "BBO_CFG": "NORMAL",
+    "ALM_MUTE": "On",
+    "TRANSEC_MODE": "SMAT-BASED",
+    "KE_SERIAL_ID": "NULL",
+    "ESEM_AUTO_NEG": "ON",
+    "ESEM_PORT_MODE": "FULL-DUPLEX",
+    "ESEM_PORT_SPEED": "100",
+    "ESEM_SIMPLEX_SUP": "ON",
+    "ESEM_PAUSE_FRAMES": "OFF",
+    "ESEM_WINDOW_SIZE": "5",
+    "ESEM_RF_PROP_DELAY": "250",
+    "ESEM_CREDIT_PPPOE": "OFF",
+    "PPPOE_KEEP_ALIVE": "1",
+    "PPPOE_INIT_RETRY": "OFF",
+    "ESEM_THRESH_TXDR": "64000",
+    "ESEM_THRESH_RXDR": "64000",
+    "ETH_TX_DR": "64000",
+    "ETH_RX_DR": "64000",
+    "FAT_OP": "NOP",
+}
+
+CBM_EXPORT_ORDER = [
+    "TX_OP", "TXIF_LVL", "TXIF_FRQ", "TX_MOP", "TX_SMOP", "TX_MOD", "TX_DR", "TX_SR", "TX_CODE",
+    "TX_SCR", "TX_EMBCH", "ITA_ENGAGE", "ITT_OP", "ITT_WMASK", "ITR_OP", "ITR_WMASK",
+    "ITR_MRGN", "ITR_HYST", "AUPC_OP", "AUPC_PWR_RNG", "AUPC_DESNO_RNG", "TXPI_OP",
+    "TXPI_INH_DLY", "TXPI_REAC_STEP", "TXPI_REAC_MODE", "TXPI_REAC_DLY", "AUPC_TGT_DESNO_CFG",
+    "AUPC_MAX_PWR_CFG", "RX_OP", "RXIF_FRQ", "RX_MOP", "RX_SMOP", "RX_MOD",
+    "RX_DR", "RX_SR", "RX_CODE", "RX_SCR", "RX_EMBCH", "EQUAL_OP", "CFG_NAME", "CFG_VER",
+    "FRQ_REF", "LBK_CFG", "MDM_ADDR", "TX_LNKID", "RX_LNKID", "IP_ADDR", "SUB_MSK", "IP_GWY",
+    "BB_INTF", "SNMP_COMM", "TRAP_ADDR", "DEM_OP", "BERT_TXPAT",
+    "BERT_RXPAT", "BERT_SLD", "BERT_SLOP", "EBNO_LVL", "BBI_CFG", "BBO_CFG", "ALM_MUTE",
+    "EBNOTRAP_CFG", "EBNOTRAP_THRESH", "TRANSEC_MODE", "KE_SERIAL_ID", "ESEM_AUTO_NEG", "ESEM_PORT_MODE", "ESEM_PORT_SPEED",
+    "ESEM_SIMPLEX_SUP", "ESEM_PAUSE_FRAMES", "ESEM_WINDOW_SIZE", "ESEM_RF_PROP_DELAY",
+    "ESEM_CREDIT_PPPOE", "PPPOE_KEEP_ALIVE", "PPPOE_INIT_RETRY", "ESEM_THRESH_TXDR",
+    "ESEM_THRESH_RXDR", "ETH_TX_DR", "ETH_RX_DR", "FAT_OP",
 ]
 
 
@@ -127,6 +227,115 @@ def _dict_to_entries(data: dict) -> list[dict]:
             "display_order": i,
         })
     return entries
+
+
+def _safe_filename(value: str, fallback: str = "signal") -> str:
+    cleaned = "".join(ch if ch.isalnum() or ch in ("-", "_", ".") else "_" for ch in value.strip())
+    return (cleaned.strip("._") or fallback)[:80]
+
+
+def _cbm_pairs_from_text(text: str) -> dict[str, str]:
+    text = text.strip().lstrip("\ufeff")
+    if not text:
+        raise ValueError("CBM config file is empty.")
+    if text.startswith("STR_CFG"):
+        first_comma = text.find(",")
+        text = text[first_comma + 1:] if first_comma >= 0 else ""
+    pairs: dict[str, str] = {}
+    for part in text.replace("\r", "").replace("\n", "").split(","):
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        key = key.strip().upper()
+        if key:
+            pairs[key] = value.strip()
+    if "TXIF_FRQ" not in pairs and "RXIF_FRQ" not in pairs:
+        raise ValueError("CBM config does not contain TXIF_FRQ or RXIF_FRQ.")
+    return pairs
+
+
+def _cbm_if_to_mhz(value: str | None) -> Optional[float]:
+    raw = _float_or_none(value)
+    if raw is None:
+        return None
+    # CBM export uses kHz-style integers, e.g. 1205000 = 1205.000 MHz.
+    return raw / 1000.0
+
+
+def _mhz_to_cbm_if(value: float | None) -> str:
+    if value is None:
+        return "0"
+    cbm_value = value * 1000.0
+    return str(int(round(cbm_value))) if abs(cbm_value - round(cbm_value)) < 0.001 else f"{cbm_value:.3f}".rstrip("0").rstrip(".")
+
+
+def _cbm_mod_to_project(value: str | None) -> str | None:
+    if not value:
+        return None
+    mapping = {"8-PSK": "8PSK", "16-APSK": "16APSK", "32-APSK": "32APSK"}
+    return mapping.get(value.strip().upper(), value.strip())
+
+
+def _project_mod_to_cbm(value: str | None) -> str:
+    if not value:
+        return "BPSK"
+    mapping = {"8PSK": "8-PSK", "16APSK": "16-APSK", "32APSK": "32-APSK"}
+    return mapping.get(value.strip().upper(), value.strip())
+
+
+def _cbm_entry_from_text(text: str, filename: str, display_order: int = 0) -> dict:
+    pairs = _cbm_pairs_from_text(text)
+    stem = (filename.rsplit("/", 1)[-1] or "").rsplit(".", 1)[0]
+    signal_name = stem or pairs.get("CFG_NAME", "Imported Signal")
+    tx_if = _cbm_if_to_mhz(pairs.get("TXIF_FRQ"))
+    rx_if = _cbm_if_to_mhz(pairs.get("RXIF_FRQ"))
+    modulation = _cbm_mod_to_project(pairs.get("TX_MOD") or pairs.get("RX_MOD"))
+    symbol_rate = pairs.get("TX_SR") or pairs.get("RX_SR")
+    fec = pairs.get("TX_CODE") or pairs.get("RX_CODE")
+    power = _float_or_none(pairs.get("TXIF_LVL"))
+    notes = "Imported from CBM-400 config"
+    if pairs.get("TX_OP") or pairs.get("RX_OP") or pairs.get("ITA_ENGAGE"):
+        notes += f" (TX_OP={pairs.get('TX_OP', 'n/a')}, RX_OP={pairs.get('RX_OP', 'n/a')}, ITA_ENGAGE={pairs.get('ITA_ENGAGE', 'n/a')})"
+    return {
+        "signal_name": signal_name.strip(),
+        "description": f"CBM-400 config import: {filename}"[:256],
+        "band": None,
+        "tx_if": tx_if,
+        "tx_rf": None,
+        "rx_rf": None,
+        "rx_if": rx_if,
+        "freq_unit": "MHz",
+        "modulation": modulation,
+        "fec": fec,
+        "symbol_rate": symbol_rate,
+        "power": power,
+        "power_unit": "dBm",
+        "eb_no": None,
+        "source": pairs.get("CFG_NAME") or None,
+        "antenna": None,
+        "cbm_path": "tx_rx" if tx_if is not None and rx_if is not None else ("tx" if tx_if is not None else "rx"),
+        "cbm_carrier": signal_name.strip(),
+        "notes": notes,
+        "display_order": display_order,
+    }
+
+
+def _cbm_text_from_entry(entry: SignalPackageEntry) -> str:
+    values = dict(CBM_DEFAULTS)
+    values.update({
+        "TXIF_FRQ": _mhz_to_cbm_if(entry.tx_if),
+        "RXIF_FRQ": _mhz_to_cbm_if(entry.rx_if if entry.rx_if is not None else entry.tx_if),
+        "TX_MOD": _project_mod_to_cbm(entry.modulation),
+        "RX_MOD": _project_mod_to_cbm(entry.modulation),
+        "TX_SR": str(entry.symbol_rate or "0"),
+        "RX_SR": str(entry.symbol_rate or "0"),
+        "TX_CODE": str(entry.fec or ""),
+        "RX_CODE": str(entry.fec or ""),
+        "TXIF_LVL": str(entry.power if entry.power is not None else -30.0),
+        "CFG_NAME": _safe_filename(entry.cbm_carrier or entry.signal_name, "ProjectRange"),
+    })
+    parts = [f"{key}={values[key]}" for key in CBM_EXPORT_ORDER if values.get(key) is not None]
+    return "STR_CFG 2," + ",".join(parts) + "\r\n"
 
 
 def _float_or_none(v) -> Optional[float]:
@@ -512,11 +721,30 @@ async def package_export(
     pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id, SignalPackage.is_testing == is_testing_state(db)).first()
     if not pkg:
         return RedirectResponse("/packages", status_code=302)
-    data = json.dumps(_package_to_dict(pkg), indent=2)
-    filename = pkg.name.replace(" ", "_").replace("/", "-")[:60] + ".json"
+    if len(pkg.signals) == 1:
+        entry = pkg.signals[0]
+        data = _cbm_text_from_entry(entry)
+        filename = _safe_filename(entry.cbm_carrier or entry.signal_name or pkg.name, "signal") + ".txt"
+        return StreamingResponse(
+            iter([data]),
+            media_type="text/plain",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for i, entry in enumerate(pkg.signals, start=1):
+            filename = _safe_filename(entry.cbm_carrier or entry.signal_name or f"signal_{i}", f"signal_{i}") + ".txt"
+            zf.writestr(filename, _cbm_text_from_entry(entry))
+        zf.writestr(
+            "project_range_package.json",
+            json.dumps(_package_to_dict(pkg), indent=2),
+        )
+    buffer.seek(0)
+    filename = _safe_filename(pkg.name, "signal_package") + "_cbm_configs.zip"
     return StreamingResponse(
-        iter([data]),
-        media_type="application/json",
+        buffer,
+        media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
@@ -538,19 +766,80 @@ async def package_import_page(
 @router.post("/import")
 async def package_import_submit(
     request: Request,
-    file: UploadFile = File(...),
+    package_name: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     error = None
     try:
-        content = await file.read()
-        data = json.loads(content.decode("utf-8"))
-        if not isinstance(data, dict) or "signals" not in data:
-            raise ValueError("File must be a JSON object with a 'signals' list.")
+        form = await request.form()
+        uploads = [item for _, item in form.multi_items() if hasattr(item, "filename") and item.filename]
+        if not uploads:
+            raise ValueError("Select at least one CBM .txt, .zip, or legacy Project Range .json file.")
+
+        files: list[tuple[str, bytes]] = []
+        for upload in uploads:
+            content = await upload.read()
+            if zipfile.is_zipfile(io.BytesIO(content)):
+                with zipfile.ZipFile(io.BytesIO(content)) as zf:
+                    for name in zf.namelist():
+                        if name.endswith("/") or name.rsplit("/", 1)[-1].startswith("."):
+                            continue
+                        if name.lower().endswith((".txt", ".cfg", ".conf")):
+                            files.append((name, zf.read(name)))
+            else:
+                files.append((upload.filename, content))
+
+        if len(files) == 1 and files[0][0].lower().endswith(".json"):
+            data = json.loads(files[0][1].decode("utf-8-sig"))
+            if not isinstance(data, dict) or "signals" not in data:
+                raise ValueError("JSON file must be a Project Range package object with a 'signals' list.")
+            return _import_json_package(data, files[0][0], db, current_user)
+
+        entries = []
+        for i, (filename, content) in enumerate(files):
+            if filename.lower().endswith(".json"):
+                continue
+            text = content.decode("utf-8-sig", errors="replace")
+            entries.append(_cbm_entry_from_text(text, filename, display_order=i))
+        if not entries:
+            raise ValueError("No CBM config text files were found to import.")
+
+        pkg_name = package_name.strip()
+        if not pkg_name:
+            pkg_name = entries[0]["signal_name"] if len(entries) == 1 else f"CBM Import {datetime.utcnow().strftime('%Y%m%d %H%MZ')}"
+        pkg = SignalPackage(
+            name=pkg_name,
+            description="Imported from CBM-400 signal configuration file(s).",
+            freq_unit="MHz",
+            created_by_id=current_user.id,
+            is_testing=is_testing_state(db),
+        )
+        db.add(pkg)
+        db.flush()
+        for fields in entries:
+            if fields["signal_name"]:
+                db.add(SignalPackageEntry(package_id=pkg.id, **fields))
+        db.add(AuditLog(user_id=current_user.id, action_type="PACKAGE_IMPORT",
+                        entity_type="SignalPackage", entity_id=pkg.id, new_value=pkg.name))
+        db.commit()
+        return RedirectResponse(f"/packages/{pkg.id}?toast=CBM+config+imported", status_code=302)
+    except Exception as e:
+        error = str(e)
+
+    return templates.TemplateResponse(request, "package_import.html", {
+        "user": current_user,
+        "range_state": get_current_range_state(db),
+        "page": "packages",
+        "error": error,
+    })
+
+
+def _import_json_package(data: dict, filename: str, db: Session, current_user: User):
+    try:
         rf = data.get("rf_config", {}) or {}
         pkg = SignalPackage(
-            name=str(data.get("name", file.filename or "Imported Package")).strip(),
+            name=str(data.get("name", filename or "Imported Package")).strip(),
             description=str(data.get("description", "")).strip() or None,
             band=str(rf.get("band", "")).strip() or None,
             antenna=str(rf.get("antenna", "")).strip() or None,
@@ -573,12 +862,6 @@ async def package_import_submit(
                         entity_type="SignalPackage", entity_id=pkg.id, new_value=pkg.name))
         db.commit()
         return RedirectResponse(f"/packages/{pkg.id}?toast=Package+imported", status_code=302)
-    except Exception as e:
-        error = str(e)
-
-    return templates.TemplateResponse(request, "package_import.html", {
-        "user": current_user,
-        "range_state": get_current_range_state(db),
-        "page": "packages",
-        "error": error,
-    })
+    except Exception:
+        db.rollback()
+        raise

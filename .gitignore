@@ -45,3 +45,4 @@ backups/
 
 # Local vendor/device manuals (do not publish restricted PDFs)
 CBM-400*.pdf
+modem_configs/

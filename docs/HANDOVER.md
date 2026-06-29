@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.17.4` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.17.5` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -136,6 +136,11 @@
 - **0.17.4 — Form/tab position restore:**
   - Added a global page-state helper in `app.js` that remembers active Bootstrap tabs and scroll position during normal form/select submits, then restores them after the reload. This fixes App Config add/toggle/delete actions jumping back to the Modulation tab/top of page, and applies to the same reload pattern across the app.
   - Static JS cache key bumped to `app.js?v=18`.
+- **0.17.5 — CBM-400 signal package import/export format:**
+  - Signal package import now accepts CBM-400 `STR_CFG` text exports (`.txt`/`.cfg`/`.conf`), ZIP files containing those configs, and the previous Project Range JSON format for backwards compatibility.
+  - CBM imports create package signals using the filename as the signal name and read only the useful Project Range fields: `TXIF_FRQ`, `RXIF_FRQ`, `TXIF_LVL`, `TX_MOD`/`RX_MOD`, `TX_SR`/`RX_SR`, `TX_CODE`/`RX_CODE`, and `CFG_NAME`. Other modem-only fields are ignored except TX/RX/ITA operation values are copied into notes.
+  - Signal package export now emits CBM-style modem config files. A one-signal package exports a `.txt`; multi-signal packages export a `.zip` with one modem config text file per signal plus a `project_range_package.json` compatibility snapshot.
+  - Local sample modem config exports live under `modem_configs/` and are intentionally gitignored. Do not commit real modem config exports unless explicitly cleared.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.

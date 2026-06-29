@@ -10,7 +10,7 @@
   <div class="ms-auto d-flex gap-2">
     {% if package %}
     <a href="/packages/{{ package.id }}/export" class="btn btn-sm btn-outline-secondary">
-      <i class="bi bi-download me-1"></i>Export JSON
+      <i class="bi bi-download me-1"></i>Export CBM
     </a>
     <form method="post" action="/packages/{{ package.id }}/duplicate"
           onsubmit="return confirm('Duplicate package {{ package.name | e }}?')">
