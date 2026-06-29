@@ -110,6 +110,7 @@ def _migrate(conn):
         "ALTER TABLE signal_packages ADD COLUMN is_testing BOOLEAN DEFAULT 0",
         "ALTER TABLE serials ADD COLUMN is_testing BOOLEAN DEFAULT 0",
         "ALTER TABLE signal_logs ADD COLUMN is_testing BOOLEAN DEFAULT 0",
+        "ALTER TABLE signal_logs ADD COLUMN engaged BOOLEAN DEFAULT 0",
         "ALTER TABLE audit_logs ADD COLUMN is_testing BOOLEAN DEFAULT 0",
         "ALTER TABLE rf_devices ADD COLUMN is_testing BOOLEAN DEFAULT 0",
         "ALTER TABLE device_links ADD COLUMN is_testing BOOLEAN DEFAULT 0",

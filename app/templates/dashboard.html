@@ -903,7 +903,8 @@ function splitActive(groupId) {
 
 // ── Column show/hide (applies to every signal table, persisted) ─────────────
 const COL_DEFS = [
-  ['signal','Signal'],['source','Source'],['status','Status'],['tx_if','TxIF'],
+  ['signal','Signal'],['source','Source'],['status','Status'],['engaged','Engaged'],
+  ['tx_if','TxIF'],
   ['tx_rf','TxRF'],['rx_rf','RxRF'],['rx_if','RxIF'],['unit','Unit'],['band','Band'],
   ['mod','Mod'],['sym','Sym Rate'],['fec','FEC'],['antenna','Antenna'],['power','Power'],
   ['ebno','Eb/No'],['updated','Updated'],['warn','Warn'],
@@ -1320,6 +1321,38 @@ function cancelQuickRow(rowId) {
   const pv = document.getElementById('power-val-' + rowId);
   if (pv) pv.value = row.dataset.origPower;
   refreshQuickDirty(rowId);
+}
+
+async function onEngagedToggle(rowId) {
+  const row = quickRow(rowId);
+  const input = document.getElementById('engaged-' + rowId);
+  const label = document.getElementById('engaged-label-' + rowId);
+  if (!row || !input) return;
+  const previous = !input.checked;
+  input.disabled = true;
+  try {
+    const payload = {
+      signal_name: row.dataset.signalName,
+      engaged: input.checked,
+    };
+    if (row.dataset.serialId) payload.serial_id = parseInt(row.dataset.serialId, 10);
+    const resp = await fetch('/dashboard/engaged-toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) throw new Error();
+    const data = await resp.json();
+    input.checked = !!data.engaged;
+    if (label) label.textContent = input.checked ? 'On' : 'Off';
+    showToast(`${row.dataset.signalName} engaged ${input.checked ? 'on' : 'off'}`, 'success');
+  } catch (_) {
+    input.checked = previous;
+    if (label) label.textContent = previous ? 'On' : 'Off';
+    showToast('Engaged update failed — please try again', 'danger');
+  } finally {
+    input.disabled = false;
+  }
 }
 
 </script>

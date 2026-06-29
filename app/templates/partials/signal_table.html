@@ -25,6 +25,7 @@
       <th data-col="signal">Signal</th>
       <th data-col="source">Source</th>
       <th data-col="status">Status</th>
+      <th data-col="engaged">Engaged</th>
       <th data-col="tx_if">TxIF</th>
       <th data-col="tx_rf">TxRF</th>
       <th data-col="rx_rf">RxRF</th>
@@ -74,6 +75,15 @@
           <span id="status-badge-{{ row_id }}">{{ status_badge(log.signal_status) }}</span>
         </div>
       </td>
+      <td data-col="engaged" style="min-width:110px">
+        <div class="form-check form-switch mb-0" title="Mission systems affecting this signal">
+          <input class="form-check-input" type="checkbox" role="switch"
+                 id="engaged-{{ row_id }}" {% if log.engaged %}checked{% endif %}
+                 onchange="onEngagedToggle('{{ row_id }}')">
+          <label class="form-check-label small" for="engaged-{{ row_id }}"
+                 id="engaged-label-{{ row_id }}">{{ 'On' if log.engaged else 'Off' }}</label>
+        </div>
+      </td>
       <td data-col="tx_if">{{ log.tx_if if log.tx_if is not none else '—' }}</td>
       <td data-col="tx_rf">{{ log.tx_rf if log.tx_rf is not none else '—' }}</td>
       <td data-col="rx_rf">{{ log.rx_rf if log.rx_rf is not none else '—' }}</td>
@@ -109,7 +119,7 @@
 
     <!-- Inline quick-edit row (collapsed by default) -->
     <tr class="collapse" id="{{ row_id }}-edit">
-      <td colspan="18" class="p-0">
+      <td colspan="19" class="p-0">
         <div class="p-2 bg-body-tertiary border-top border-secondary">
           <form hx-post="/dashboard/quick-update"
                 hx-target="#signalTableContainer-{{ serial_id if serial_id is not none else 'legacy' }}"

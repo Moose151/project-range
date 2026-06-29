@@ -1,6 +1,6 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -23,6 +23,12 @@ class _SignalUpdate(BaseModel):
 class _BulkUpdateBody(BaseModel):
     serial_id: Optional[int] = None
     updates: list[_SignalUpdate]
+
+
+class _EngagedUpdateBody(BaseModel):
+    signal_name: str
+    engaged: bool
+    serial_id: Optional[int] = None
 
 router = APIRouter()
 from app.templating import templates
@@ -358,6 +364,7 @@ async def dashboard_quick_update(
                         power=sib_latest.power,
                         power_unit=sib_latest.power_unit,
                         eb_no=sib_latest.eb_no,
+                        engaged=sib_latest.engaged,
                         source=sib_latest.source,
                         antenna=sib_latest.antenna,
                         notes=f"Auto-downed: {signal_name} came Up (group: {sig_reg.exclusivity_group})",
@@ -383,6 +390,7 @@ async def dashboard_quick_update(
         power=power if power is not None else (latest.power if latest else None),
         power_unit=power_unit,
         eb_no=eb_no if eb_no is not None else (latest.eb_no if latest else None),
+        engaged=latest.engaged if latest else False,
         source=source or (latest.source if latest else None),
         antenna=antenna or (latest.antenna if latest else None),
         notes=notes.strip() or None,
@@ -477,6 +485,7 @@ async def dashboard_bulk_update(
                             modulation=sib_latest.modulation, symbol_rate=sib_latest.symbol_rate,
                             fec=sib_latest.fec, power=sib_latest.power,
                             power_unit=sib_latest.power_unit, eb_no=sib_latest.eb_no,
+                            engaged=sib_latest.engaged,
                             source=sib_latest.source, antenna=sib_latest.antenna,
                             notes=f"Auto-downed: {upd.signal_name} came Up (group: {sig_reg.exclusivity_group})",
                             entry_type="Automatic", updated_by_id=current_user.id, serial_id=serial_id,
@@ -497,6 +506,7 @@ async def dashboard_bulk_update(
             power=upd.power if upd.power is not None else (latest.power if latest else None),
             power_unit=upd.power_unit,
             eb_no=latest.eb_no if latest else None,
+            engaged=latest.engaged if latest else False,
             source=latest.source if latest else None,
             antenna=latest.antenna if latest else None,
             entry_type="Dashboard", updated_by_id=current_user.id,
@@ -532,6 +542,47 @@ async def dashboard_bulk_update(
         "pkg_rf": _pkg_rf_for_serial(db, serial_id) if serial_id else None,
         "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial_id, signals) if serial_id else {},
     })
+
+
+@router.post("/dashboard/engaged-toggle")
+async def dashboard_engaged_toggle(
+    body: _EngagedUpdateBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Immediately set the visual mission-system engagement flag for a signal."""
+    testing = is_testing_state(db)
+    serial_id = body.serial_id
+    if serial_id is not None:
+        serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
+        if not serial:
+            serial_id = None
+
+    latest_q = db.query(SignalLog).filter(
+        SignalLog.signal_name == body.signal_name,
+        SignalLog.signal_name != "[NOTE]",
+        SignalLog.is_deleted == False,
+        SignalLog.is_testing == testing,
+    )
+    if serial_id is not None:
+        latest_q = latest_q.filter(SignalLog.serial_id == serial_id)
+    latest = latest_q.order_by(SignalLog.timestamp.desc()).first()
+    if not latest:
+        return JSONResponse({"error": "Signal not found"}, status_code=404)
+
+    previous = bool(latest.engaged)
+    latest.engaged = body.engaged
+    latest.updated_by_id = current_user.id
+    db.add(AuditLog(
+        user_id=current_user.id,
+        action_type="SIGNAL_ENGAGED_TOGGLE",
+        entity_type="SignalLog",
+        entity_id=latest.id,
+        previous_value="On" if previous else "Off",
+        new_value=f"{latest.signal_name}: {'On' if latest.engaged else 'Off'}",
+    ))
+    db.commit()
+    return {"engaged": bool(latest.engaged)}
 
 
 @router.get("/status/serials", response_class=HTMLResponse)

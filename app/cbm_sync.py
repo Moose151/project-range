@@ -172,6 +172,7 @@ def sync_active_cbms(db: Session, actor_id: int) -> CBMSyncResult:
             power=power,
             power_unit="dBm",
             eb_no=values.get("eb_no") if values.get("eb_no") is not None else (latest.eb_no if latest else entry.eb_no),
+            engaged=latest.engaged if latest else False,
             source=latest.source if latest else entry.source,
             antenna=latest.antenna if latest else (entry.package.antenna or entry.antenna),
             serial_id=serial.id,

@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.17.1` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.17.2` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -125,6 +125,11 @@
   - Admins can archive accounts. Archived accounts are disabled, cannot log in, do not appear in the normal Users list, and are excluded from chat/presence and admin credential checks. They can be viewed/restored from the Archived toggle.
   - Hard delete is available only when no required operational attribution rows depend on the account. If records exist, use Archive instead; nullable references are cleared only for accounts that are safe to delete.
   - Verification passed locally: `init_db.py`, compileall, template parsing, enum/migration checks, archived-login check, foreign-key delete-safety checks, and app import.
+- **0.17.2 — Dashboard signal Engaged indicator:**
+  - Signal dashboard tables now have an optional **Engaged** column. Operators can toggle it On/Off immediately without using the dashboard **Submit All Changes** bar.
+  - `SignalLog.engaged` is a visual mission-system engagement flag only. It does not change signal status, power, buzzer logic, range state, or CBM sync decisions.
+  - The toggle updates the latest visible signal log row directly through `POST /dashboard/engaged-toggle` and writes an audit entry (`SIGNAL_ENGAGED_TOGGLE`). The flag is inherited when dashboard quick/bulk updates or CBM automatic sync create a newer log row, so normal status/power updates do not clear it.
+  - Additive migration adds `signal_logs.engaged BOOLEAN DEFAULT 0`. The column is included in the dashboard column picker and hidden/shown with the existing dashboard column preferences.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.
@@ -140,6 +145,7 @@
    - only after proving the above, decide whether to add background polling and at what interval.
 5. **Instant chat browser QA** — open two or more logged-in users/sessions and test: presence list updates, double-click private chat, group chat creation, send/receive, minimised-window alert, unread launcher badge, dashboard chat widget, page-change notification replay, logout/age-out behaviour, and mobile bottom-right layout. Decide later whether persistent DB chat history/audit is desired; current implementation is in-memory per app process plus browser `sessionStorage` read/unread tracking.
 6. **Testing-state browser QA** — with at least one administrator and one user, test changing into/out of Testing, non-administrator state lock while Testing, creating/editing packages/serials/logs/devices/CDA/incidents/CEASE in Testing, then returning to normal states and confirming those Testing rows are hidden. Re-enter Testing and confirm they return.
+7. **Dashboard Engaged column browser QA** — with an active serial, toggle Engaged on/off from the dashboard and confirm it saves immediately without using Submit All Changes, survives the 10-second dashboard refresh, appears/disappears through the Columns menu, and remains set after a status/power update or CBM sync update.
 
 ### Also pending (from ROADMAP)
 - **Deferred infra (user's call):** HTTPS/TLS, PostgreSQL (+ Alembic). Cookies are TLS-ready (`SESSION_HTTPS_ONLY=1`).
@@ -156,6 +162,7 @@
 - **Settings area** — now reached via the sidebar (user footer → Preferences/Password; administrator → Admin → App Config). The old Settings dropdown is gone.
 - **`DeviceLink` and `RFDevice` new columns are fully implemented** — `device_model`, `has_web_gui`, and the `device_links` table are all in place. Device type list now includes `antenna`. No further migration needed for those.
 - **CBM sync columns:** `signal_package_entries.cbm_device_id` / `cbm_path` / `cbm_carrier`; `rf_devices.cbm_sync_enabled` / `cbm_username` / `cbm_password_encrypted` / `cbm_last_sync_*`. Additive migrations are in `init_db.py`.
+- **Dashboard Engaged column:** `SignalLog.engaged` is a per-signal visual flag used by operators to mark whether mission systems are affecting that signal. It is intentionally not part of the status enum and should not drive buzzer/range-state behavior.
 
 ### Caveats / verification gaps
 - Theme switching verified at **build/markup level only** — not click-tested in a real browser. User confirmed themes "don't change enough", so **theme rework is still outstanding** (item 1 above).
