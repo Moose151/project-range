@@ -2,9 +2,9 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center justify-content-between mb-3">
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
   <h4 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Live Range Dashboard</h4>
-  <div class="d-flex gap-2 align-items-center">
+  <div class="d-flex gap-2 align-items-center flex-wrap">
     <span class="text-muted small" id="lastRefresh">Auto-refreshing every 10s</span>
     <div class="dropdown">
       <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
@@ -12,15 +12,25 @@
         <i class="bi bi-grid-3x3-gap me-1"></i>Widgets
       </button>
       <ul class="dropdown-menu dropdown-menu-end">
-        <li><button type="button" class="dropdown-item" onclick="showClockWidget()"><i class="bi bi-clock-history me-2"></i>Show Combined Clock</button></li>
-        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('clock')"><i class="bi bi-clock me-2"></i>Add Clock</button></li>
-        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('notes')"><i class="bi bi-pencil-square me-2"></i>Add Quick Notes</button></li>
-        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('doc')"><i class="bi bi-file-earmark-text me-2"></i>Add Doc Reference</button></li>
-        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('links')"><i class="bi bi-lightning me-2"></i>Add Quick Links</button></li>
+        <li><h6 class="dropdown-header">Info Widgets</h6></li>
+        <li><button type="button" class="dropdown-item" onclick="showClockWidget()"><i class="bi bi-clock-history me-2"></i>Zulu / Local Clock</button></li>
+        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('range-state')"><i class="bi bi-broadcast-pin me-2"></i>Range State</button></li>
+        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('active-signals')"><i class="bi bi-broadcast me-2"></i>Active Signals</button></li>
+        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('last-state-change')"><i class="bi bi-clock me-2"></i>Last State Change</button></li>
         {% if cda_by_serial %}
-        <li><hr class="dropdown-divider"></li>
-        <li><button type="button" class="dropdown-item" onclick="showCDAWidget()"><i class="bi bi-shield-exclamation me-2"></i>Show CDA Timer</button></li>
+        <li><button type="button" class="dropdown-item" onclick="showCDAWidget()"><i class="bi bi-shield-exclamation me-2"></i>CDA Timer</button></li>
         {% endif %}
+        <li><hr class="dropdown-divider"></li>
+        <li><h6 class="dropdown-header">Calculators</h6></li>
+        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('calc')"><i class="bi bi-calculator me-2"></i>Basic Calculator</button></li>
+        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('rf-calc')"><i class="bi bi-broadcast me-2"></i>RF Frequency</button></li>
+        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('power-conv')"><i class="bi bi-lightning-charge me-2"></i>Power Converter</button></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><h6 class="dropdown-header">Utilities</h6></li>
+        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('clock')"><i class="bi bi-clock me-2"></i>Additional Clock</button></li>
+        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('notes')"><i class="bi bi-pencil-square me-2"></i>Quick Notes</button></li>
+        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('doc')"><i class="bi bi-file-earmark-text me-2"></i>Doc Reference</button></li>
+        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('links')"><i class="bi bi-lightning me-2"></i>Quick Links</button></li>
       </ul>
     </div>
     <div class="dropdown">
@@ -49,9 +59,6 @@
 <div id="buzzerAlert"></div>
 {% endif %}
 
-<!-- Summary cards (kept fresh on every poll via OOB swap) -->
-{% include "partials/dashboard_summary.html" %}
-
 {% if not active_serials %}
 <!-- No active serials notice -->
 <div class="alert alert-info d-flex align-items-center gap-3 mb-3">
@@ -64,8 +71,8 @@
 </div>
 {% endif %}
 
-<!-- Serial widget container — SortableJS handles reorder; JS handles tab-merge -->
-<div id="serialWidgetsContainer" class="d-flex flex-column gap-3">
+<!-- Widget grid — SortableJS reorders; JS handles tab-merge; widgets can be half or full width -->
+<div id="serialWidgetsContainer" class="widget-grid">
   <div class="serial-widget-group clock-widget-group"
        data-group-id="group-clock"
        data-serial-ids="clock"
@@ -80,7 +87,12 @@
         </div>
         <div class="serial-group-controls d-flex gap-1 align-items-center"></div>
         <div class="serial-actions ms-auto d-flex gap-1 align-items-center"></div>
-        <button type="button" class="widget-collapse-btn btn btn-sm btn-link link-secondary p-0 ms-1"
+        <button type="button" class="widget-span-btn btn btn-sm btn-link link-secondary p-0"
+                title="Toggle half / full width" onclick="toggleWidgetSpan(this)">
+          <i class="bi bi-arrows-angle-expand ico-expand"></i>
+          <i class="bi bi-arrows-angle-contract ico-contract"></i>
+        </button>
+        <button type="button" class="widget-collapse-btn btn btn-sm btn-link link-secondary p-0"
                 title="Minimise / expand" onclick="toggleCollapse(this)"><i class="bi bi-chevron-up"></i></button>
       </div>
       <div class="serial-bodies">
@@ -125,7 +137,12 @@
         </div>
         <div class="serial-group-controls d-flex gap-1 align-items-center"></div>
         <div class="serial-actions ms-auto d-flex gap-1 align-items-center"></div>
-        <button type="button" class="widget-collapse-btn btn btn-sm btn-link link-secondary p-0 ms-1"
+        <button type="button" class="widget-span-btn btn btn-sm btn-link link-secondary p-0"
+                title="Toggle half / full width" onclick="toggleWidgetSpan(this)">
+          <i class="bi bi-arrows-angle-expand ico-expand"></i>
+          <i class="bi bi-arrows-angle-contract ico-contract"></i>
+        </button>
+        <button type="button" class="widget-collapse-btn btn btn-sm btn-link link-secondary p-0"
                 title="Minimise / expand" onclick="toggleCollapse(this)"><i class="bi bi-chevron-up"></i></button>
       </div>
       <div class="serial-bodies">
@@ -234,7 +251,12 @@
         </div>
         <div class="serial-group-controls d-flex gap-1 align-items-center"></div>
         <div class="serial-actions ms-auto d-flex gap-1 align-items-center"></div>
-        <button type="button" class="widget-collapse-btn btn btn-sm btn-link link-secondary p-0 ms-1"
+        <button type="button" class="widget-span-btn btn btn-sm btn-link link-secondary p-0"
+                title="Toggle half / full width" onclick="toggleWidgetSpan(this)">
+          <i class="bi bi-arrows-angle-expand ico-expand"></i>
+          <i class="bi bi-arrows-angle-contract ico-contract"></i>
+        </button>
+        <button type="button" class="widget-collapse-btn btn btn-sm btn-link link-secondary p-0"
                 title="Minimise / expand" onclick="toggleCollapse(this)"><i class="bi bi-chevron-up"></i></button>
       </div>
       <div class="serial-bodies">
@@ -371,7 +393,7 @@ function saveUtilityWidgets() {
     if (type === 'notes') config.text = group.querySelector('textarea')?.value || '';
     if (type === 'doc') config.slug = group.querySelector('select')?.value || '';
     if (type === 'clock') config.mode = group.querySelector('[data-clock-mode]')?.value || 'both';
-    return { id, type, config, collapsed: group.classList.contains('collapsed') };
+    return { id, type, config, collapsed: group.classList.contains('collapsed'), span1: group.classList.contains('span-1') };
   });
   localStorage.setItem(UTILITY_WIDGETS_KEY, JSON.stringify(widgets));
 }
@@ -403,6 +425,41 @@ function utilityBody(id, type, config = {}) {
               <a href="/handover" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left-right me-1"></i>Handover</a>
             </div>`;
   }
+  // ── New widget types ──────────────────────────────────────────────────────
+  if (type === 'range-state') {
+    const rs = {{ range_state | tojson }};
+    const cls = rs === 'Live' ? 'text-danger' : (rs === 'Closed Loop' ? 'text-info' : 'text-secondary');
+    const icon = rs === 'Live' ? 'bi-broadcast-pin blink-icon' : (rs === 'Closed Loop' ? 'bi-arrow-repeat' : 'bi-power');
+    return `<div class="text-center py-2">
+              <div class="text-muted small mb-1">Range State</div>
+              <div class="fw-bold fs-4 ${cls}"><i class="bi ${icon} me-1"></i>${escapeHtml(rs)}</div>
+              <div class="mt-2"><a href="/range-state/change" class="btn btn-sm btn-outline-secondary">Change State</a></div>
+            </div>`;
+  }
+  if (type === 'active-signals') {
+    return `<div class="text-center py-2" id="utilActiveSignalsWidget-${id}">
+              <div class="text-muted small mb-1">Active Signals (Up)</div>
+              <div class="fw-bold fs-1" id="utilActiveSigCount-${id}"
+                   hx-get="/status/active-count-raw"
+                   hx-trigger="load, every 10s"
+                   hx-swap="innerHTML">{{ up_count }}</div>
+            </div>`;
+  }
+  if (type === 'last-state-change') {
+    {% if last_state_change %}
+    return `<div class="text-center py-2">
+              <div class="text-muted small mb-1">Last State Change</div>
+              <div class="fw-semibold text-primary">{{ last_state_change.timestamp.strftime('%H:%M %d/%m/%y') }}Z</div>
+              <div class="text-muted small">by {{ last_state_change.changed_by_user.display_name }}</div>
+            </div>`;
+    {% else %}
+    return `<div class="text-center py-2 text-muted fst-italic small">No state changes recorded.</div>`;
+    {% endif %}
+  }
+  if (type === 'calc') { return mathCalcBody(id); }
+  if (type === 'rf-calc') { return rfCalcBody(id); }
+  if (type === 'power-conv') { return powerConvBody(id); }
+  // ── Default: extra clock ──────────────────────────────────────────────────
   return `<div class="utility-clock dashboard-clock" data-local-tz="{{ local_timezone or 'UTC' }}">
             <div class="d-flex align-items-center gap-2 mb-2">
               <label class="form-label small mb-0">Display</label>
@@ -420,10 +477,23 @@ function utilityBody(id, type, config = {}) {
 function renderUtilityWidget(widget) {
   const id = widget.id || ('w-' + Date.now());
   const type = widget.type;
-  const title = { notes: 'Quick Notes', doc: 'Doc Reference', clock: 'Clock', links: 'Quick Links' }[type] || 'Widget';
-  const icon = { notes: 'bi-pencil-square', doc: 'bi-file-earmark-text', clock: 'bi-clock', links: 'bi-lightning' }[type] || 'bi-grid';
+  const TITLES = {
+    notes: 'Quick Notes', doc: 'Doc Reference', clock: 'Clock', links: 'Quick Links',
+    'range-state': 'Range State', 'active-signals': 'Active Signals',
+    'last-state-change': 'Last State Change',
+    calc: 'Calculator', 'rf-calc': 'RF Frequency', 'power-conv': 'Power Converter',
+  };
+  const ICONS = {
+    notes: 'bi-pencil-square', doc: 'bi-file-earmark-text', clock: 'bi-clock', links: 'bi-lightning',
+    'range-state': 'bi-broadcast-pin', 'active-signals': 'bi-broadcast',
+    'last-state-change': 'bi-clock-history',
+    calc: 'bi-calculator', 'rf-calc': 'bi-broadcast', 'power-conv': 'bi-lightning-charge',
+  };
+  const title = TITLES[type] || 'Widget';
+  const icon  = ICONS[type]  || 'bi-grid';
   const group = document.createElement('div');
   group.className = 'serial-widget-group utility-widget-group';
+  if (widget.span1) group.classList.add('span-1');
   group.dataset.groupId = 'group-' + id;
   group.dataset.serialIds = id;
   group.dataset.activeTab = id;
@@ -437,7 +507,12 @@ function renderUtilityWidget(widget) {
         <div class="serial-group-controls d-flex gap-1 align-items-center"></div>
         <div class="serial-actions ms-auto d-flex gap-1 align-items-center"></div>
         <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" title="Remove widget" onclick="removeUtilityWidget('${id}')"><i class="bi bi-x-lg"></i></button>
-        <button type="button" class="widget-collapse-btn btn btn-sm btn-link link-secondary p-0 ms-1" title="Minimise / expand" onclick="toggleCollapse(this)"><i class="bi bi-chevron-up"></i></button>
+        <button type="button" class="widget-span-btn btn btn-sm btn-link link-secondary p-0"
+                title="Toggle half / full width" onclick="toggleWidgetSpan(this)">
+          <i class="bi bi-arrows-angle-expand ico-expand"></i>
+          <i class="bi bi-arrows-angle-contract ico-contract"></i>
+        </button>
+        <button type="button" class="widget-collapse-btn btn btn-sm btn-link link-secondary p-0" title="Minimise / expand" onclick="toggleCollapse(this)"><i class="bi bi-chevron-up"></i></button>
       </div>
       <div class="serial-bodies"><div class="serial-body-wrap" data-serial-body="${id}" data-serial-title="${title}">
         <div class="serial-actions-store d-none"></div>
@@ -512,6 +587,7 @@ function saveLayout() {
       serials: ids,
       activeTab: g.dataset.activeTab || ids[0],
       collapsed: g.classList.contains('collapsed'),
+      span1: g.classList.contains('span-1'),
     });
   });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(groups));
@@ -949,7 +1025,7 @@ function restoreLayout() {
     if (g.activeTab) setActiveTab(targetGroup, g.activeTab);
   }
 
-  // Pass 2: restore widget order + collapsed state
+  // Pass 2: restore widget order + collapsed + span state
   const container = document.getElementById('serialWidgetsContainer');
   if (!container) return;
   for (const g of groups) {
@@ -958,6 +1034,7 @@ function restoreLayout() {
     if (!el) continue;
     if (el.parentElement === container) container.appendChild(el);
     setCollapsed(el, !!g.collapsed);
+    el.classList.toggle('span-1', !!g.span1);
   }
 }
 

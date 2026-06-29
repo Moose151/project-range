@@ -9,168 +9,202 @@
   <!-- Vendored locally so styling works on LAN devices with no internet access -->
   <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="/static/vendor/bootstrap-icons/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=11">
+  <link rel="stylesheet" href="/static/css/app.css?v=12">
   <link rel="icon" type="image/png" href="/static/img/sew-range-logo.png">
 </head>
 <body>
 
 {% if user is defined and user %}
-<!-- Range state banner -->
-{% set state_class = "banner-live" if range_state == "Live" else ("banner-closed" if range_state == "Closed Loop" else "banner-standby") %}
-<div class="range-banner {{ state_class }} d-flex align-items-center justify-content-between px-3 py-1">
-  <span>
-    {% if range_state == "Live" %}
-      <i class="bi bi-broadcast-pin me-1 blink-icon"></i> <strong>RANGE IS LIVE — RF TRANSMITTING</strong>
-    {% elif range_state == "Closed Loop" %}
-      <i class="bi bi-arrow-repeat me-1"></i> Range State: <strong>Closed Loop</strong> — IF Only
-    {% else %}
-      <i class="bi bi-power me-1"></i> Range State: <strong>{{ range_state }}</strong>
-    {% endif %}
-    {% if not user.must_change_password %}
-    <span id="buzzerBadge"
-          hx-get="/status/buzzer"
-          hx-trigger="load, every 10s"
-          hx-swap="innerHTML">
-      {% if buzzer_active is defined %}{% include "partials/buzzer_badge.html" %}{% endif %}
-    </span>
-    {% endif %}
-  </span>
-  <span class="d-flex align-items-center gap-2">
-    {% if not user.must_change_password %}
-    <span id="activeSerialsBadge"
-          hx-get="/status/serials"
-          hx-trigger="load, every 15s"
-          hx-swap="innerHTML">
-    </span>
-    {% endif %}
-    <a href="/range-state/change" class="btn btn-sm btn-outline-secondary py-0">Change State</a>
-  </span>
-</div>
+<!-- Mobile sidebar backdrop — clicking it closes the sidebar -->
+<div class="sidebar-backdrop" onclick="toggleSidebar()"></div>
 
-<!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-secondary">
-  <div class="container-fluid">
-    <a class="navbar-brand fw-bold d-flex align-items-center brand-sew" href="/">
-      <img src="/static/img/sew-range-logo.png" alt="SEW Range" height="30" class="me-2">
-      <span>SEW Range</span>
-    </a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navMain">
-      <ul class="navbar-nav me-auto">
-        <li class="nav-item">
-          <a class="nav-link {% if page == 'dashboard' %}active{% endif %}" href="/">
-            <i class="bi bi-speedometer2 me-1"></i>Dashboard
-          </a>
-        </li>
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle {% if page == 'calculator' %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="bi bi-calculator me-1"></i>Calculators
-          </a>
-          <ul class="dropdown-menu dropdown-menu-dark">
-            <li><a class="dropdown-item" href="/calculator/rf"><i class="bi bi-broadcast me-2"></i>RF Frequency</a></li>
-            <li><a class="dropdown-item" href="/calculator/power"><i class="bi bi-lightning-charge me-2"></i>Power Converter</a></li>
-            <li><a class="dropdown-item" href="/calculator/eirp"><i class="bi bi-reception-4 me-2"></i>EIRP</a></li>
-          </ul>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if page == 'logs' %}active{% endif %}" href="/logs">
-            <i class="bi bi-journal-text me-1"></i>Signal Logs
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if page == 'packages' %}active{% endif %}" href="/packages">
-            <i class="bi bi-box-seam me-1"></i>Packages
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if page == 'serials' %}active{% endif %}" href="/serials">
-            <i class="bi bi-collection-play me-1"></i>Serials
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if page == 'devices' %}active{% endif %}" href="/devices">
-            <i class="bi bi-hdd-network me-1"></i>Devices
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if page == 'handover' %}active{% endif %}" href="/handover">
-            <i class="bi bi-arrow-left-right me-1"></i>Handover
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if page == 'incidents' %}active{% endif %}" href="/incidents">
-            <i class="bi bi-exclamation-octagon me-1"></i>Incidents
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if page == 'cda' %}active{% endif %}" href="/cda">
-            <i class="bi bi-shield-exclamation me-1"></i>CDA
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if page == 'history' %}active{% endif %}" href="/history">
-            <i class="bi bi-clock-history me-1"></i>History
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if page == 'docs' %}active{% endif %}" href="/docs">
-            <i class="bi bi-book me-1"></i>Docs
-          </a>
-        </li>
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle {% if page in ['preferences', 'config'] %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="bi bi-gear me-1"></i>Settings
-          </a>
-          <ul class="dropdown-menu dropdown-menu-dark">
-            <li><a class="dropdown-item" href="/preferences"><i class="bi bi-person-gear me-2"></i>Your Preferences</a></li>
-            <li><a class="dropdown-item" href="/account/password"><i class="bi bi-key me-2"></i>Password</a></li>
-            {% if user.role == 'supervisor' %}
-            <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item" href="/config"><i class="bi bi-sliders me-2"></i>Admin Config</a></li>
-            {% endif %}
-          </ul>
-        </li>
-        {% if user.role == 'supervisor' %}
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle {% if page in ['users', 'config'] or page_name == 'audit' %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="bi bi-sliders me-1"></i>Admin
-          </a>
-          <ul class="dropdown-menu dropdown-menu-dark">
-            <li><a class="dropdown-item" href="/users"><i class="bi bi-people me-2"></i>Users</a></li>
-            <li><a class="dropdown-item" href="/audit"><i class="bi bi-shield-check me-2"></i>Audit Log</a></li>
-            <li><a class="dropdown-item" href="/config"><i class="bi bi-gear me-2"></i>Config</a></li>
-          </ul>
-        </li>
-        {% endif %}
-      </ul>
-      <div class="d-flex align-items-center gap-2">
-        <a href="/preferences" class="text-secondary small text-decoration-none" title="Your preferences">
-          <i class="bi bi-person-circle me-1"></i>{{ user.display_name }}
-          {% if user.role == 'supervisor' %}<span class="badge bg-primary ms-1">Supervisor</span>{% endif %}
-        </a>
-        <button id="themeToggle" type="button" class="btn btn-sm btn-outline-secondary"
-                onclick="toggleTheme()" title="Toggle light / dark">
+<div class="app-layout">
+
+  <!-- ── LEFT SIDEBAR ──────────────────────────────────────── -->
+  <nav class="app-sidebar" id="appSidebar" aria-label="Main navigation">
+
+    <!-- Brand -->
+    <div class="sidebar-brand">
+      <img src="/static/img/sew-range-logo.png" alt="SEW Range" height="26" style="flex-shrink:0">
+      <span class="sidebar-label fw-bold" style="color:var(--range-gold);letter-spacing:.04em;font-size:.95rem">SEW Range</span>
+    </div>
+
+    <!-- Navigation links -->
+    <div class="sidebar-nav">
+
+      <a href="/" class="sidebar-link {% if page == 'dashboard' %}active{% endif %}">
+        <i class="bi bi-speedometer2"></i>
+        <span class="sidebar-label">Dashboard</span>
+      </a>
+
+      <div class="sidebar-section-header">Operations</div>
+      <a href="/logs" class="sidebar-link {% if page == 'logs' %}active{% endif %}">
+        <i class="bi bi-journal-text"></i>
+        <span class="sidebar-label">Signal Logs</span>
+      </a>
+      <a href="/serials" class="sidebar-link {% if page == 'serials' %}active{% endif %}">
+        <i class="bi bi-collection-play"></i>
+        <span class="sidebar-label">Serials</span>
+      </a>
+      <a href="/cda" class="sidebar-link {% if page == 'cda' %}active{% endif %}">
+        <i class="bi bi-shield-exclamation"></i>
+        <span class="sidebar-label">CDA</span>
+      </a>
+      <a href="/incidents" class="sidebar-link {% if page == 'incidents' %}active{% endif %}">
+        <i class="bi bi-exclamation-octagon"></i>
+        <span class="sidebar-label">Incidents</span>
+      </a>
+      <a href="/handover" class="sidebar-link {% if page == 'handover' %}active{% endif %}">
+        <i class="bi bi-arrow-left-right"></i>
+        <span class="sidebar-label">Handover</span>
+      </a>
+
+      <div class="sidebar-section-header">Resources</div>
+      <a href="/packages" class="sidebar-link {% if page == 'packages' %}active{% endif %}">
+        <i class="bi bi-box-seam"></i>
+        <span class="sidebar-label">Signal Packages</span>
+      </a>
+      <a href="/devices" class="sidebar-link {% if page == 'devices' %}active{% endif %}">
+        <i class="bi bi-hdd-network"></i>
+        <span class="sidebar-label">Devices</span>
+      </a>
+
+      <div class="sidebar-section-header">Calculators</div>
+      <a href="/calculator/rf" class="sidebar-link {% if page == 'calculator' and (page_name is not defined or page_name == 'rf') %}active{% endif %}">
+        <i class="bi bi-broadcast"></i>
+        <span class="sidebar-label">RF Frequency</span>
+      </a>
+      <a href="/calculator/power" class="sidebar-link {% if page == 'calculator' and page_name is defined and page_name == 'power' %}active{% endif %}">
+        <i class="bi bi-lightning-charge"></i>
+        <span class="sidebar-label">Power Converter</span>
+      </a>
+      <a href="/calculator/eirp" class="sidebar-link {% if page == 'calculator' and page_name is defined and page_name == 'eirp' %}active{% endif %}">
+        <i class="bi bi-reception-4"></i>
+        <span class="sidebar-label">EIRP</span>
+      </a>
+
+      <div class="sidebar-section-header">Records</div>
+      <a href="/history" class="sidebar-link {% if page == 'history' %}active{% endif %}">
+        <i class="bi bi-clock-history"></i>
+        <span class="sidebar-label">History</span>
+      </a>
+      <a href="/docs" class="sidebar-link {% if page == 'docs' %}active{% endif %}">
+        <i class="bi bi-book"></i>
+        <span class="sidebar-label">Documentation</span>
+      </a>
+
+      {% if user.role == 'supervisor' %}
+      <div class="sidebar-section-header">Admin</div>
+      <a href="/users" class="sidebar-link {% if page == 'users' %}active{% endif %}">
+        <i class="bi bi-people"></i>
+        <span class="sidebar-label">Users</span>
+      </a>
+      <a href="/audit" class="sidebar-link {% if page_name is defined and page_name == 'audit' %}active{% endif %}">
+        <i class="bi bi-shield-check"></i>
+        <span class="sidebar-label">Audit Log</span>
+      </a>
+      <a href="/config" class="sidebar-link {% if page == 'config' %}active{% endif %}">
+        <i class="bi bi-sliders"></i>
+        <span class="sidebar-label">App Config</span>
+      </a>
+      {% endif %}
+
+    </div><!-- /.sidebar-nav -->
+
+    <!-- Footer: user preferences / logout -->
+    <div class="sidebar-footer">
+      <a href="/preferences" class="sidebar-link {% if page == 'preferences' %}active{% endif %}">
+        <i class="bi bi-person-gear"></i>
+        <span class="sidebar-label">
+          {{ user.display_name }}
+          {% if user.role == 'supervisor' %}<span class="badge bg-primary ms-1" style="font-size:.6rem;vertical-align:middle">SUP</span>{% endif %}
+        </span>
+      </a>
+      <a href="/account/password" class="sidebar-link {% if page == 'account' %}active{% endif %}">
+        <i class="bi bi-key"></i>
+        <span class="sidebar-label">Password</span>
+      </a>
+      <a href="/logout" class="sidebar-link">
+        <i class="bi bi-box-arrow-right"></i>
+        <span class="sidebar-label">Logout</span>
+      </a>
+    </div>
+
+  </nav><!-- /.app-sidebar -->
+
+  <!-- ── MAIN AREA ─────────────────────────────────────────── -->
+  <div class="app-main">
+
+    <!-- Top bar -->
+    <div class="app-topbar">
+      <button type="button" class="topbar-btn" onclick="toggleSidebar()" title="Toggle navigation">
+        <i class="bi bi-list" style="font-size:1.15rem"></i>
+      </button>
+      <button type="button" class="topbar-btn" onclick="history.back()" title="Go back">
+        <i class="bi bi-arrow-left"></i>
+      </button>
+      <span class="topbar-brand d-none d-lg-inline ms-1">SEW Range</span>
+      <div class="ms-auto d-flex align-items-center gap-2">
+        <button id="themeToggle" type="button" class="topbar-btn" onclick="toggleTheme()" title="Toggle light / dark">
           <i class="bi bi-moon-stars"></i>
         </button>
-        <a href="/logout" class="btn btn-sm btn-outline-secondary">
-          <i class="bi bi-box-arrow-right me-1"></i>Logout
-        </a>
       </div>
     </div>
-  </div>
-</nav>
+
+    <!-- Range state banner -->
+    {% set state_class = "banner-live" if range_state == "Live" else ("banner-closed" if range_state == "Closed Loop" else "banner-standby") %}
+    <div class="range-banner {{ state_class }} d-flex align-items-center justify-content-between px-3 py-1">
+      <span>
+        {% if range_state == "Live" %}
+          <i class="bi bi-broadcast-pin me-1 blink-icon"></i> <strong>RANGE IS LIVE — RF TRANSMITTING</strong>
+        {% elif range_state == "Closed Loop" %}
+          <i class="bi bi-arrow-repeat me-1"></i> Range State: <strong>Closed Loop</strong> — IF Only
+        {% else %}
+          <i class="bi bi-power me-1"></i> Range State: <strong>{{ range_state }}</strong>
+        {% endif %}
+        {% if not user.must_change_password %}
+        <span id="buzzerBadge"
+              hx-get="/status/buzzer"
+              hx-trigger="load, every 10s"
+              hx-swap="innerHTML">
+          {% if buzzer_active is defined %}{% include "partials/buzzer_badge.html" %}{% endif %}
+        </span>
+        {% endif %}
+      </span>
+      <span class="d-flex align-items-center gap-3">
+        {% if not user.must_change_password %}
+        <span id="bannerActiveSignals"
+              hx-get="/status/active-count"
+              hx-trigger="load, every 10s"
+              hx-swap="innerHTML"
+              class="text-muted small"></span>
+        <span id="activeSerialsBadge"
+              hx-get="/status/serials"
+              hx-trigger="load, every 15s"
+              hx-swap="innerHTML"></span>
+        {% endif %}
+        <a href="/range-state/change" class="btn btn-sm btn-outline-secondary py-0">Change State</a>
+      </span>
+    </div>
+
+    <!-- Toast container -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1100" id="toastContainer"></div>
+
+    <!-- Page content -->
+    <div class="app-content">
 {% endif %}
 
-<!-- Toast container -->
+{% block content %}{% endblock %}
+
+{% if user is defined and user %}
+    </div><!-- /.app-content -->
+  </div><!-- /.app-main -->
+</div><!-- /.app-layout -->
+{% else %}
+<!-- Logged-out pages: toast container still available for error messages -->
 <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1100" id="toastContainer"></div>
+{% endif %}
 
-<main class="container-fluid py-3 px-4">
-  {% block content %}{% endblock %}
-</main>
-
-<!-- Version badge, bottom-right. Single source of truth: app/config.py APP_VERSION -->
 <div class="app-version-badge" title="Application version">v{{ app_version }}</div>
 
 <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>

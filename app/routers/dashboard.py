@@ -526,6 +526,31 @@ async def serials_fragment(
     })
 
 
+@router.get("/status/active-count", response_class=HTMLResponse)
+async def active_count_fragment(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Lightweight endpoint — Up-signal count for the banner badge."""
+    signals = _latest_signal_status(db)
+    up = sum(1 for s in signals if s.signal_status == "Up")
+    icon = '<i class="bi bi-broadcast me-1"></i>'
+    return HTMLResponse(f'{icon}{up} Up')
+
+
+@router.get("/status/active-count-raw", response_class=HTMLResponse)
+async def active_count_raw(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Just the number — for the Active Signals dashboard widget."""
+    signals = _latest_signal_status(db)
+    up = sum(1 for s in signals if s.signal_status == "Up")
+    return HTMLResponse(str(up))
+
+
 @router.get("/status/buzzer", response_class=HTMLResponse)
 async def buzzer_fragment(
     request: Request,

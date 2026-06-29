@@ -119,7 +119,7 @@ async def rf_calc_page(
         # Seed the unit selectors from the user's preferred default frequency unit.
         "form": {"input_unit": current_user.default_freq_unit,
                  "output_unit": current_user.default_freq_unit},
-        "page": "calculator",
+        "page": "calculator", "page_name": "rf",
     })
 
 
@@ -184,7 +184,7 @@ async def rf_calc_submit(
         "result": result,
         "form": form_data,
         "error": error,
-        "page": "calculator",
+        "page": "calculator", "page_name": "rf",
     })
 
 
@@ -202,7 +202,7 @@ async def power_calc_page(
         # Seed unit selectors from the user's preferred default power unit.
         "form": {"from_unit": current_user.default_power_unit,
                  "start_unit": current_user.default_power_unit},
-        "page": "calculator",
+        "page": "calculator", "page_name": "power",
     })
 
 
@@ -233,7 +233,7 @@ async def power_calc_submit(
         "chain_result": None,
         "form": {"power_value": power_value, "from_unit": from_unit, "to_unit": to_unit},
         "error": error,
-        "page": "calculator",
+        "page": "calculator", "page_name": "power",
     })
 
 
@@ -249,7 +249,7 @@ async def eirp_calc_page(
         "result": None,
         "form": {},
         "error": None,
-        "page": "calculator",
+        "page": "calculator", "page_name": "eirp",
     })
 
 
@@ -294,7 +294,7 @@ async def eirp_calc_submit(
         "result": result,
         "form": form_data,
         "error": error,
-        "page": "calculator",
+        "page": "calculator", "page_name": "eirp",
     })
 
 
@@ -349,5 +349,5 @@ async def power_chain_submit(
         "result": None,
         "chain_result": chain_result,
         "form": dict(form),
-        "page": "calculator",
+        "page": "calculator", "page_name": "power",
     })
