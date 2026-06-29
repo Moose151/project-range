@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.16.0` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.16.1` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -100,6 +100,13 @@
   - Dashboard utility widget type `chat` added to the Widgets menu. It shows online users/open rooms and opens the same floating chat windows. Widget persistence follows existing terminal-local dashboard utility widget storage.
   - Static cache keys bumped to `app.css?v=15` / `app.js?v=15`. New CSS is in `app/static/css/app.css`; client logic is in `app/static/js/app.js`.
   - **Verification gap:** compile, app import, JS syntax, and template parse passed. Needs real browser QA with two logged-in sessions to confirm online presence, private/group room creation, unread alerts, minimised windows, mobile layout, and dashboard widget behaviour.
+- **0.16.1 — Chat notification/usability polish:**
+  - Chat now polls all rooms the user participates in, not only rooms with an open floating window. If a message arrives while no relevant chat window is open, the launcher unread badge increments and a toast notification appears.
+  - Clicking the chat window header now minimises/restores the window; the small dash button remains but is no longer the only target.
+  - Online roster, group creator, and dashboard Chat widget now show the user's current duty-role tag when available, falling back to account role.
+  - Dashboard Chat widget is now a real embedded chat surface: select/start a private chat, select existing private/group rooms, read messages, and send replies inside the widget without opening a floating bottom chat window. The floating windows remain available from the global launcher.
+  - Group chats are implemented as in-memory rooms with 2+ participants via `/chat/rooms/group`; still no persistence/history after restart.
+  - Static cache keys bumped to `app.css?v=16` / `app.js?v=16`.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with operator feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.

@@ -130,6 +130,7 @@ const chatState = {
   rooms: {},
   openRooms: {},
   lastMessageIds: {},
+  roomSeen: {},
   unread: {},
   rosterOpen: false,
 };
@@ -166,18 +167,31 @@ function renderChatRoster() {
     <button type="button" class="chat-user-row" ondblclick="openPrivateChat(${u.id})" title="Double-click to chat">
       <span class="chat-presence-dot"></span>
       <span class="text-truncate">${escapeHtml(u.display_name)}</span>
+      ${chatRoleBadge(u)}
     </button>
   `).join('') : '<div class="text-muted py-2">No other users online.</div>';
   groupUsers.innerHTML = others.length ? others.map(u => `
     <label class="d-flex align-items-center gap-2 py-1">
       <input class="form-check-input m-0" type="checkbox" value="${u.id}" data-chat-group-user>
       <span class="text-truncate">${escapeHtml(u.display_name)}</span>
+      ${chatRoleBadge(u)}
     </label>
   `).join('') : '<div class="text-muted py-2">No online users to add.</div>';
 }
 
+function chatRoleBadge(user) {
+  const label = user.duty_role || user.role || '';
+  if (!label) return '';
+  const colour = user.duty_role_color || '#6c757d';
+  return `<span class="badge chat-role-badge" style="background:${escapeHtml(colour)}">${escapeHtml(label)}</span>`;
+}
+
 function mergeChatRooms(rooms) {
-  (rooms || []).forEach(room => { chatState.rooms[room.id] = room; });
+  (rooms || []).forEach(room => {
+    const known = Boolean(chatState.rooms[room.id]);
+    chatState.rooms[room.id] = room;
+    if (!known) chatState.roomSeen[room.id] = false;
+  });
 }
 
 async function refreshChatState() {
@@ -187,6 +201,7 @@ async function refreshChatState() {
     chatState.me = data.me;
     chatState.users = data.online_users || [];
     mergeChatRooms(data.rooms);
+    pollKnownChatRooms();
     renderChatRoster();
     window.renderDashboardChatWidget?.();
   } catch (e) {}
@@ -230,6 +245,7 @@ function openChatWindow(roomId) {
   if (!room) return;
   chatState.openRooms[roomId] = true;
   chatState.unread[roomId] = 0;
+  chatState.roomSeen[roomId] = true;
   const existing = document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"]`);
   if (existing) {
     existing.classList.remove('minimised', 'has-alert');
@@ -242,11 +258,11 @@ function openChatWindow(roomId) {
   node.className = 'chat-window';
   node.dataset.chatWindow = roomId;
   node.innerHTML = `
-    <div class="chat-window-header">
+    <div class="chat-window-header" onclick="toggleChatWindowMinimised('${escapeHtml(roomId)}')" title="Click to minimise / expand">
       <i class="bi ${room.is_group ? 'bi-people-fill' : 'bi-person-fill'}"></i>
       <div class="chat-window-title">${escapeHtml(room.title)}</div>
-      <button type="button" class="btn btn-sm btn-link link-secondary p-0 ms-auto" title="Minimise" onclick="minimiseChatWindow('${escapeHtml(roomId)}')"><i class="bi bi-dash-lg"></i></button>
-      <button type="button" class="btn btn-sm btn-link link-secondary p-0" title="Close" onclick="closeChatWindow('${escapeHtml(roomId)}')"><i class="bi bi-x-lg"></i></button>
+      <button type="button" class="btn btn-sm btn-link link-secondary p-0 ms-auto" title="Minimise" onclick="event.stopPropagation(); toggleChatWindowMinimised('${escapeHtml(roomId)}')"><i class="bi bi-dash-lg"></i></button>
+      <button type="button" class="btn btn-sm btn-link link-secondary p-0" title="Close" onclick="event.stopPropagation(); closeChatWindow('${escapeHtml(roomId)}')"><i class="bi bi-x-lg"></i></button>
     </div>
     <div class="chat-window-body" data-chat-messages></div>
     <form class="chat-window-form" onsubmit="sendChatMessage(event, '${escapeHtml(roomId)}')">
@@ -258,9 +274,16 @@ function openChatWindow(roomId) {
   updateChatUnreadBadge();
 }
 
-function minimiseChatWindow(roomId) {
+function toggleChatWindowMinimised(roomId) {
   const win = document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"]`);
-  if (win) win.classList.toggle('minimised');
+  if (!win) return;
+  win.classList.toggle('minimised');
+  if (!win.classList.contains('minimised')) {
+    win.classList.remove('has-alert');
+    chatState.unread[roomId] = 0;
+    chatState.roomSeen[roomId] = true;
+    updateChatUnreadBadge();
+  }
 }
 
 function closeChatWindow(roomId) {
@@ -291,23 +314,29 @@ async function sendChatMessage(evt, roomId) {
 function appendChatMessages(roomId, messages) {
   const win = document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"]`);
   const body = win?.querySelector('[data-chat-messages]');
-  if (!body) return;
+  const roomOpen = Boolean(win && body);
   let receivedNewFromOther = false;
   messages.forEach(msg => {
     chatState.lastMessageIds[roomId] = Math.max(chatState.lastMessageIds[roomId] || 0, msg.id);
     const mine = chatState.me && msg.sender_id === chatState.me.id;
     if (!mine) receivedNewFromOther = true;
-    body.insertAdjacentHTML('beforeend', `
-      <div class="chat-message ${mine ? 'mine' : ''}">
-        <div class="chat-message-meta">${mine ? 'You' : escapeHtml(msg.sender_name)} · ${escapeHtml(msg.sent_at)}</div>
-        <div class="chat-message-bubble">${escapeHtml(msg.body)}</div>
-      </div>`);
+    if (body) {
+      body.insertAdjacentHTML('beforeend', `
+        <div class="chat-message ${mine ? 'mine' : ''}">
+          <div class="chat-message-meta">${mine ? 'You' : escapeHtml(msg.sender_name)} · ${escapeHtml(msg.sent_at)}</div>
+          <div class="chat-message-bubble">${escapeHtml(msg.body)}</div>
+        </div>`);
+    }
   });
-  if (messages.length) body.scrollTop = body.scrollHeight;
-  if (receivedNewFromOther && win.classList.contains('minimised')) {
-    win.classList.add('has-alert');
-    chatState.unread[roomId] = (chatState.unread[roomId] || 0) + messages.filter(m => !chatState.me || m.sender_id !== chatState.me.id).length;
+  if (messages.length && body) body.scrollTop = body.scrollHeight;
+  const unreadNew = messages.filter(m => !chatState.me || m.sender_id !== chatState.me.id).length;
+  const shouldAlert = receivedNewFromOther && (!roomOpen || win.classList.contains('minimised'));
+  if (shouldAlert) {
+    if (win) win.classList.add('has-alert');
+    chatState.unread[roomId] = (chatState.unread[roomId] || 0) + unreadNew;
     updateChatUnreadBadge();
+    const room = chatState.rooms[roomId];
+    if (room && !roomOpen) showToast?.(`New chat message: ${escapeHtml(room.title)}`, 'info');
   }
 }
 
@@ -319,6 +348,10 @@ async function pollChatRoom(roomId) {
     if (data.room) mergeChatRooms([data.room]);
     appendChatMessages(roomId, data.messages || []);
   } catch (e) {}
+}
+
+function pollKnownChatRooms() {
+  Object.keys(chatState.rooms).forEach(roomId => pollChatRoom(roomId));
 }
 
 function updateChatUnreadBadge() {
@@ -343,7 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!document.getElementById('chatDock')) return;
   refreshChatState();
   setInterval(refreshChatState, 10000);
-  setInterval(() => Object.keys(chatState.openRooms).forEach(pollChatRoom), 2500);
+  setInterval(pollKnownChatRooms, 2500);
 });
 
 // ── Sidebar toggle ────────────────────────────────────────────────────────────

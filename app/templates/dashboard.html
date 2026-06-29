@@ -429,17 +429,25 @@ function utilityBody(id, type, config = {}) {
   if (type === 'chat') {
     return `<div class="dashboard-chat-widget" data-dashboard-chat-widget="${id}">
               <div class="d-flex gap-2 mb-2">
-                <button type="button" class="btn btn-sm btn-primary" onclick="toggleChatRoster(true)">
-                  <i class="bi bi-chat-dots me-1"></i>Open Chat
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshChatState()">
+                <select class="form-select form-select-sm dashboard-chat-room-select" onchange="selectDashboardChatRoom('${id}', this.value)">
+                  <option value="">Select a chat...</option>
+                </select>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshChatState()" title="Refresh">
                   <i class="bi bi-arrow-clockwise"></i>
                 </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleChatRoster(true)" title="Create group chat">
+                  <i class="bi bi-people"></i>
+                </button>
               </div>
-              <div class="small text-muted mb-1">Online users</div>
+              <div class="dashboard-chat-body border rounded p-2 mb-2" data-dashboard-chat-messages>
+                <div class="text-muted small">Select an online user or existing room.</div>
+              </div>
+              <form class="dashboard-chat-form d-flex gap-2" onsubmit="sendDashboardChatMessage(event, '${id}')">
+                <input type="text" class="form-control form-control-sm" name="body" autocomplete="off" maxlength="2000" placeholder="Message" disabled>
+                <button type="submit" class="btn btn-sm btn-primary" title="Send" disabled><i class="bi bi-send"></i></button>
+              </form>
+              <div class="small text-muted mt-2 mb-1">Online users</div>
               <div class="dashboard-chat-online small text-muted">Loading...</div>
-              <div class="small text-muted mt-2 mb-1">Open rooms</div>
-              <div class="dashboard-chat-rooms small text-muted">No rooms yet.</div>
             </div>`;
   }
   // ── New widget types ──────────────────────────────────────────────────────
@@ -582,24 +590,118 @@ function loadDocWidget(id, slug) {
 
 function renderDashboardChatWidget() {
   document.querySelectorAll('[data-dashboard-chat-widget]').forEach(widget => {
+    const widgetId = widget.dataset.dashboardChatWidget;
+    const selected = widget.dataset.selectedRoom || '';
+    const select = widget.querySelector('.dashboard-chat-room-select');
     const online = widget.querySelector('.dashboard-chat-online');
-    const rooms = widget.querySelector('.dashboard-chat-rooms');
     const others = (window.chatState?.users || []).filter(u => !window.chatState?.me || u.id !== window.chatState.me.id);
+    const roomList = Object.values(window.chatState?.rooms || {});
+    if (select) {
+      const current = selected || select.value || '';
+      select.innerHTML = '<option value="">Select a chat...</option>' + roomList.map(room =>
+        `<option value="${escapeHtml(room.id)}" ${current === room.id ? 'selected' : ''}>${escapeHtml(room.title)}</option>`
+      ).join('');
+      if (current && roomList.some(room => room.id === current)) select.value = current;
+    }
     if (online) {
       online.innerHTML = others.length ? others.map(u => `
-        <button type="button" class="btn btn-sm btn-outline-secondary me-1 mb-1" ondblclick="openPrivateChat(${u.id})" onclick="openPrivateChat(${u.id})">
-          <i class="bi bi-person-fill me-1"></i>${escapeHtml(u.display_name)}
+        <button type="button" class="btn btn-sm btn-outline-secondary me-1 mb-1" onclick="startDashboardPrivateChat('${widgetId}', ${u.id})">
+          <i class="bi bi-person-fill me-1"></i>${escapeHtml(u.display_name)} ${chatRoleBadge(u)}
         </button>`).join('') : '<span class="text-muted">No other users online.</span>';
     }
-    const roomList = Object.values(window.chatState?.rooms || {});
-    if (rooms) {
-      rooms.innerHTML = roomList.length ? roomList.map(room => `
-        <button type="button" class="btn btn-sm btn-outline-info me-1 mb-1" onclick="openChatWindow('${escapeHtml(room.id)}')">
-          <i class="bi ${room.is_group ? 'bi-people-fill' : 'bi-chat-fill'} me-1"></i>${escapeHtml(room.title)}
-        </button>`).join('') : '<span class="text-muted">No rooms yet.</span>';
-    }
+    if (selected) loadDashboardChatMessages(widgetId, selected);
   });
 }
+
+async function startDashboardPrivateChat(widgetId, userId) {
+  try {
+    const data = await chatApi('/chat/rooms/private', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ user_id: userId }),
+    });
+    mergeChatRooms([data.room]);
+    renderDashboardChatWidget();
+    selectDashboardChatRoom(widgetId, data.room.id);
+  } catch (e) {
+    showToast?.('Could not open chat', 'danger');
+  }
+}
+
+function setDashboardChatEnabled(widget, enabled) {
+  widget.querySelector('.dashboard-chat-form input')?.toggleAttribute('disabled', !enabled);
+  widget.querySelector('.dashboard-chat-form button')?.toggleAttribute('disabled', !enabled);
+}
+
+function selectDashboardChatRoom(widgetId, roomId) {
+  const widget = document.querySelector(`[data-dashboard-chat-widget="${CSS.escape(widgetId)}"]`);
+  if (!widget) return;
+  widget.dataset.selectedRoom = roomId || '';
+  widget.dataset.lastMessageId = '0';
+  setDashboardChatEnabled(widget, Boolean(roomId));
+  if (roomId) {
+    window.chatState.unread[roomId] = 0;
+    window.chatState.roomSeen[roomId] = true;
+    updateChatUnreadBadge?.();
+    loadDashboardChatMessages(widgetId, roomId, true);
+  } else {
+    widget.querySelector('[data-dashboard-chat-messages]').innerHTML = '<div class="text-muted small">Select an online user or existing room.</div>';
+  }
+}
+
+async function loadDashboardChatMessages(widgetId, roomId, full = false) {
+  const widget = document.querySelector(`[data-dashboard-chat-widget="${CSS.escape(widgetId)}"]`);
+  if (!widget || !roomId) return;
+  const pane = widget.querySelector('[data-dashboard-chat-messages]');
+  const after = full ? 0 : parseInt(widget.dataset.lastMessageId || '0', 10);
+  try {
+    const data = await chatApi('/chat/rooms/' + encodeURIComponent(roomId) + '/messages?after=' + after);
+    if (data.room) window.chatState.rooms[roomId] = data.room;
+    const messages = data.messages || [];
+    if (full) pane.innerHTML = '';
+    if (!messages.length && full) pane.innerHTML = '<div class="text-muted small">No messages yet.</div>';
+    messages.forEach(msg => {
+      widget.dataset.lastMessageId = String(Math.max(parseInt(widget.dataset.lastMessageId || '0', 10), msg.id));
+      const mine = window.chatState?.me && msg.sender_id === window.chatState.me.id;
+      pane.insertAdjacentHTML('beforeend', `
+        <div class="chat-message ${mine ? 'mine' : ''}">
+          <div class="chat-message-meta">${mine ? 'You' : escapeHtml(msg.sender_name)} · ${escapeHtml(msg.sent_at)}</div>
+          <div class="chat-message-bubble">${escapeHtml(msg.body)}</div>
+        </div>`);
+    });
+    if (messages.length || full) pane.scrollTop = pane.scrollHeight;
+    window.chatState.unread[roomId] = 0;
+    updateChatUnreadBadge?.();
+  } catch (e) {}
+}
+
+async function sendDashboardChatMessage(evt, widgetId) {
+  evt.preventDefault();
+  const widget = document.querySelector(`[data-dashboard-chat-widget="${CSS.escape(widgetId)}"]`);
+  const roomId = widget?.dataset.selectedRoom || '';
+  const input = widget?.querySelector('.dashboard-chat-form input[name="body"]');
+  const body = (input?.value || '').trim();
+  if (!roomId || !body) return;
+  input.value = '';
+  try {
+    await chatApi('/chat/rooms/' + encodeURIComponent(roomId) + '/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ body }),
+    });
+    loadDashboardChatMessages(widgetId, roomId);
+  } catch (e) {
+    showToast?.('Message not sent', 'danger');
+  }
+}
+
+function refreshDashboardChatActiveRooms() {
+  document.querySelectorAll('[data-dashboard-chat-widget]').forEach(widget => {
+    const roomId = widget.dataset.selectedRoom || '';
+    if (roomId) loadDashboardChatMessages(widget.dataset.dashboardChatWidget, roomId);
+  });
+}
+setInterval(refreshDashboardChatActiveRooms, 2500);
 
 // ── Drag-to-reorder ────────────────────────────────────────────────────────
 const container = document.getElementById('serialWidgetsContainer');

@@ -10,12 +10,26 @@ from app.models import User
 router = APIRouter(prefix="/chat")
 
 
-def _room_payload(room, current_user: User) -> dict:
+def _room_title(room, current_user: User, db: Session | None = None) -> str:
+    if room.is_group:
+        return room.title
+    other_ids = [uid for uid in room.participant_ids if uid != current_user.id]
+    if not other_ids:
+        return "Notes to self"
+    if db is not None:
+        other = db.query(User).filter(User.id == other_ids[0]).first()
+        if other:
+            return other.display_name
+    return room.title
+
+
+def _room_payload(room, current_user: User, db: Session | None = None) -> dict:
     return {
         "id": room.id,
-        "title": room.title,
+        "title": _room_title(room, current_user, db),
         "is_group": room.is_group,
         "participants": sorted(room.participant_ids),
+        "last_message_id": chat_state.last_message_id(room),
         "unread_hint": False,
     }
 
@@ -34,12 +48,19 @@ def _message_payload(msg) -> dict:
 @router.get("/state")
 async def chat_state_endpoint(
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    chat_state.touch_user(current_user.id, current_user.display_name, str(current_user.role.value if hasattr(current_user.role, "value") else current_user.role))
+    chat_state.touch_user(
+        current_user.id,
+        current_user.display_name,
+        str(current_user.role.value if hasattr(current_user.role, "value") else current_user.role),
+        current_user.duty_role,
+        current_user.duty_role_color,
+    )
     return JSONResponse({
         "me": {"id": current_user.id, "display_name": current_user.display_name},
         "online_users": chat_state.online_users(),
-        "rooms": [_room_payload(room, current_user) for room in chat_state.user_rooms(current_user.id)],
+        "rooms": [_room_payload(room, current_user, db) for room in chat_state.user_rooms(current_user.id)],
     })
 
 
@@ -57,7 +78,7 @@ async def chat_private_room(
         other.id,
         other.display_name if other.id != current_user.id else "Notes to self",
     )
-    return JSONResponse({"room": _room_payload(room, current_user)})
+    return JSONResponse({"room": _room_payload(room, current_user, db)})
 
 
 @router.post("/rooms/group")
@@ -78,7 +99,7 @@ async def chat_group_room(
         .all()
     ] if ids else []
     room = chat_state.create_group_room(current_user.id, active_ids, title)
-    return JSONResponse({"room": _room_payload(room, current_user)})
+    return JSONResponse({"room": _room_payload(room, current_user, db)})
 
 
 @router.get("/rooms/{room_id}/messages")
@@ -86,11 +107,12 @@ async def chat_messages(
     room_id: str,
     after: int = 0,
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     messages = chat_state.messages_after(room_id, current_user.id, after)
     room = chat_state.get_room_for_user(room_id, current_user.id)
     return JSONResponse({
-        "room": _room_payload(room, current_user) if room else None,
+        "room": _room_payload(room, current_user, db) if room else None,
         "messages": [_message_payload(msg) for msg in messages],
     })
 

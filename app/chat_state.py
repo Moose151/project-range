@@ -40,12 +40,20 @@ _rooms: dict[str, ChatRoom] = {}
 _message_seq = 0
 
 
-def touch_user(user_id: int, display_name: str, role: str | None = None) -> None:
+def touch_user(
+    user_id: int,
+    display_name: str,
+    role: str | None = None,
+    duty_role: str | None = None,
+    duty_role_color: str | None = None,
+) -> None:
     with _lock:
         _presence[user_id] = {
             "id": user_id,
             "display_name": display_name,
             "role": role or "",
+            "duty_role": duty_role or "",
+            "duty_role_color": duty_role_color or "",
             "last_seen": datetime.utcnow(),
         }
 
@@ -66,6 +74,8 @@ def online_users() -> list[dict]:
                 "id": item["id"],
                 "display_name": item["display_name"],
                 "role": item["role"],
+                "duty_role": item.get("duty_role", ""),
+                "duty_role_color": item.get("duty_role_color", ""),
                 "last_seen": item["last_seen"].isoformat(),
             }
             for item in sorted(_presence.values(), key=lambda x: x["display_name"].lower())
@@ -100,6 +110,10 @@ def create_group_room(creator_id: int, participant_ids: list[int], title: str) -
 def user_rooms(user_id: int) -> list[ChatRoom]:
     with _lock:
         return [room for room in _rooms.values() if user_id in room.participant_ids]
+
+
+def last_message_id(room: ChatRoom) -> int:
+    return room.messages[-1].id if room.messages else 0
 
 
 def get_room_for_user(room_id: str, user_id: int) -> ChatRoom | None:

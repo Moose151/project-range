@@ -282,6 +282,13 @@ code {
   font-size: 0.85rem;
   font-weight: 700;
 }
+.chat-window-header {
+  cursor: pointer;
+  user-select: none;
+}
+.chat-window-header .btn {
+  cursor: pointer;
+}
 .chat-roster-body {
   padding: 0.65rem;
 }
@@ -300,6 +307,16 @@ code {
 }
 .chat-user-row:hover {
   background: rgba(var(--range-accent-rgb), 0.12);
+}
+.chat-role-badge {
+  flex: 0 0 auto;
+  font-size: 0.62rem;
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
 }
 .chat-presence-dot {
   width: 0.55rem;
@@ -393,6 +410,14 @@ code {
 }
 .dashboard-chat-widget {
   min-height: 13rem;
+}
+.dashboard-chat-body {
+  height: 13rem;
+  overflow-y: auto;
+  background: var(--bs-body-bg);
+}
+.dashboard-chat-form input {
+  min-width: 0;
 }
 @media (max-width: 768px) {
   .chat-dock {
