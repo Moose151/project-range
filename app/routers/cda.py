@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.deps import get_current_user, require_supervisor, get_current_range_state
+from app.deps import get_current_user, require_supervisor, get_current_range_state, is_testing_state
 from app.models import User, CDATable, CDAWindow, SerialCDATable, Serial, AuditLog
 
 router = APIRouter(prefix="/cda")
@@ -33,7 +33,7 @@ async def cda_list(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    tables = db.query(CDATable).order_by(CDATable.name).all()
+    tables = db.query(CDATable).filter(CDATable.is_testing == is_testing_state(db)).order_by(CDATable.name).all()
     return templates.TemplateResponse(request, "cda_tables.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
@@ -58,6 +58,7 @@ async def cda_create(
         name=name,
         description=description.strip() or None,
         created_by_id=current_user.id,
+        is_testing=is_testing_state(db),
     )
     db.add(table)
     db.flush()
@@ -76,13 +77,14 @@ async def cda_detail(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    table = db.query(CDATable).filter(CDATable.id == table_id).first()
+    testing = is_testing_state(db)
+    table = db.query(CDATable).filter(CDATable.id == table_id, CDATable.is_testing == testing).first()
     if not table:
         return RedirectResponse("/cda?toast=Table+not+found", status_code=302)
     assigned_serials = (
         db.query(Serial)
         .join(SerialCDATable, SerialCDATable.serial_id == Serial.id)
-        .filter(SerialCDATable.cda_table_id == table_id, Serial.closed_at == None)
+        .filter(SerialCDATable.cda_table_id == table_id, Serial.closed_at == None, Serial.is_testing == testing)
         .all()
     )
     return templates.TemplateResponse(request, "cda_table_edit.html", {
@@ -103,7 +105,7 @@ async def cda_edit(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
-    table = db.query(CDATable).filter(CDATable.id == table_id).first()
+    table = db.query(CDATable).filter(CDATable.id == table_id, CDATable.is_testing == is_testing_state(db)).first()
     if not table:
         return RedirectResponse("/cda", status_code=302)
     table.name = name.strip()
@@ -122,7 +124,7 @@ async def cda_delete(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
-    table = db.query(CDATable).filter(CDATable.id == table_id).first()
+    table = db.query(CDATable).filter(CDATable.id == table_id, CDATable.is_testing == is_testing_state(db)).first()
     if table:
         db.add(AuditLog(
             user_id=current_user.id, action_type="CDA_TABLE_DELETE",
@@ -141,9 +143,9 @@ async def cda_window_add(
     end_zulu: str = Form(...),
     max_power_dbm: Optional[float] = Form(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_supervisor),
+    current_user: User = Depends(get_current_user),
 ):
-    table = db.query(CDATable).filter(CDATable.id == table_id).first()
+    table = db.query(CDATable).filter(CDATable.id == table_id, CDATable.is_testing == is_testing_state(db)).first()
     if not table:
         return RedirectResponse("/cda", status_code=302)
 
@@ -177,7 +179,7 @@ async def cda_export_csv(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    table = db.query(CDATable).filter(CDATable.id == table_id).first()
+    table = db.query(CDATable).filter(CDATable.id == table_id, CDATable.is_testing == is_testing_state(db)).first()
     if not table:
         return RedirectResponse("/cda", status_code=302)
     buf = io.StringIO()
@@ -204,9 +206,9 @@ async def cda_import_csv(
     table_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_supervisor),
+    current_user: User = Depends(get_current_user),
 ):
-    table = db.query(CDATable).filter(CDATable.id == table_id).first()
+    table = db.query(CDATable).filter(CDATable.id == table_id, CDATable.is_testing == is_testing_state(db)).first()
     if not table:
         return RedirectResponse("/cda", status_code=302)
 
@@ -264,8 +266,11 @@ async def cda_window_delete(
     table_id: int,
     window_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_supervisor),
+    current_user: User = Depends(get_current_user),
 ):
+    table = db.query(CDATable).filter(CDATable.id == table_id, CDATable.is_testing == is_testing_state(db)).first()
+    if not table:
+        return RedirectResponse("/cda", status_code=302)
     window = db.query(CDAWindow).filter(
         CDAWindow.id == window_id, CDAWindow.cda_table_id == table_id,
     ).first()
@@ -278,3 +283,47 @@ async def cda_window_delete(
         db.delete(window)
         db.commit()
     return RedirectResponse(f"/cda/{table_id}?toast=Window+removed", status_code=302)
+
+
+@router.post("/{table_id}/windows/{window_id}/edit")
+async def cda_window_edit(
+    table_id: int,
+    window_id: int,
+    label: str = Form(""),
+    start_zulu: str = Form(...),
+    end_zulu: str = Form(...),
+    max_power_dbm: Optional[float] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    table = db.query(CDATable).filter(CDATable.id == table_id, CDATable.is_testing == is_testing_state(db)).first()
+    if not table:
+        return RedirectResponse("/cda", status_code=302)
+    window = db.query(CDAWindow).filter(
+        CDAWindow.id == window_id,
+        CDAWindow.cda_table_id == table_id,
+    ).first()
+    if not window:
+        return RedirectResponse(f"/cda/{table_id}?toast=Window+not+found", status_code=302)
+
+    try:
+        start_zulu = _parse_zulu_time(start_zulu)
+        end_zulu = _parse_zulu_time(end_zulu)
+    except ValueError as e:
+        return RedirectResponse(f"/cda/{table_id}?toast=Invalid+time+format:+{e}", status_code=302)
+
+    previous = f"{window.start_zulu}-{window.end_zulu}"
+    window.label = label.strip() or None
+    window.start_zulu = start_zulu
+    window.end_zulu = end_zulu
+    window.max_power_dbm = max_power_dbm
+    db.add(AuditLog(
+        user_id=current_user.id,
+        action_type="CDA_WINDOW_EDIT",
+        entity_type="CDAWindow",
+        entity_id=window.id,
+        previous_value=previous,
+        new_value=f"{start_zulu}-{end_zulu}",
+    ))
+    db.commit()
+    return RedirectResponse(f"/cda/{table_id}?toast=Window+updated", status_code=302)

@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.16.1` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.17.0` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -107,6 +107,17 @@
   - Dashboard Chat widget is now a real embedded chat surface: select/start a private chat, select existing private/group rooms, read messages, and send replies inside the widget without opening a floating bottom chat window. The floating windows remain available from the global launcher.
   - Group chats are implemented as in-memory rooms with 2+ participants via `/chat/rooms/group`; still no persistence/history after restart.
   - Static cache keys bumped to `app.css?v=16` / `app.js?v=16`.
+- **0.17.0 — Testing range state + chat/CDA/serial usability fixes:**
+  - New range state **Testing** (`RangeState.TESTING`). Only supervisors can place the range into Testing or take it out again. Non-supervisors who are logged in while the range is Testing stay in Testing and cannot change state.
+  - Testing is a separate operational workspace, not a discard mode. Rows created while Testing are saved with `is_testing=True` and hidden from the normal states. Returning to Testing shows the same Testing data again.
+  - Scoped/sandboxed models: `SignalPackage`, `Serial`, `SignalLog`, `AuditLog`, `RFDevice`, `DeviceLink`, `CDATable`, `Incident`, and `CeaseEvent`. Additive migrations for all `is_testing` columns are in `init_db.py`.
+  - A SQLAlchemy `before_flush` hook in `models.py` automatically marks new scoped rows based on current range state (or a pending range-state transition), so audit/log/config rows do not accidentally leak into the wrong workspace.
+  - On first entry to Testing, current operational **RF devices/topology** and **CDA tables/windows** are copied into Testing as editable sandbox rows. Testing edits to devices/CDA do not modify operational rows.
+  - Testing scoping is enforced in the main operational views and exports: packages, serials, dashboard status/update endpoints, logs, history, audit, devices, topology, CBM active sync, CDA, incidents, and CEASE. User accounts, Docs, duty-role/admin reference lists, and signal registry remain global.
+  - UI shows a yellow Testing range banner and warning on the range-state change screen. Static cache keys bumped to `app.css?v=17` / `app.js?v=17`.
+  - Chat fix: opening a chat now loads the full in-memory room history for the current app session, so a message received before the floating window/widget is opened appears with sender and time. Last-seen/unread state is stored in browser `sessionStorage`, preventing the same message notification from replaying on every page change. Messages still live only in the Python process; browser session state is only for notification/read tracking.
+  - CDA permissions changed: operators can now add, import, edit, and delete **CDA windows**. CDA table create/edit/delete remains supervisor-only. Safety Supervisor remains read-only via middleware/UI.
+  - Serials page no longer shows the New Serial form by default. It now has a top-right **New Serial** button that opens a collapsible form, matching the Packages flow.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with operator feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.
@@ -120,7 +131,8 @@
    - map real firmware statuses to Project Range states (`Up`, `Down`, `Configured`, `Standby`) and confirm whether `TX_OP=OFF` should always mean Down;
    - test `Sync Active CBMs` on a non-operational serial/package first;
    - only after proving the above, decide whether to add background polling and at what interval.
-5. **Instant chat browser QA** — open two or more logged-in users/sessions and test: presence list updates, double-click private chat, group chat creation, send/receive, minimised-window alert, unread launcher badge, dashboard chat widget, logout/age-out behaviour, and mobile bottom-right layout. Decide later whether any history/audit/persistence is desired; current requirement is no memory/history.
+5. **Instant chat browser QA** — open two or more logged-in users/sessions and test: presence list updates, double-click private chat, group chat creation, send/receive, minimised-window alert, unread launcher badge, dashboard chat widget, page-change notification replay, logout/age-out behaviour, and mobile bottom-right layout. Decide later whether persistent DB chat history/audit is desired; current implementation is in-memory per app process plus browser `sessionStorage` read/unread tracking.
+6. **Testing-state browser QA** — with at least one supervisor and one operator, test changing into/out of Testing, non-supervisor state lock while Testing, creating/editing packages/serials/logs/devices/CDA/incidents/CEASE in Testing, then returning to normal states and confirming those Testing rows are hidden. Re-enter Testing and confirm they return.
 
 ### Also pending (from ROADMAP)
 - **Deferred infra (user's call):** HTTPS/TLS, PostgreSQL (+ Alembic). Cookies are TLS-ready (`SESSION_HTTPS_ONLY=1`).
@@ -132,7 +144,7 @@
 - **`Role` enum has THREE values:** `operator`, `supervisor`, `safety_supervisor` (read-only). Read-only is enforced in `main.py` `security_middleware` (blocks non-safe methods; allow-list `SAFETY_SUPERVISOR_ALLOWED_WRITES`). `SessionMiddleware` must stay **added last** (outermost) or `request.session` is empty in that check.
 - **New models since 0.11.0:** `CDATable`, `CDAWindow`, `SerialCDATable` (CDA); `CeaseEvent` (CEASE); `DutyRole` + `User.duty_role`/`User.duty_role_color` (duty tags). All tables auto-create via `create_all`; the two `users` columns are additive migrations in `init_db.py`.
 - **New routers:** `cda.py`, `cease.py` (both registered in `main.py`). Duty-role CRUD lives in `config.py`; duty-role self-set in `preferences.py`.
-- **Static cache-busting is mandatory:** `base.html` references `app.css?v=N` and `app.js?v=N` (currently **14**). **Bump N on every CSS/JS change** — without it, browsers serve a stale file and new JS handlers silently break (this exact bug hit the 0.13.0 sidebar/span buttons).
+- **Static cache-busting is mandatory:** `base.html` references `app.css?v=N` and `app.js?v=N` (currently **17**). **Bump N on every CSS/JS change** — without it, browsers serve a stale file and new JS handlers silently break (this exact bug hit the 0.13.0 sidebar/span buttons).
 - **`partials/dashboard_summary.html` is now dead code** (the hardcoded summary row was removed in 0.13.0). Safe to delete; left in place for now.
 - **Settings area** — now reached via the sidebar (user footer → Preferences/Password; supervisor → Admin → App Config). The old Settings dropdown is gone.
 - **`DeviceLink` and `RFDevice` new columns are fully implemented** — `device_model`, `has_web_gui`, and the `device_links` table are all in place. Device type list now includes `antenna`. No further migration needed for those.

@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.database import get_db
-from app.deps import get_current_user, get_current_range_state
+from app.deps import get_current_user, get_current_range_state, is_testing_state
 from app.models import User, Serial, SignalLog
 from app.log_changes import annotate_log_changes
 from app.settings import annotate_local_times, get_local_timezone
@@ -26,7 +26,8 @@ async def history_list(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    q = db.query(Serial).filter(Serial.closed_at != None)
+    testing = is_testing_state(db)
+    q = db.query(Serial).filter(Serial.closed_at != None, Serial.is_testing == testing)
     if search:
         q = q.filter(Serial.title.ilike(f"%{search}%"))
     total = q.count()
@@ -54,11 +55,16 @@ async def history_detail(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    serial = db.query(Serial).filter(Serial.id == serial_id).first()
+    testing = is_testing_state(db)
+    serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
     if not serial:
         return RedirectResponse("/history", status_code=302)
 
-    q = db.query(SignalLog).filter(SignalLog.serial_id == serial_id, SignalLog.is_deleted == False)
+    q = db.query(SignalLog).filter(
+        SignalLog.serial_id == serial_id,
+        SignalLog.is_deleted == False,
+        SignalLog.is_testing == testing,
+    )
     if search:
         q = q.filter(or_(
             SignalLog.signal_name.ilike(f"%{search}%"),
@@ -89,13 +95,14 @@ async def history_export_csv(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    serial = db.query(Serial).filter(Serial.id == serial_id).first()
+    testing = is_testing_state(db)
+    serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
     if not serial:
         return RedirectResponse("/history", status_code=302)
 
     logs = (
         db.query(SignalLog)
-        .filter(SignalLog.serial_id == serial_id, SignalLog.is_deleted == False)
+        .filter(SignalLog.serial_id == serial_id, SignalLog.is_deleted == False, SignalLog.is_testing == testing)
         .order_by(SignalLog.timestamp.asc())
         .all()
     )
@@ -132,13 +139,14 @@ async def history_export_xlsx(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    serial = db.query(Serial).filter(Serial.id == serial_id).first()
+    testing = is_testing_state(db)
+    serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
     if not serial:
         return RedirectResponse("/history", status_code=302)
 
     logs = (
         db.query(SignalLog)
-        .filter(SignalLog.serial_id == serial_id, SignalLog.is_deleted == False)
+        .filter(SignalLog.serial_id == serial_id, SignalLog.is_deleted == False, SignalLog.is_testing == testing)
         .order_by(SignalLog.timestamp.asc())
         .all()
     )

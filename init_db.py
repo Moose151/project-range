@@ -106,6 +106,15 @@ def _migrate(conn):
         "ALTER TABLE rf_devices ADD COLUMN cbm_last_sync_error TEXT",
         "ALTER TABLE users ADD COLUMN duty_role VARCHAR(64)",
         "ALTER TABLE users ADD COLUMN duty_role_color VARCHAR(16)",
+        "ALTER TABLE signal_packages ADD COLUMN is_testing BOOLEAN DEFAULT 0",
+        "ALTER TABLE serials ADD COLUMN is_testing BOOLEAN DEFAULT 0",
+        "ALTER TABLE signal_logs ADD COLUMN is_testing BOOLEAN DEFAULT 0",
+        "ALTER TABLE audit_logs ADD COLUMN is_testing BOOLEAN DEFAULT 0",
+        "ALTER TABLE rf_devices ADD COLUMN is_testing BOOLEAN DEFAULT 0",
+        "ALTER TABLE device_links ADD COLUMN is_testing BOOLEAN DEFAULT 0",
+        "ALTER TABLE cda_tables ADD COLUMN is_testing BOOLEAN DEFAULT 0",
+        "ALTER TABLE incidents ADD COLUMN is_testing BOOLEAN DEFAULT 0",
+        "ALTER TABLE cease_events ADD COLUMN is_testing BOOLEAN DEFAULT 0",
     ]
     for sql in migrations:
         try:

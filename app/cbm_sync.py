@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.cbm import CBMError, CBMSnapshot, poll_cbm_ssh
 from app.crypto import decrypt_secret
-from app.deps import get_current_range_state
+from app.deps import get_current_range_state, is_testing_state
 from app.models import AuditLog, RFDevice, Serial, SignalLog, SignalPackageEntry
 from app.signal_warnings import warning_flags_for
 
@@ -93,9 +93,11 @@ def _changed(latest: SignalLog | None, values: dict) -> bool:
 def sync_active_cbms(db: Session, actor_id: int) -> CBMSyncResult:
     result = CBMSyncResult(errors=[])
     range_state = get_current_range_state(db)
+    testing = is_testing_state(db)
     active_serials = db.query(Serial).filter(
         Serial.closed_at == None,
         Serial.is_started == True,
+        Serial.is_testing == testing,
     ).all()
 
     mappings: list[tuple[Serial, SignalPackageEntry]] = []
@@ -117,7 +119,7 @@ def sync_active_cbms(db: Session, actor_id: int) -> CBMSyncResult:
             result.add_error(f"Ambiguous CBM mapping on device {device_id} {path}: {names}")
             continue
 
-        device = db.query(RFDevice).filter(RFDevice.id == device_id).first()
+        device = db.query(RFDevice).filter(RFDevice.id == device_id, RFDevice.is_testing == testing).first()
         if not device or not device.cbm_sync_enabled:
             result.skipped += 1
             continue
@@ -147,6 +149,7 @@ def sync_active_cbms(db: Session, actor_id: int) -> CBMSyncResult:
             SignalLog.serial_id == serial.id,
             SignalLog.signal_name == entry.signal_name,
             SignalLog.is_deleted == False,
+            SignalLog.is_testing == testing,
         ).order_by(SignalLog.timestamp.desc()).first()
         if not _changed(latest, values):
             continue

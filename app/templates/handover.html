@@ -20,7 +20,7 @@
     <div class="card border-secondary h-100">
       <div class="card-body py-3">
         <div class="text-muted small">Range State</div>
-        <div class="fs-5 fw-semibold {% if range_state == 'Live' %}text-danger{% elif range_state == 'Closed Loop' %}text-warning{% else %}text-secondary{% endif %}">
+        <div class="fs-5 fw-semibold {% if range_state == 'Live' %}text-danger{% elif range_state == 'Closed Loop' %}text-warning{% elif range_state == 'Testing' %}text-warning{% else %}text-secondary{% endif %}">
           {{ range_state }}
         </div>
       </div>

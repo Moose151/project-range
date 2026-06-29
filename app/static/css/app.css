@@ -27,6 +27,11 @@
   color: #a7afb8;          /* was #6c757d — too dark on near-black */
   border-bottom: 1px solid #343a40;
 }
+.banner-testing {
+  background: #211a05;
+  color: #ffd86b;
+  border-bottom: 2px solid #f59f00;
+}
 
 /* ── Blinking icon for Live state ───────────────────────────── */
 @keyframes blink {

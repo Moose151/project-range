@@ -124,14 +124,35 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── Instant chat: lightweight in-memory polling chat ─────────────────────────
+function loadChatSessionState() {
+  try {
+    const raw = sessionStorage.getItem('projectRangeChatState');
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveChatSessionState() {
+  try {
+    sessionStorage.setItem('projectRangeChatState', JSON.stringify({
+      lastMessageIds: chatState.lastMessageIds,
+      unread: chatState.unread,
+    }));
+  } catch (e) {}
+}
+
+const savedChatState = loadChatSessionState();
 const chatState = {
   me: null,
   users: [],
   rooms: {},
   openRooms: {},
-  lastMessageIds: {},
+  lastMessageIds: savedChatState.lastMessageIds || {},
   roomSeen: {},
-  unread: {},
+  unread: savedChatState.unread || {},
   rosterOpen: false,
 };
 window.chatState = chatState;
@@ -192,6 +213,7 @@ function mergeChatRooms(rooms) {
     chatState.rooms[room.id] = room;
     if (!known) chatState.roomSeen[room.id] = false;
   });
+  saveChatSessionState();
 }
 
 async function refreshChatState() {
@@ -250,6 +272,7 @@ function openChatWindow(roomId) {
   if (existing) {
     existing.classList.remove('minimised', 'has-alert');
     updateChatUnreadBadge();
+    pollChatRoom(roomId, { full: true, alert: false });
     return;
   }
   const windows = document.getElementById('chatWindows');
@@ -270,7 +293,7 @@ function openChatWindow(roomId) {
       <button type="submit" class="btn btn-sm btn-primary" title="Send"><i class="bi bi-send"></i></button>
     </form>`;
   windows.appendChild(node);
-  pollChatRoom(roomId);
+  pollChatRoom(roomId, { full: true, alert: false });
   updateChatUnreadBadge();
 }
 
@@ -283,6 +306,7 @@ function toggleChatWindowMinimised(roomId) {
     chatState.unread[roomId] = 0;
     chatState.roomSeen[roomId] = true;
     updateChatUnreadBadge();
+    saveChatSessionState();
   }
 }
 
@@ -291,6 +315,7 @@ function closeChatWindow(roomId) {
   delete chatState.openRooms[roomId];
   chatState.unread[roomId] = 0;
   updateChatUnreadBadge();
+  saveChatSessionState();
 }
 
 async function sendChatMessage(evt, roomId) {
@@ -311,11 +336,14 @@ async function sendChatMessage(evt, roomId) {
   }
 }
 
-function appendChatMessages(roomId, messages) {
+function appendChatMessages(roomId, messages, opts = {}) {
+  const alert = opts.alert !== false;
+  const full = opts.full === true;
   const win = document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"]`);
   const body = win?.querySelector('[data-chat-messages]');
   const roomOpen = Boolean(win && body);
   let receivedNewFromOther = false;
+  if (full && body) body.innerHTML = '';
   messages.forEach(msg => {
     chatState.lastMessageIds[roomId] = Math.max(chatState.lastMessageIds[roomId] || 0, msg.id);
     const mine = chatState.me && msg.sender_id === chatState.me.id;
@@ -331,22 +359,27 @@ function appendChatMessages(roomId, messages) {
   if (messages.length && body) body.scrollTop = body.scrollHeight;
   const unreadNew = messages.filter(m => !chatState.me || m.sender_id !== chatState.me.id).length;
   const shouldAlert = receivedNewFromOther && (!roomOpen || win.classList.contains('minimised'));
-  if (shouldAlert) {
+  if (alert && shouldAlert) {
     if (win) win.classList.add('has-alert');
     chatState.unread[roomId] = (chatState.unread[roomId] || 0) + unreadNew;
     updateChatUnreadBadge();
     const room = chatState.rooms[roomId];
     if (room && !roomOpen) showToast?.(`New chat message: ${escapeHtml(room.title)}`, 'info');
   }
+  if (!alert && roomOpen && !win.classList.contains('minimised')) {
+    chatState.unread[roomId] = 0;
+    updateChatUnreadBadge();
+  }
+  saveChatSessionState();
 }
 
-async function pollChatRoom(roomId) {
+async function pollChatRoom(roomId, opts = {}) {
   if (!chatState.openRooms[roomId] && !chatState.rooms[roomId]) return;
   try {
-    const after = chatState.lastMessageIds[roomId] || 0;
+    const after = opts.full ? 0 : (chatState.lastMessageIds[roomId] || 0);
     const data = await chatApi('/chat/rooms/' + encodeURIComponent(roomId) + '/messages?after=' + after);
     if (data.room) mergeChatRooms([data.room]);
-    appendChatMessages(roomId, data.messages || []);
+    appendChatMessages(roomId, data.messages || [], opts);
   } catch (e) {}
 }
 
@@ -369,12 +402,14 @@ document.addEventListener('click', (evt) => {
     win.classList.remove('has-alert');
     chatState.unread[roomId] = 0;
     updateChatUnreadBadge();
+    saveChatSessionState();
   }
 });
 
 document.addEventListener('DOMContentLoaded', () => {
   if (!document.getElementById('chatDock')) return;
   refreshChatState();
+  updateChatUnreadBadge();
   setInterval(refreshChatState, 10000);
   setInterval(pollKnownChatRooms, 2500);
 });

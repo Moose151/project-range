@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user, get_current_range_state, require_supervisor
+from app.deps import get_current_user, get_current_range_state, is_testing_state, require_supervisor
 from app.cbm import CBMError, poll_cbm_ssh
 from app.cbm_sync import sync_active_cbms
 from app.crypto import decrypt_secret, encrypt_secret
@@ -66,7 +66,8 @@ async def devices_status(
     current_user: User = Depends(get_current_user),
 ):
     """JSON map of device id -> reachability, checked concurrently."""
-    devices = db.query(RFDevice).filter(RFDevice.is_active == True).all()
+    testing = is_testing_state(db)
+    devices = db.query(RFDevice).filter(RFDevice.is_active == True, RFDevice.is_testing == testing).all()
     results = await asyncio.gather(*(_reachable(d.host, d.check_port) for d in devices))
     return JSONResponse({str(d.id): status for d, status in zip(devices, results)})
 
@@ -79,7 +80,8 @@ async def devices_list(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    devices = db.query(RFDevice).order_by(RFDevice.device_type, RFDevice.name).all()
+    testing = is_testing_state(db)
+    devices = db.query(RFDevice).filter(RFDevice.is_testing == testing).order_by(RFDevice.device_type, RFDevice.name).all()
     return templates.TemplateResponse(request, "devices.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
@@ -138,6 +140,7 @@ async def device_create(
             num_inputs=max(0, min(num_inputs, 128)),
             num_outputs=max(0, min(num_outputs, 128)),
             notes=notes.strip() or None,
+            is_testing=is_testing_state(db),
         )
         db.add(dev)
         db.flush()
@@ -167,7 +170,7 @@ async def device_update(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
-    dev = db.query(RFDevice).filter(RFDevice.id == dev_id).first()
+    dev = db.query(RFDevice).filter(RFDevice.id == dev_id, RFDevice.is_testing == is_testing_state(db)).first()
     if dev:
         dev.name = name.strip() or dev.name
         dev.device_model = device_model.strip() or None
@@ -197,7 +200,7 @@ async def device_cbm_test(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
-    dev = db.query(RFDevice).filter(RFDevice.id == dev_id).first()
+    dev = db.query(RFDevice).filter(RFDevice.id == dev_id, RFDevice.is_testing == is_testing_state(db)).first()
     if not dev or dev.device_type != "modem":
         return RedirectResponse("/devices?toast=CBM+device+not+found", status_code=302)
     if not dev.host or not dev.cbm_username or not dev.cbm_password_encrypted:
@@ -255,7 +258,7 @@ async def device_delete(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
-    dev = db.query(RFDevice).filter(RFDevice.id == dev_id).first()
+    dev = db.query(RFDevice).filter(RFDevice.id == dev_id, RFDevice.is_testing == is_testing_state(db)).first()
     if dev:
         db.add(AuditLog(user_id=current_user.id, action_type="DEVICE_DELETE",
                         entity_type="RFDevice", entity_id=dev.id, previous_value=dev.name))
@@ -290,7 +293,7 @@ async def device_routing_page(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    dev = db.query(RFDevice).filter(RFDevice.id == dev_id).first()
+    dev = db.query(RFDevice).filter(RFDevice.id == dev_id, RFDevice.is_testing == is_testing_state(db)).first()
     if not dev:
         return RedirectResponse("/devices", status_code=302)
     _ensure_ports(db, dev)
@@ -301,6 +304,7 @@ async def device_routing_page(
     # Inputs: this device is on the "to" end  →  connected to from_device
     # Outputs: this device is on the "from" end → connected to to_device
     links = db.query(DeviceLink).filter(
+        DeviceLink.is_testing == is_testing_state(db),
         (DeviceLink.to_device_id == dev.id) | (DeviceLink.from_device_id == dev.id)
     ).all()
     input_hints: dict[int, str] = {}
@@ -331,7 +335,7 @@ async def device_routing_save(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    dev = db.query(RFDevice).filter(RFDevice.id == dev_id).first()
+    dev = db.query(RFDevice).filter(RFDevice.id == dev_id, RFDevice.is_testing == is_testing_state(db)).first()
     if not dev:
         return RedirectResponse("/devices", status_code=302)
     form = await request.form()
@@ -361,9 +365,11 @@ async def topology_page(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    devices = db.query(RFDevice).filter(RFDevice.is_active == True).order_by(RFDevice.name).all()
+    testing = is_testing_state(db)
+    devices = db.query(RFDevice).filter(RFDevice.is_active == True, RFDevice.is_testing == testing).order_by(RFDevice.name).all()
     links = (
         db.query(DeviceLink)
+        .filter(DeviceLink.is_testing == testing)
         .order_by(DeviceLink.link_type, DeviceLink.id)
         .all()
     )
@@ -392,7 +398,10 @@ async def link_create(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
-    if from_device_id != to_device_id:
+    testing = is_testing_state(db)
+    from_dev = db.query(RFDevice).filter(RFDevice.id == from_device_id, RFDevice.is_testing == testing).first()
+    to_dev = db.query(RFDevice).filter(RFDevice.id == to_device_id, RFDevice.is_testing == testing).first()
+    if from_dev and to_dev and from_device_id != to_device_id:
         lnk = DeviceLink(
             from_device_id=from_device_id,
             from_port=from_port.strip() or None,
@@ -402,6 +411,7 @@ async def link_create(
             to_port_idx=int(to_port_idx) if to_port_idx.strip().isdigit() else None,
             link_type=link_type if link_type in dict(LINK_TYPES) else "rf",
             label=label.strip() or None,
+            is_testing=testing,
         )
         db.add(lnk)
         db.flush()
@@ -420,7 +430,7 @@ async def link_delete(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
-    lnk = db.query(DeviceLink).filter(DeviceLink.id == link_id).first()
+    lnk = db.query(DeviceLink).filter(DeviceLink.id == link_id, DeviceLink.is_testing == is_testing_state(db)).first()
     if lnk:
         desc = f"{lnk.from_device.name} → {lnk.to_device.name}"
         db.add(AuditLog(

@@ -1,10 +1,10 @@
 import enum
 from datetime import datetime
 from sqlalchemy import (
-    Boolean, DateTime, Enum, Float, ForeignKey,
+    Boolean, DateTime, Enum, Float, ForeignKey, event,
     Integer, String, Text, func
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, Session as SASession, mapped_column, relationship
 from app.database import Base
 
 
@@ -20,6 +20,7 @@ class RangeState(str, enum.Enum):
     CLOSED_LOOP = "Closed Loop"
     LIVE = "Live"
     STANDBY = "Standby/Off"
+    TESTING = "Testing"
 
 
 class SignalStatus(str, enum.Enum):
@@ -107,6 +108,7 @@ class SignalPackage(Base):
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    is_testing: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Package-level RF configuration — shared by all signals in this package
     band: Mapped[str | None] = mapped_column(String(8), nullable=True)
@@ -170,6 +172,7 @@ class Serial(Base):
     closed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     is_started: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_testing: Mapped[bool] = mapped_column(Boolean, default=False)
 
     opened_by: Mapped[User] = relationship("User", foreign_keys="Serial.opened_by_id")
     closed_by: Mapped[User | None] = relationship("User", foreign_keys="Serial.closed_by_id")
@@ -238,6 +241,7 @@ class SignalLog(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, onupdate=func.now())
     updated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_testing: Mapped[bool] = mapped_column(Boolean, default=False)
 
     operator: Mapped[User] = relationship("User", foreign_keys="SignalLog.operator_id", back_populates="signal_logs")
     signal: Mapped[Signal | None] = relationship("Signal", back_populates="signal_logs")
@@ -339,6 +343,7 @@ class AuditLog(Base):
     previous_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     new_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_testing: Mapped[bool] = mapped_column(Boolean, default=False)
 
     user: Mapped[User | None] = relationship("User", back_populates="audit_entries")
 
@@ -436,6 +441,7 @@ class RFDevice(Base):
     num_inputs: Mapped[int] = mapped_column(Integer, default=16)
     num_outputs: Mapped[int] = mapped_column(Integer, default=16)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_testing: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     ports: Mapped[list["DevicePort"]] = relationship(
@@ -484,6 +490,7 @@ class DeviceLink(Base):
     to_port_idx: Mapped[int | None] = mapped_column(Integer, nullable=True)
     link_type: Mapped[str] = mapped_column(String(16), default="rf")   # rf|ip|clock|power
     label: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    is_testing: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     from_device: Mapped["RFDevice"] = relationship("RFDevice", foreign_keys=[from_device_id])
@@ -500,6 +507,7 @@ class CDATable(Base):
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    is_testing: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     created_by: Mapped["User"] = relationship("User", foreign_keys=[created_by_id])
@@ -565,6 +573,7 @@ class Incident(Base):
     affected: Mapped[str | None] = mapped_column(String(200), nullable=True)  # signal/device/area
     serial_id: Mapped[int | None] = mapped_column(ForeignKey("serials.id"), nullable=True)
     reported_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    is_testing: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     resolution: Mapped[str | None] = mapped_column(Text, nullable=True)
     resolved_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
@@ -587,6 +596,7 @@ class CeaseEvent(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     raised_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    is_testing: Mapped[bool] = mapped_column(Boolean, default=False)
     raised_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     dismissed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     dismissed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -597,3 +607,28 @@ class CeaseEvent(Base):
     @property
     def is_active(self) -> bool:
         return self.dismissed_at is None
+
+
+def _session_testing_state(session: SASession) -> bool:
+    for obj in session.new:
+        if isinstance(obj, RangeStateLog) and (
+            obj.new_state == RangeState.TESTING.value
+            or obj.previous_state == RangeState.TESTING.value
+        ):
+            return True
+    latest = session.query(RangeStateLog).order_by(RangeStateLog.id.desc()).first()
+    return bool(latest and latest.new_state == RangeState.TESTING.value)
+
+
+@event.listens_for(SASession, "before_flush")
+def _mark_testing_scoped_rows(session: SASession, flush_context, instances) -> None:
+    scoped_models = (
+        SignalPackage, Serial, SignalLog, AuditLog, RFDevice, DeviceLink,
+        CDATable, Incident, CeaseEvent,
+    )
+    new_scoped = [obj for obj in session.new if isinstance(obj, scoped_models)]
+    if not new_scoped:
+        return
+    testing = _session_testing_state(session)
+    for obj in new_scoped:
+        obj.is_testing = testing

@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.database import get_db
-from app.deps import get_current_user, get_current_range_state
+from app.deps import get_current_user, get_current_range_state, is_testing_state
 from app.models import (
     User, Signal, SignalPackage, SignalPackageEntry,
     ModulationType, FecType, SignalSource, AntennaType, AuditLog, RFDevice,
@@ -28,6 +28,7 @@ CBM_PATHS = [
 
 
 def _dropdown_lists(db: Session) -> dict:
+    testing = is_testing_state(db)
     mod_types = [m.name for m in db.query(ModulationType).filter(ModulationType.is_active == True).order_by(ModulationType.display_order).all()]
     fec_types = [f.name for f in db.query(FecType).filter(FecType.is_active == True).order_by(FecType.display_order).all()]
     sources = [s.name for s in db.query(SignalSource).filter(SignalSource.is_active == True).order_by(SignalSource.display_order).all()]
@@ -38,6 +39,7 @@ def _dropdown_lists(db: Session) -> dict:
         .filter(
             RFDevice.is_active == True,
             RFDevice.device_type == "modem",
+            RFDevice.is_testing == testing,
         )
         .order_by(RFDevice.name)
         .all()
@@ -142,7 +144,8 @@ async def packages_list(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    packages = db.query(SignalPackage).order_by(SignalPackage.created_at.desc()).all()
+    testing = is_testing_state(db)
+    packages = db.query(SignalPackage).filter(SignalPackage.is_testing == testing).order_by(SignalPackage.created_at.desc()).all()
     return templates.TemplateResponse(request, "packages.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
@@ -194,6 +197,7 @@ async def package_create(
         ttf=ttf,
         ttf_direction=ttf_direction or "+",
         freq_unit=freq_unit or "MHz",
+        is_testing=is_testing_state(db),
         created_by_id=current_user.id,
     )
     db.add(pkg)
@@ -213,7 +217,10 @@ async def package_detail(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id).first()
+    pkg = db.query(SignalPackage).filter(
+        SignalPackage.id == pkg_id,
+        SignalPackage.is_testing == is_testing_state(db),
+    ).first()
     if not pkg:
         return RedirectResponse("/packages", status_code=302)
     return templates.TemplateResponse(request, "package_edit.html", {
@@ -241,7 +248,7 @@ async def package_update_meta(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id).first()
+    pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id, SignalPackage.is_testing == is_testing_state(db)).first()
     if pkg:
         pkg.name = name.strip() or pkg.name
         pkg.description = description.strip() or None
@@ -283,9 +290,13 @@ async def package_signal_add(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id).first()
+    testing = is_testing_state(db)
+    pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id, SignalPackage.is_testing == testing).first()
     if not pkg:
         return RedirectResponse("/packages", status_code=302)
+    if cbm_device_id:
+        device = db.query(RFDevice).filter(RFDevice.id == cbm_device_id, RFDevice.is_testing == testing).first()
+        cbm_device_id = device.id if device else None
     order = len(pkg.signals)
     entry = SignalPackageEntry(
         package_id=pkg_id,
@@ -340,10 +351,15 @@ async def package_signal_update(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    testing = is_testing_state(db)
+    pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id, SignalPackage.is_testing == testing).first()
+    if cbm_device_id:
+        device = db.query(RFDevice).filter(RFDevice.id == cbm_device_id, RFDevice.is_testing == testing).first()
+        cbm_device_id = device.id if device else None
     entry = db.query(SignalPackageEntry).filter(
         SignalPackageEntry.id == entry_id,
         SignalPackageEntry.package_id == pkg_id,
-    ).first()
+    ).first() if pkg else None
     if entry:
         entry.signal_name = signal_name.strip()
         entry.description = description.strip() or None
@@ -362,9 +378,7 @@ async def package_signal_update(
         entry.cbm_path = cbm_path or None
         entry.cbm_carrier = cbm_carrier.strip() or None
         entry.notes = notes.strip() or None
-        pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id).first()
-        if pkg:
-            pkg.updated_at = datetime.utcnow()
+        pkg.updated_at = datetime.utcnow()
         db.commit()
     return RedirectResponse(f"/packages/{pkg_id}?toast=Signal+updated", status_code=302)
 
@@ -376,15 +390,14 @@ async def package_signal_delete(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id, SignalPackage.is_testing == is_testing_state(db)).first()
     entry = db.query(SignalPackageEntry).filter(
         SignalPackageEntry.id == entry_id,
         SignalPackageEntry.package_id == pkg_id,
-    ).first()
+    ).first() if pkg else None
     if entry:
         db.delete(entry)
-        pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id).first()
-        if pkg:
-            pkg.updated_at = datetime.utcnow()
+        pkg.updated_at = datetime.utcnow()
         db.commit()
     return RedirectResponse(f"/packages/{pkg_id}?toast=Signal+removed", status_code=302)
 
@@ -395,7 +408,8 @@ async def package_duplicate(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    orig = db.query(SignalPackage).filter(SignalPackage.id == pkg_id).first()
+    testing = is_testing_state(db)
+    orig = db.query(SignalPackage).filter(SignalPackage.id == pkg_id, SignalPackage.is_testing == testing).first()
     if not orig:
         return RedirectResponse("/packages", status_code=302)
     copy = SignalPackage(
@@ -408,6 +422,7 @@ async def package_duplicate(
         ttf=orig.ttf,
         ttf_direction=orig.ttf_direction,
         freq_unit=orig.freq_unit,
+        is_testing=testing,
         created_by_id=current_user.id,
     )
     db.add(copy)
@@ -449,6 +464,9 @@ async def package_signals_reorder(
     current_user: User = Depends(get_current_user),
 ):
     form = await request.form()
+    pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id, SignalPackage.is_testing == is_testing_state(db)).first()
+    if not pkg:
+        return RedirectResponse("/packages", status_code=302)
     for key, val in form.items():
         if key.startswith("order_"):
             entry_id = int(key.split("_")[1])
@@ -471,7 +489,10 @@ async def package_delete(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id).first()
+    pkg = db.query(SignalPackage).filter(
+        SignalPackage.id == pkg_id,
+        SignalPackage.is_testing == is_testing_state(db),
+    ).first()
     if pkg:
         db.delete(pkg)
         db.add(AuditLog(user_id=current_user.id, action_type="PACKAGE_DELETE",
@@ -488,7 +509,7 @@ async def package_export(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id).first()
+    pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id, SignalPackage.is_testing == is_testing_state(db)).first()
     if not pkg:
         return RedirectResponse("/packages", status_code=302)
     data = json.dumps(_package_to_dict(pkg), indent=2)
@@ -540,6 +561,7 @@ async def package_import_submit(
             ttf_direction=str(rf.get("ttf_direction", "+")) or "+",
             freq_unit=str(rf.get("freq_unit", "MHz")) or "MHz",
             created_by_id=current_user.id,
+            is_testing=is_testing_state(db),
         )
         db.add(pkg)
         db.flush()

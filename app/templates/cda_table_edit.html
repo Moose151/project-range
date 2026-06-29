@@ -31,7 +31,7 @@
               <th>End (Z)</th>
               <th>Label</th>
               <th>Type</th>
-              {% if user.role == 'supervisor' %}<th></th>{% endif %}
+              {% if user.role != 'safety_supervisor' %}<th></th>{% endif %}
             </tr>
           </thead>
           <tbody>
@@ -51,17 +51,55 @@
                 </span>
                 {% endif %}
               </td>
-              {% if user.role == 'supervisor' %}
+              {% if user.role != 'safety_supervisor' %}
               <td class="text-end">
-                <form method="post" action="/cda/{{ table.id }}/windows/{{ w.id }}/delete"
-                      onsubmit="return confirm('Delete window {{ w.start_zulu }}–{{ w.end_zulu }}?')">
-                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">
-                    <i class="bi bi-trash"></i>
+                <div class="d-flex justify-content-end gap-1">
+                  <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                          data-bs-toggle="collapse" data-bs-target="#editWindow{{ w.id }}" title="Edit window">
+                    <i class="bi bi-pencil"></i>
                   </button>
-                </form>
+                  <form method="post" action="/cda/{{ table.id }}/windows/{{ w.id }}/delete"
+                        onsubmit="return confirm('Delete window {{ w.start_zulu }}–{{ w.end_zulu }}?')">
+                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Delete window">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </div>
               </td>
               {% endif %}
             </tr>
+            {% if user.role != 'safety_supervisor' %}
+            <tr class="collapse" id="editWindow{{ w.id }}">
+              <td colspan="5" class="bg-body-tertiary">
+                <form method="post" action="/cda/{{ table.id }}/windows/{{ w.id }}/edit" class="row g-2 align-items-end">
+                  <div class="col-sm-2">
+                    <label class="form-label small mb-1">Start Z</label>
+                    <input type="text" name="start_zulu" class="form-control form-control-sm font-monospace cda-time-input"
+                           value="{{ w.start_zulu }}" maxlength="5" inputmode="numeric" autocomplete="off" required>
+                  </div>
+                  <div class="col-sm-2">
+                    <label class="form-label small mb-1">End Z</label>
+                    <input type="text" name="end_zulu" class="form-control form-control-sm font-monospace cda-time-input"
+                           value="{{ w.end_zulu }}" maxlength="5" inputmode="numeric" autocomplete="off" required>
+                  </div>
+                  <div class="col-sm-3">
+                    <label class="form-label small mb-1">Label</label>
+                    <input type="text" name="label" class="form-control form-control-sm" value="{{ w.label or '' }}">
+                  </div>
+                  <div class="col-sm-3">
+                    <label class="form-label small mb-1">Max power dBm</label>
+                    <input type="number" name="max_power_dbm" class="form-control form-control-sm" step="0.1"
+                           value="{{ '' if w.max_power_dbm is none else w.max_power_dbm }}" placeholder="blank = No Fire">
+                  </div>
+                  <div class="col-sm-2">
+                    <button type="submit" class="btn btn-sm btn-primary w-100">
+                      <i class="bi bi-check2 me-1"></i>Save
+                    </button>
+                  </div>
+                </form>
+              </td>
+            </tr>
+            {% endif %}
             {% endfor %}
           </tbody>
         </table>
@@ -105,7 +143,7 @@
       </div>
     </div>
 
-    {% if user.role == 'supervisor' %}
+    {% if user.role != 'safety_supervisor' %}
     <!-- Add window form -->
     <div class="card mb-3">
       <div class="card-header"><i class="bi bi-plus-circle me-1"></i>Add CDA Window</div>
@@ -162,6 +200,8 @@
         </form>
       </div>
     </div>
+    {% endif %}
+    {% if user.role == 'supervisor' %}
 
     <!-- Edit table name/description -->
     <div class="card mb-3">

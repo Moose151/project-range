@@ -9,7 +9,7 @@ import csv
 import io
 import openpyxl
 from app.database import get_db
-from app.deps import get_current_user, get_current_range_state, get_active_serials
+from app.deps import get_current_user, get_current_range_state, get_active_serials, is_testing_state
 from app.models import User, SignalLog, Signal, AuditLog, SignalStatus, Role, ModulationType, FecType, SignalSource, AntennaType, LogSession, Serial
 from app.rf_config import serial_package_rf_config
 from app.signal_warnings import warning_flags_for
@@ -111,7 +111,8 @@ async def log_list(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    q = db.query(SignalLog)
+    testing = is_testing_state(db)
+    q = db.query(SignalLog).filter(SignalLog.is_testing == testing)
     if not (show_deleted == "1" and current_user.role == Role.SUPERVISOR):
         q = q.filter(SignalLog.is_deleted == False)
     q = _apply_filters(q, search, status, band, date_from, date_to, activity, serial_id, signal_name)
@@ -130,12 +131,12 @@ async def log_list(
     serial_obj = None
     if serial_id:
         try:
-            serial_obj = db.query(Serial).filter(Serial.id == int(serial_id)).first()
+            serial_obj = db.query(Serial).filter(Serial.id == int(serial_id), Serial.is_testing == testing).first()
         except (ValueError, TypeError):
             pass
 
     active_serials = get_active_serials(db)
-    all_serials = db.query(Serial).order_by(Serial.opened_at.desc()).all()
+    all_serials = db.query(Serial).filter(Serial.is_testing == testing).order_by(Serial.opened_at.desc()).all()
 
     return templates.TemplateResponse(request, "logs_list.html", {
         "user": current_user,
@@ -188,7 +189,8 @@ async def log_new(
         "band": request.session.get("last_band", ""),
     }
     active_serials = get_active_serials(db)
-    all_serials = db.query(Serial).filter(Serial.closed_at == None).order_by(Serial.opened_at.desc()).all()
+    testing = is_testing_state(db)
+    all_serials = db.query(Serial).filter(Serial.closed_at == None, Serial.is_testing == testing).order_by(Serial.opened_at.desc()).all()
     preselect_serial_id = serial_id if serial_id else (active_serials[0].id if active_serials else None)
 
     # Look up the package RF config for the preselected serial so it can pre-fill TxLO/RxLO/TTF
@@ -252,6 +254,11 @@ async def log_create(
     current_user: User = Depends(get_current_user),
 ):
     range_state = get_current_range_state(db)
+    testing = is_testing_state(db)
+    if serial_id:
+        serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
+        if not serial:
+            serial_id = None
     entry = SignalLog(
         operator_id=current_user.id,
         range_state=range_state,
@@ -300,12 +307,13 @@ async def log_edit(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    log_entry = db.query(SignalLog).filter(SignalLog.id == log_id).first()
+    testing = is_testing_state(db)
+    log_entry = db.query(SignalLog).filter(SignalLog.id == log_id, SignalLog.is_testing == testing).first()
     if not log_entry:
         return RedirectResponse("/logs", status_code=302)
     signals = db.query(Signal).filter(Signal.is_active == True).order_by(Signal.name).all()
     active_serials = get_active_serials(db)
-    all_serials = db.query(Serial).order_by(Serial.opened_at.desc()).all()
+    all_serials = db.query(Serial).filter(Serial.is_testing == testing).order_by(Serial.opened_at.desc()).all()
     return templates.TemplateResponse(request, "logs_form.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
@@ -353,9 +361,14 @@ async def log_update(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    log_entry = db.query(SignalLog).filter(SignalLog.id == log_id).first()
+    testing = is_testing_state(db)
+    log_entry = db.query(SignalLog).filter(SignalLog.id == log_id, SignalLog.is_testing == testing).first()
     if not log_entry:
         return RedirectResponse("/logs", status_code=302)
+    if serial_id:
+        serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
+        if not serial:
+            serial_id = None
 
     old_status = log_entry.signal_status
     log_entry.signal_name = signal_name.strip()
@@ -403,7 +416,7 @@ async def log_soft_delete(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    log_entry = db.query(SignalLog).filter(SignalLog.id == log_id).first()
+    log_entry = db.query(SignalLog).filter(SignalLog.id == log_id, SignalLog.is_testing == is_testing_state(db)).first()
     if log_entry:
         log_entry.is_deleted = True
         db.add(AuditLog(
@@ -425,7 +438,7 @@ async def log_restore(
 ):
     if current_user.role != Role.SUPERVISOR:
         return RedirectResponse("/logs", status_code=302)
-    log_entry = db.query(SignalLog).filter(SignalLog.id == log_id).first()
+    log_entry = db.query(SignalLog).filter(SignalLog.id == log_id, SignalLog.is_testing == is_testing_state(db)).first()
     if log_entry:
         log_entry.is_deleted = False
         db.add(AuditLog(
@@ -449,7 +462,7 @@ async def log_hard_delete(
     soft-deleted entries (so it's a deliberate two-step action)."""
     if current_user.role != Role.SUPERVISOR:
         return RedirectResponse("/logs", status_code=302)
-    log_entry = db.query(SignalLog).filter(SignalLog.id == log_id).first()
+    log_entry = db.query(SignalLog).filter(SignalLog.id == log_id, SignalLog.is_testing == is_testing_state(db)).first()
     if log_entry and log_entry.is_deleted:
         db.add(AuditLog(
             user_id=current_user.id,
@@ -488,6 +501,11 @@ async def log_note_save(
     current_user: User = Depends(get_current_user),
 ):
     range_state = get_current_range_state(db)
+    testing = is_testing_state(db)
+    if serial_id:
+        serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
+        if not serial:
+            serial_id = None
     entry = SignalLog(
         operator_id=current_user.id,
         range_state=range_state,
@@ -524,7 +542,7 @@ async def export_csv(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    q = db.query(SignalLog).filter(SignalLog.is_deleted == False)
+    q = db.query(SignalLog).filter(SignalLog.is_deleted == False, SignalLog.is_testing == is_testing_state(db))
     q = _apply_filters(q, search, status, band, date_from, date_to, activity)
     logs = q.order_by(SignalLog.timestamp.desc()).all()
 
@@ -566,7 +584,7 @@ async def export_xlsx(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    q = db.query(SignalLog).filter(SignalLog.is_deleted == False)
+    q = db.query(SignalLog).filter(SignalLog.is_deleted == False, SignalLog.is_testing == is_testing_state(db))
     q = _apply_filters(q, search, status, band, date_from, date_to, activity)
     logs = q.order_by(SignalLog.timestamp.desc()).all()
 

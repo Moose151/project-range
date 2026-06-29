@@ -4,7 +4,7 @@
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-lg-6">
-    <div class="card border-{% if current_state == 'Live' %}danger{% else %}secondary{% endif %}">
+    <div class="card border-{% if current_state == 'Live' %}danger{% elif current_state == 'Testing' %}warning{% else %}secondary{% endif %}">
       <div class="card-header">
         <i class="bi bi-arrow-left-right me-1"></i>Change Range State
       </div>
@@ -17,11 +17,18 @@
         <div class="mb-4">
           <div class="text-muted small mb-1">Current State</div>
           <div class="fs-4 fw-bold
-            {% if current_state == 'Live' %}text-danger{% elif current_state == 'Closed Loop' %}text-info{% else %}text-secondary{% endif %}">
+            {% if current_state == 'Live' %}text-danger{% elif current_state == 'Closed Loop' %}text-info{% elif current_state == 'Testing' %}text-warning{% else %}text-secondary{% endif %}">
             {{ current_state }}
           </div>
         </div>
 
+        {% if not valid_states %}
+        <div class="alert alert-warning d-flex align-items-center gap-2 py-2">
+          <i class="bi bi-lock-fill"></i>
+          Only a supervisor can change the range out of Testing.
+        </div>
+        <a href="/" class="btn btn-outline-secondary w-100">Back to Dashboard</a>
+        {% else %}
         <form method="post" action="/range-state/change" onsubmit="return confirmChange()">
           <div class="mb-3">
             <label class="form-label">New State</label>
@@ -36,6 +43,11 @@
             <i class="bi bi-exclamation-triangle-fill me-2"></i>
             <strong>Warning:</strong> Changing to <strong>Live</strong> means RF will be considered
             active on the range. Ensure all personnel are clear and all safety procedures are followed.
+          </div>
+
+          <div id="testingWarning" class="alert alert-warning d-none">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>Testing:</strong> operational data and configuration changes are kept in the Testing workspace and hidden from other range states.
           </div>
 
           <!-- Live authorisation: safety acknowledgment + (if operator) supervisor sign-off -->
@@ -72,6 +84,7 @@
             <a href="/" class="btn btn-outline-secondary">Cancel</a>
           </div>
         </form>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -82,15 +95,22 @@
 <script>
 function updateWarning() {
   const sel = document.getElementById('newStateSelect');
+  if (!sel) return;
   const isLive = sel.value === 'Live';
+  const isTesting = sel.value === 'Testing';
   document.getElementById('liveWarning').classList.toggle('d-none', !isLive);
   document.getElementById('liveAuth').classList.toggle('d-none', !isLive);
+  document.getElementById('testingWarning')?.classList.toggle('d-none', !isTesting);
 }
 
 function confirmChange() {
   const sel = document.getElementById('newStateSelect');
+  if (!sel) return true;
   if (sel.value === 'Live') {
     return confirm('Confirm: Change range state to LIVE? RF is considered active on range.');
+  }
+  if (sel.value === 'Testing') {
+    return confirm('Confirm: Change range state to TESTING? Operational data will switch to the Testing workspace.');
   }
   return true;
 }

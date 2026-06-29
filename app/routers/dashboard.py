@@ -5,7 +5,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.deps import get_current_user, get_current_range_state, get_active_serials
+from app.deps import get_current_user, get_current_range_state, get_active_serials, is_testing_state
 from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage, SerialCDATable, CDAWindow
 from app.rf_config import serial_package_rf_config
 from app.signal_warnings import warning_flags_for
@@ -37,6 +37,7 @@ def _latest_signal_status(db: Session, serial_id: int | None = None) -> list:
     q = db.query(SignalLog).filter(
         SignalLog.is_deleted == False,
         SignalLog.signal_name != "[NOTE]",
+        SignalLog.is_testing == is_testing_state(db),
     )
     if serial_id is not None:
         q = q.filter(SignalLog.serial_id == serial_id)
@@ -249,6 +250,9 @@ async def dashboard_fragment(
     current_user: User = Depends(get_current_user),
 ):
     """HTMX polling endpoint — returns the serial's table + OOB summary/buzzer."""
+    serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == is_testing_state(db)).first()
+    if not serial:
+        return HTMLResponse("")
     ctx = _dashboard_ctx(db)
     signals = _latest_signal_status(db, serial_id=serial_id)
     range_state = ctx["range_state"]
@@ -299,10 +303,17 @@ async def dashboard_quick_update(
     current_user: User = Depends(get_current_user),
 ):
     range_state = get_current_range_state(db)
+    testing = is_testing_state(db)
+    if serial_id is not None:
+        serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
+        if not serial:
+            serial_id = None
 
     # Copy freq/band data from the latest existing entry for this signal
     latest_query = db.query(SignalLog).filter(
-        SignalLog.signal_name == signal_name, SignalLog.is_deleted == False,
+        SignalLog.signal_name == signal_name,
+        SignalLog.is_deleted == False,
+        SignalLog.is_testing == testing,
     )
     if serial_id is not None:
         latest_query = latest_query.filter(SignalLog.serial_id == serial_id)
@@ -322,7 +333,9 @@ async def dashboard_quick_update(
             )
             for sib in siblings:
                 sib_query = db.query(SignalLog).filter(
-                    SignalLog.signal_name == sib.name, SignalLog.is_deleted == False,
+                    SignalLog.signal_name == sib.name,
+                    SignalLog.is_deleted == False,
+                    SignalLog.is_testing == testing,
                 )
                 if serial_id is not None:
                     sib_query = sib_query.filter(SignalLog.serial_id == serial_id)
@@ -420,12 +433,18 @@ async def dashboard_bulk_update(
 ):
     """Apply status/power changes for multiple signals in one DB transaction."""
     range_state = get_current_range_state(db)
+    testing = is_testing_state(db)
     serial_id = body.serial_id
+    if serial_id is not None:
+        serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
+        if not serial:
+            serial_id = None
 
     for upd in body.updates:
         latest_q = db.query(SignalLog).filter(
             SignalLog.signal_name == upd.signal_name,
             SignalLog.is_deleted == False,
+            SignalLog.is_testing == testing,
         )
         if serial_id is not None:
             latest_q = latest_q.filter(SignalLog.serial_id == serial_id)
@@ -441,7 +460,9 @@ async def dashboard_bulk_update(
                 ).all()
                 for sib in siblings:
                     sib_q = db.query(SignalLog).filter(
-                        SignalLog.signal_name == sib.name, SignalLog.is_deleted == False,
+                        SignalLog.signal_name == sib.name,
+                        SignalLog.is_deleted == False,
+                        SignalLog.is_testing == testing,
                     )
                     if serial_id is not None:
                         sib_q = sib_q.filter(SignalLog.serial_id == serial_id)

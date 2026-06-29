@@ -5,7 +5,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.database import get_db
-from app.deps import get_current_user, get_current_range_state, get_active_serials
+from app.deps import get_current_user, get_current_range_state, get_active_serials, is_testing_state
 from app.models import (
     User, Serial, SerialPackage, SignalPackage, SignalLog, AuditLog,
     CDATable, SerialCDATable,
@@ -22,14 +22,15 @@ async def serials_list(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    testing = is_testing_state(db)
     active = db.query(Serial).filter(
-        Serial.closed_at == None, Serial.is_started == True,
+        Serial.closed_at == None, Serial.is_started == True, Serial.is_testing == testing,
     ).order_by(Serial.opened_at.asc()).all()
     pending = db.query(Serial).filter(
-        Serial.closed_at == None, Serial.is_started == False,
+        Serial.closed_at == None, Serial.is_started == False, Serial.is_testing == testing,
     ).order_by(Serial.opened_at.desc()).all()
-    packages = db.query(SignalPackage).order_by(SignalPackage.name).all()
-    cda_tables = db.query(CDATable).order_by(CDATable.name).all()
+    packages = db.query(SignalPackage).filter(SignalPackage.is_testing == testing).order_by(SignalPackage.name).all()
+    cda_tables = db.query(CDATable).filter(CDATable.is_testing == testing).order_by(CDATable.name).all()
     return templates.TemplateResponse(request, "serials.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
@@ -52,16 +53,18 @@ async def serial_create(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    testing = is_testing_state(db)
     serial = Serial(
         title=title.strip(),
         notes=notes.strip() or None,
         opened_by_id=current_user.id,
+        is_testing=testing,
     )
     db.add(serial)
     db.flush()
 
     for pid in package_ids:
-        pkg = db.query(SignalPackage).filter(SignalPackage.id == pid).first()
+        pkg = db.query(SignalPackage).filter(SignalPackage.id == pid, SignalPackage.is_testing == testing).first()
         if pkg:
             db.add(SerialPackage(serial_id=serial.id, package_id=pid))
 
@@ -83,7 +86,7 @@ async def serial_start_page(
     current_user: User = Depends(get_current_user),
 ):
     """Confirmation page before pre-populating signals from packages."""
-    serial = db.query(Serial).filter(Serial.id == serial_id).first()
+    serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == is_testing_state(db)).first()
     if not serial:
         return RedirectResponse("/serials", status_code=302)
 
@@ -109,7 +112,7 @@ async def serial_start(
     current_user: User = Depends(get_current_user),
 ):
     """Create initial SignalLog entries for all package signals and log the start."""
-    serial = db.query(Serial).filter(Serial.id == serial_id).first()
+    serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == is_testing_state(db)).first()
     if not serial:
         return RedirectResponse("/serials", status_code=302)
 
@@ -175,7 +178,7 @@ async def serial_end(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    serial = db.query(Serial).filter(Serial.id == serial_id).first()
+    serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == is_testing_state(db)).first()
     if not serial or serial.closed_at:
         return RedirectResponse("/serials", status_code=302)
 
@@ -212,6 +215,7 @@ async def serial_delete(
     """Delete a pending (not yet started) serial."""
     serial = db.query(Serial).filter(
         Serial.id == serial_id, Serial.is_started == False, Serial.closed_at == None,
+        Serial.is_testing == is_testing_state(db),
     ).first()
     if serial:
         db.add(AuditLog(
@@ -230,8 +234,10 @@ async def serial_add_package(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    serial = db.query(Serial).filter(Serial.id == serial_id).first()
-    if serial and serial.closed_at is None:
+    testing = is_testing_state(db)
+    serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
+    package = db.query(SignalPackage).filter(SignalPackage.id == package_id, SignalPackage.is_testing == testing).first()
+    if serial and package and serial.closed_at is None:
         existing = db.query(SerialPackage).filter(
             SerialPackage.serial_id == serial_id,
             SerialPackage.package_id == package_id,
@@ -250,8 +256,9 @@ async def serial_assign_cda(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    serial = db.query(Serial).filter(Serial.id == serial_id).first()
-    cda_table = db.query(CDATable).filter(CDATable.id == cda_table_id).first()
+    testing = is_testing_state(db)
+    serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
+    cda_table = db.query(CDATable).filter(CDATable.id == cda_table_id, CDATable.is_testing == testing).first()
     if serial and cda_table:
         existing = db.query(SerialCDATable).filter(
             SerialCDATable.serial_id == serial_id,
@@ -275,10 +282,13 @@ async def serial_remove_cda(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    testing = is_testing_state(db)
+    serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
+    cda_table = db.query(CDATable).filter(CDATable.id == cda_table_id, CDATable.is_testing == testing).first()
     link = db.query(SerialCDATable).filter(
         SerialCDATable.serial_id == serial_id,
         SerialCDATable.cda_table_id == cda_table_id,
-    ).first()
+    ).first() if serial and cda_table else None
     if link:
         db.add(AuditLog(
             user_id=current_user.id, action_type="SERIAL_CDA_REMOVE",
@@ -302,6 +312,11 @@ async def serial_rf_config(
     If signal_name is supplied, its package is preferred. Used by the log form to
     auto-populate TxLO/RxLO/TTF/band/antenna. Returns nulls when no package has RF config.
     """
+    serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == is_testing_state(db)).first()
+    if not serial:
+        return JSONResponse({"tx_lo": None, "rx_lo": None, "ttf": None,
+                             "ttf_direction": "+", "freq_unit": "MHz",
+                             "band": None, "antenna": None})
     config = serial_package_rf_config(db, serial_id, signal_name)
     if not config:
         return JSONResponse({"tx_lo": None, "rx_lo": None, "ttf": None,

@@ -3,7 +3,7 @@ from fastapi import Depends, Request, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import User, Role, LogSession, Serial
+from app.models import User, Role, LogSession, Serial, RangeState
 from app.auth import session_is_expired
 
 
@@ -36,6 +36,10 @@ def get_current_range_state(db: Session) -> str:
     return latest.new_state if latest else "Standby/Off"
 
 
+def is_testing_state(db: Session) -> bool:
+    return get_current_range_state(db) == RangeState.TESTING.value
+
+
 def get_active_session(db: Session) -> LogSession | None:
     """Legacy helper — returns the most recent open LogSession (old data only)."""
     return (
@@ -48,9 +52,14 @@ def get_active_session(db: Session) -> LogSession | None:
 
 def get_active_serials(db: Session) -> list[Serial]:
     """Return all started, open Serials ordered by start time."""
+    testing = is_testing_state(db)
     return (
         db.query(Serial)
-        .filter(Serial.closed_at == None, Serial.is_started == True)
+        .filter(
+            Serial.closed_at == None,
+            Serial.is_started == True,
+            Serial.is_testing == testing,
+        )
         .order_by(Serial.opened_at.asc())
         .all()
     )

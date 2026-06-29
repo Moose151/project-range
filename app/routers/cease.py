@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, is_testing_state
 from app.models import User, CeaseEvent, AuditLog
 
 router = APIRouter(prefix="/cease")
@@ -15,7 +15,10 @@ def _active_cease(db: Session) -> CeaseEvent | None:
     """The current, undismissed CEASE (most recent if several somehow exist)."""
     return (
         db.query(CeaseEvent)
-        .filter(CeaseEvent.dismissed_at == None)  # noqa: E711
+        .filter(
+            CeaseEvent.dismissed_at == None,  # noqa: E711
+            CeaseEvent.is_testing == is_testing_state(db),
+        )
         .order_by(CeaseEvent.id.desc())
         .first()
     )
@@ -56,7 +59,7 @@ async def cease_raise(
     if existing:
         return JSONResponse({"ok": True, "id": existing.id, "already_active": True})
 
-    ev = CeaseEvent(reason=reason, raised_by_id=current_user.id)
+    ev = CeaseEvent(reason=reason, raised_by_id=current_user.id, is_testing=is_testing_state(db))
     db.add(ev)
     db.flush()
     db.add(AuditLog(

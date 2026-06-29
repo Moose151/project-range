@@ -4,8 +4,8 @@
       <div class="card-body">
         <div class="text-muted small mb-1">Range State</div>
         <div class="fw-bold fs-5
-          {% if range_state == 'Live' %}text-danger{% elif range_state == 'Closed Loop' %}text-info{% else %}text-secondary{% endif %}">
-          <i class="bi bi-{% if range_state == 'Live' %}broadcast-pin blink-icon{% elif range_state == 'Closed Loop' %}arrow-repeat{% else %}power{% endif %} me-1"></i>
+          {% if range_state == 'Live' %}text-danger{% elif range_state == 'Closed Loop' %}text-info{% elif range_state == 'Testing' %}text-warning{% else %}text-secondary{% endif %}">
+          <i class="bi bi-{% if range_state == 'Live' %}broadcast-pin blink-icon{% elif range_state == 'Closed Loop' %}arrow-repeat{% elif range_state == 'Testing' %}wrench-adjustable-circle{% else %}power{% endif %} me-1"></i>
           {{ range_state }}
         </div>
       </div>

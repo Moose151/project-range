@@ -453,8 +453,8 @@ function utilityBody(id, type, config = {}) {
   // ── New widget types ──────────────────────────────────────────────────────
   if (type === 'range-state') {
     const rs = {{ range_state | tojson }};
-    const cls = rs === 'Live' ? 'text-danger' : (rs === 'Closed Loop' ? 'text-info' : 'text-secondary');
-    const icon = rs === 'Live' ? 'bi-broadcast-pin blink-icon' : (rs === 'Closed Loop' ? 'bi-arrow-repeat' : 'bi-power');
+    const cls = rs === 'Live' ? 'text-danger' : (rs === 'Closed Loop' ? 'text-info' : (rs === 'Testing' ? 'text-warning' : 'text-secondary'));
+    const icon = rs === 'Live' ? 'bi-broadcast-pin blink-icon' : (rs === 'Closed Loop' ? 'bi-arrow-repeat' : (rs === 'Testing' ? 'bi-wrench-adjustable-circle' : 'bi-power'));
     return `<div class="text-center py-2">
               <div class="text-muted small mb-1">Range State</div>
               <div class="fw-bold fs-4 ${cls}"><i class="bi ${icon} me-1"></i>${escapeHtml(rs)}</div>

@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from datetime import datetime
 from typing import Optional
 from app.database import get_db
-from app.deps import require_supervisor, get_current_range_state
+from app.deps import require_supervisor, get_current_range_state, is_testing_state
 from app.models import AuditLog, User
 
 router = APIRouter(prefix="/audit")
@@ -33,7 +33,11 @@ async def audit_list(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
-    q = db.query(AuditLog).join(User, AuditLog.user_id == User.id, isouter=True)
+    q = (
+        db.query(AuditLog)
+        .join(User, AuditLog.user_id == User.id, isouter=True)
+        .filter(AuditLog.is_testing == is_testing_state(db))
+    )
 
     if action:
         q = q.filter(AuditLog.action_type == action)

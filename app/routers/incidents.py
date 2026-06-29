@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user, get_current_range_state
+from app.deps import get_current_user, get_current_range_state, is_testing_state
 from app.models import Incident, Serial, AuditLog, User
 from app.templating import templates
 
@@ -25,11 +25,15 @@ async def incidents_list(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    q = db.query(Incident)
+    testing = is_testing_state(db)
+    q = db.query(Incident).filter(Incident.is_testing == testing)
     if status in STATUSES:
         q = q.filter(Incident.status == status)
     incidents = q.order_by(Incident.created_at.desc()).all()
-    open_count = db.query(Incident).filter(Incident.status.in_(["open", "investigating"])).count()
+    open_count = db.query(Incident).filter(
+        Incident.status.in_(["open", "investigating"]),
+        Incident.is_testing == testing,
+    ).count()
     return templates.TemplateResponse(request, "incidents.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
@@ -38,7 +42,7 @@ async def incidents_list(
         "statuses": STATUSES,
         "filter_status": status,
         "open_count": open_count,
-        "serials": db.query(Serial).filter(Serial.closed_at == None).order_by(Serial.opened_at.desc()).all(),
+        "serials": db.query(Serial).filter(Serial.closed_at == None, Serial.is_testing == testing).order_by(Serial.opened_at.desc()).all(),
         "toast": request.query_params.get("toast", ""),
         "page": "incidents",
     })
@@ -56,13 +60,22 @@ async def incident_create(
 ):
     title = title.strip()
     if title:
+        testing = is_testing_state(db)
+        serial = (
+            db.query(Serial)
+            .filter(Serial.id == int(serial_id), Serial.is_testing == testing)
+            .first()
+            if serial_id.strip().isdigit()
+            else None
+        )
         inc = Incident(
             title=title,
             description=description.strip() or None,
             severity=severity if severity in SEVERITIES else "medium",
             affected=affected.strip() or None,
-            serial_id=int(serial_id) if serial_id.strip().isdigit() else None,
+            serial_id=serial.id if serial else None,
             reported_by_id=current_user.id,
+            is_testing=testing,
         )
         db.add(inc)
         db.flush()
@@ -80,7 +93,7 @@ async def incident_update(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    inc = db.query(Incident).filter(Incident.id == inc_id).first()
+    inc = db.query(Incident).filter(Incident.id == inc_id, Incident.is_testing == is_testing_state(db)).first()
     if inc:
         prev = inc.status
         if status in STATUSES:
@@ -104,7 +117,7 @@ async def incidents_export(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    incidents = db.query(Incident).order_by(Incident.created_at.desc()).all()
+    incidents = db.query(Incident).filter(Incident.is_testing == is_testing_state(db)).order_by(Incident.created_at.desc()).all()
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["ID", "Created", "Severity", "Status", "Title", "Affected",

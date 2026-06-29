@@ -4,9 +4,14 @@
 {% block content %}
 <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
   <h4 class="mb-0"><i class="bi bi-collection-play me-2"></i>Active Serials</h4>
-  <a href="/history" class="btn btn-sm btn-outline-secondary ms-auto">
-    <i class="bi bi-clock-history me-1"></i>History
-  </a>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/history" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-clock-history me-1"></i>History
+    </a>
+    <button type="button" class="btn btn-sm btn-success" data-bs-toggle="collapse" data-bs-target="#newSerialPanel" aria-expanded="false" aria-controls="newSerialPanel">
+      <i class="bi bi-plus-lg me-1"></i>New Serial
+    </button>
+  </div>
 </div>
 
 {% if toast %}
@@ -142,21 +147,27 @@
 {% else %}
 <div class="alert alert-secondary d-flex align-items-center gap-3 mb-4">
   <i class="bi bi-collection-play fs-4 text-muted"></i>
-  <div>No active serials. Create one below to start logging.</div>
+  <div>No active serials. Use <strong>New Serial</strong> to prepare or start one.</div>
 </div>
 {% endif %}
 
 <!-- Create new serial -->
+<div id="newSerialPanel" class="collapse">
 <div class="row justify-content-center">
   <div class="col-lg-6">
     <div class="card border-secondary">
-      <div class="card-header"><i class="bi bi-plus-circle me-1"></i>New Serial</div>
+      <div class="card-header d-flex align-items-center">
+        <span><i class="bi bi-plus-circle me-1"></i>New Serial</span>
+        <button type="button" class="btn btn-sm btn-link link-secondary p-0 ms-auto" data-bs-toggle="collapse" data-bs-target="#newSerialPanel" title="Close">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
       <div class="card-body">
         <form method="post" action="/serials/new">
           <div class="mb-3">
             <label class="form-label">Serial Title <span class="text-danger">*</span></label>
             <input type="text" class="form-control" name="title"
-                   placeholder="e.g. Exercise Bright Star — Serial 1" required autofocus>
+                   placeholder="e.g. Exercise Bright Star — Serial 1" required>
           </div>
 
           {% if packages %}
@@ -200,5 +211,6 @@
       </div>
     </div>
   </div>
+</div>
 </div>
 {% endblock %}
