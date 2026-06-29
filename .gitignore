@@ -42,3 +42,6 @@ logs/
 
 # Local DB backups
 backups/
+
+# Local vendor/device manuals (do not publish restricted PDFs)
+CBM-400*.pdf

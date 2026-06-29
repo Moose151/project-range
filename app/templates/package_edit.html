@@ -168,6 +168,7 @@
               <th>Mod</th>
               <th>FEC</th>
               <th>Power</th>
+              <th>CBM</th>
               <th>Source</th>
               <th></th>
             </tr>
@@ -185,6 +186,15 @@
               <td class="small">{{ entry.modulation or '—' }}</td>
               <td class="small">{{ entry.fec or '—' }}</td>
               <td class="small">{% if entry.power is not none %}{{ entry.power }} {{ entry.power_unit }}{% else %}—{% endif %}</td>
+              <td class="small">
+                {% if entry.cbm_device %}
+                  <span class="badge text-bg-secondary">{{ entry.cbm_device.name }}</span>
+                  {% if entry.cbm_path %}<span class="text-muted">{{ entry.cbm_path }}</span>{% endif %}
+                  {% if entry.cbm_carrier %}<span class="text-muted">· {{ entry.cbm_carrier }}</span>{% endif %}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
               <td class="small text-muted">{{ entry.source or '—' }}</td>
               <td class="text-nowrap">
                 <button type="button" class="btn btn-xs btn-outline-secondary btn-sm py-0 px-1"
@@ -204,6 +214,9 @@
                           'power_unit': entry.power_unit or 'dBm',
                           'eb_no': entry.eb_no,
                           'source': entry.source or '',
+                          'cbm_device_id': entry.cbm_device_id,
+                          'cbm_path': entry.cbm_path or '',
+                          'cbm_carrier': entry.cbm_carrier or '',
                           'notes': entry.notes or '',
                         } | tojson }})" title="Edit">
                   <i class="bi bi-pencil"></i>
@@ -301,6 +314,27 @@
                 {% for s in signal_sources %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
               </select>
             </div>
+            <div class="col-sm-6">
+              <label class="form-label small">CBM Modem</label>
+              <select class="form-select form-select-sm" name="cbm_device_id" id="f_cbm_device_id">
+                <option value="">—</option>
+                {% for device in cbm_devices %}
+                <option value="{{ device.id }}">{{ device.name }}{% if device.host %} · {{ device.host }}{% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small">CBM Path</label>
+              <select class="form-select form-select-sm" name="cbm_path" id="f_cbm_path">
+                {% for value, label in cbm_paths %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small">Carrier Label</label>
+              <input type="text" class="form-control form-control-sm" name="cbm_carrier" id="f_cbm_carrier" placeholder="e.g. carrier 1">
+            </div>
             <div class="col-12">
               <label class="form-label small">Notes</label>
               <input type="text" class="form-control form-control-sm" name="notes" id="f_notes">
@@ -383,6 +417,9 @@ function editSignal(entry) {
   setVal('f_power_unit', entry.power_unit);
   setVal('f_eb_no', entry.eb_no);
   setVal('f_source', entry.source);
+  setVal('f_cbm_device_id', entry.cbm_device_id);
+  setVal('f_cbm_path', entry.cbm_path);
+  setVal('f_cbm_carrier', entry.cbm_carrier);
   setVal('f_notes', entry.notes);
   document.getElementById('signalFormCard').scrollIntoView({behavior: 'smooth'});
 }

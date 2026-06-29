@@ -148,9 +148,13 @@ class SignalPackageEntry(Base):
     eb_no: Mapped[float | None] = mapped_column(Float, nullable=True)
     source: Mapped[str | None] = mapped_column(String(128), nullable=True)
     antenna: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    cbm_device_id: Mapped[int | None] = mapped_column(ForeignKey("rf_devices.id"), nullable=True)
+    cbm_path: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    cbm_carrier: Mapped[str | None] = mapped_column(String(64), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     package: Mapped["SignalPackage"] = relationship("SignalPackage", back_populates="signals")
+    cbm_device: Mapped["RFDevice | None"] = relationship("RFDevice", foreign_keys="SignalPackageEntry.cbm_device_id")
 
 
 # ── Serials ────────────────────────────────────────────────────────────────────
@@ -421,6 +425,12 @@ class RFDevice(Base):
     host: Mapped[str | None] = mapped_column(String(128), nullable=True)        # IP / hostname
     check_port: Mapped[int | None] = mapped_column(Integer, nullable=True)      # TCP port for reachability
     has_web_gui: Mapped[bool] = mapped_column(Boolean, default=False)           # exposes a web GUI at http://<host>/
+    cbm_sync_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    cbm_username: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    cbm_password_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cbm_last_sync_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cbm_last_sync_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    cbm_last_sync_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     location: Mapped[str | None] = mapped_column(String(128), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     num_inputs: Mapped[int] = mapped_column(Integer, default=16)

@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.15.0` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.16.0` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -81,11 +81,39 @@
   - Users **self-select** their current role on `/preferences` (dedicated `POST /preferences/duty-role`). The chosen **name + colour are denormalised** onto `User.duty_role` / `User.duty_role_color` so the badge renders anywhere without a lookup. Shown in the **sidebar footer** (own) and a new **Duty Role column** in the Users admin list (the existing permission column is relabelled **"Account"**).
   - Read-only Safety Supervisors **may** set their own tag (personal display setting — `/preferences/duty-role` is in the middleware allow-list); all other writes stay blocked.
   - Seeded defaults: Operator, Supervisor, EA Safety, Observer. Additive migration adds `users.duty_role` + `users.duty_role_color`; `duty_roles` table auto-creates.
+- **CBM-400 read-only sync foundation (in progress, not versioned yet):**
+  - Manuals confirmed EBEM supports read/monitor via ICC command messages over SSH/Telnet/serial and SNMPv3. Current implementation targets **SSH/ICC** first.
+  - Four CBMs are idempotently seeded into the device registry: `CBM-400-1` → `10.74.10.61`, `CBM-400-2` → `.62`, `CBM-400-3` → `.63`, `CBM-400-4` → `.64`; check port `22`; web GUI enabled.
+  - Package signals now carry an explicit modem mapping: `cbm_device_id`, `cbm_path` (`tx`/`rx`/`tx_rx`/`dvb`), and optional `cbm_carrier`. This is how Project Range knows which planned signal corresponds to which modem; it does **not** guess from modem state alone.
+  - Devices page now has supervisor-only EBEM credential fields (`cbm_username`, encrypted `cbm_password_encrypted`, `cbm_sync_enabled`) plus a per-device **Test CBM poll** action. Passwords are write-only in the GUI and encrypted at rest with a key derived from `SECRET_KEY`.
+    - **Operational caveat:** because modem passwords are encrypted from `SECRET_KEY`, changing `SECRET_KEY` makes stored EBEM passwords unreadable. Production must use a stable `.env` `SECRET_KEY`; if it changes, re-enter modem passwords in Devices.
+  - New modules: `app/crypto.py` (Fernet wrapper), `app/cbm.py` (read-only SSH/ICC client + parser), `app/cbm_sync.py` (manual active-serial sync). `requirements.txt` now includes `paramiko`.
+  - Manual sync button on Devices (`POST /devices/cbm/sync-active`) polls enabled CBMs, refuses ambiguous active mappings, and writes automatic `SignalLog` rows only when mapped modem values differ.
+    - First sync policy: `TX_OP=ON` maps to **Up**, `TX_OP` not ON maps to **Down** for Tx mappings; Rx/DVB uses available lock/link status heuristics. **This needs validation against real modem output before ops use.**
+  - In-app Docs page seeded/ensured at `/docs/cbm-400-read-only-signal-sync` ("CBM-400 Read-Only Signal Sync") with operator/supervisor setup instructions.
+  - **Verification gap:** compile/migration/import/parser checks passed locally, but actual SSH polling cannot be tested until running on the range network with EBEM credentials and `paramiko` installed/rebuilt.
+- **0.16.0 — Ephemeral instant chat:**
+  - Added a simple in-memory chat system for logged-in users. It is intentionally **not persisted**: rooms/messages live only in the current Python process and are lost on app restart. There is no chat history after logout/restart.
+  - Presence is based on recent authenticated requests/heartbeats (`ONLINE_WINDOW = 45s`) in `app/chat_state.py`; explicit logout removes the user from presence. Closed tabs age out automatically.
+  - New router `app/routers/chat.py` exposes JSON endpoints under `/chat`: online/room state, private room creation, group room creation, message send, and message polling. `main.py` registers the router and allows Safety Supervisor chat writes despite read-only enforcement.
+  - Global floating chat UI lives in `base.html`: bottom-right launcher, online user roster, double-click user to open private chat, group creator, floating chat windows, minimise/close, unread badge/alert for minimised windows.
+  - Dashboard utility widget type `chat` added to the Widgets menu. It shows online users/open rooms and opens the same floating chat windows. Widget persistence follows existing terminal-local dashboard utility widget storage.
+  - Static cache keys bumped to `app.css?v=15` / `app.js?v=15`. New CSS is in `app/static/css/app.css`; client logic is in `app/static/js/app.js`.
+  - **Verification gap:** compile, app import, JS syntax, and template parse passed. Needs real browser QA with two logged-in sessions to confirm online presence, private/group room creation, unread alerts, minimised windows, mobile layout, and dashboard widget behaviour.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with operator feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.
 2. **Browser QA of the UI overhaul + new features (0.12.0–0.15.0)** — all verified at compile/template + endpoint level (and CEASE/duty-role flows curl-tested end-to-end), but **not click-tested in a real browser**. Needs a pass over: sidebar collapse/expand + mobile overlay; dashboard grid side-by-side + span toggle persistence; new optional widgets (Range State, Active Signals, Last State Change) + calculator widgets; CDA countdown colour transitions; the CEASE splash appearing/dismissing across two sessions; duty-role badge rendering and colour contrast.
 3. **Possible CEASE enhancement** — currently CEASE is a visual/logged all-stop alert only. The user may later want it to also force the range to Standby / record against the range-state log. Not requested yet; confirm before building.
+4. **CBM sync hardware test + policy decision** — this is intentionally paused at manual-test stage. Next steps:
+   - rebuild/install dependencies so `paramiko` is available in Docker;
+   - enter EBEM credentials under Devices for each CBM;
+   - use each row's plug/test button to verify SSH login → EBEM menu → ICC (`i`) → `tx_cfg ?`, `rx_cfg ?`, `all_stat ?`;
+   - check parsed live values against what the EBEM/LCT GUI shows;
+   - map real firmware statuses to Project Range states (`Up`, `Down`, `Configured`, `Standby`) and confirm whether `TX_OP=OFF` should always mean Down;
+   - test `Sync Active CBMs` on a non-operational serial/package first;
+   - only after proving the above, decide whether to add background polling and at what interval.
+5. **Instant chat browser QA** — open two or more logged-in users/sessions and test: presence list updates, double-click private chat, group chat creation, send/receive, minimised-window alert, unread launcher badge, dashboard chat widget, logout/age-out behaviour, and mobile bottom-right layout. Decide later whether any history/audit/persistence is desired; current requirement is no memory/history.
 
 ### Also pending (from ROADMAP)
 - **Deferred infra (user's call):** HTTPS/TLS, PostgreSQL (+ Alembic). Cookies are TLS-ready (`SESSION_HTTPS_ONLY=1`).
@@ -101,6 +129,7 @@
 - **`partials/dashboard_summary.html` is now dead code** (the hardcoded summary row was removed in 0.13.0). Safe to delete; left in place for now.
 - **Settings area** — now reached via the sidebar (user footer → Preferences/Password; supervisor → Admin → App Config). The old Settings dropdown is gone.
 - **`DeviceLink` and `RFDevice` new columns are fully implemented** — `device_model`, `has_web_gui`, and the `device_links` table are all in place. Device type list now includes `antenna`. No further migration needed for those.
+- **CBM sync columns:** `signal_package_entries.cbm_device_id` / `cbm_path` / `cbm_carrier`; `rf_devices.cbm_sync_enabled` / `cbm_username` / `cbm_password_encrypted` / `cbm_last_sync_*`. Additive migrations are in `init_db.py`.
 
 ### Caveats / verification gaps
 - Theme switching verified at **build/markup level only** — not click-tested in a real browser. User confirmed themes "don't change enough", so **theme rework is still outstanding** (item 1 above).

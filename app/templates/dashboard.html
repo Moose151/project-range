@@ -31,6 +31,7 @@
         <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('notes')"><i class="bi bi-pencil-square me-2"></i>Quick Notes</button></li>
         <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('doc')"><i class="bi bi-file-earmark-text me-2"></i>Doc Reference</button></li>
         <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('links')"><i class="bi bi-lightning me-2"></i>Quick Links</button></li>
+        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('chat')"><i class="bi bi-chat-dots me-2"></i>Chat</button></li>
       </ul>
     </div>
     <div class="dropdown">
@@ -425,6 +426,22 @@ function utilityBody(id, type, config = {}) {
               <a href="/handover" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left-right me-1"></i>Handover</a>
             </div>`;
   }
+  if (type === 'chat') {
+    return `<div class="dashboard-chat-widget" data-dashboard-chat-widget="${id}">
+              <div class="d-flex gap-2 mb-2">
+                <button type="button" class="btn btn-sm btn-primary" onclick="toggleChatRoster(true)">
+                  <i class="bi bi-chat-dots me-1"></i>Open Chat
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshChatState()">
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
+              </div>
+              <div class="small text-muted mb-1">Online users</div>
+              <div class="dashboard-chat-online small text-muted">Loading...</div>
+              <div class="small text-muted mt-2 mb-1">Open rooms</div>
+              <div class="dashboard-chat-rooms small text-muted">No rooms yet.</div>
+            </div>`;
+  }
   // ── New widget types ──────────────────────────────────────────────────────
   if (type === 'range-state') {
     const rs = {{ range_state | tojson }};
@@ -482,12 +499,14 @@ function renderUtilityWidget(widget) {
     'range-state': 'Range State', 'active-signals': 'Active Signals',
     'last-state-change': 'Last State Change',
     calc: 'Calculator', 'rf-calc': 'RF Frequency', 'power-conv': 'Power Converter',
+    chat: 'Chat',
   };
   const ICONS = {
     notes: 'bi-pencil-square', doc: 'bi-file-earmark-text', clock: 'bi-clock', links: 'bi-lightning',
     'range-state': 'bi-broadcast-pin', 'active-signals': 'bi-broadcast',
     'last-state-change': 'bi-clock-history',
     calc: 'bi-calculator', 'rf-calc': 'bi-broadcast', 'power-conv': 'bi-lightning-charge',
+    chat: 'bi-chat-dots',
   };
   const title = TITLES[type] || 'Widget';
   const icon  = ICONS[type]  || 'bi-grid';
@@ -525,6 +544,7 @@ function renderUtilityWidget(widget) {
   if (widget.collapsed) setCollapsed(group, true);
   if (type === 'doc' && widget.config?.slug) loadDocWidget(id, widget.config.slug);
   if (type === 'clock') updateUtilityClocks();
+  if (type === 'chat') renderDashboardChatWidget();
 }
 function restoreUtilityWidgets() {
   utilityWidgets().forEach(renderUtilityWidget);
@@ -558,6 +578,27 @@ function loadDocWidget(id, slug) {
     .then(r => r.text())
     .then(html => { target.innerHTML = html; })
     .catch(() => { target.innerHTML = '<span class="text-danger">Could not load document.</span>'; });
+}
+
+function renderDashboardChatWidget() {
+  document.querySelectorAll('[data-dashboard-chat-widget]').forEach(widget => {
+    const online = widget.querySelector('.dashboard-chat-online');
+    const rooms = widget.querySelector('.dashboard-chat-rooms');
+    const others = (window.chatState?.users || []).filter(u => !window.chatState?.me || u.id !== window.chatState.me.id);
+    if (online) {
+      online.innerHTML = others.length ? others.map(u => `
+        <button type="button" class="btn btn-sm btn-outline-secondary me-1 mb-1" ondblclick="openPrivateChat(${u.id})" onclick="openPrivateChat(${u.id})">
+          <i class="bi bi-person-fill me-1"></i>${escapeHtml(u.display_name)}
+        </button>`).join('') : '<span class="text-muted">No other users online.</span>';
+    }
+    const roomList = Object.values(window.chatState?.rooms || {});
+    if (rooms) {
+      rooms.innerHTML = roomList.length ? roomList.map(room => `
+        <button type="button" class="btn btn-sm btn-outline-info me-1 mb-1" onclick="openChatWindow('${escapeHtml(room.id)}')">
+          <i class="bi ${room.is_group ? 'bi-people-fill' : 'bi-chat-fill'} me-1"></i>${escapeHtml(room.title)}
+        </button>`).join('') : '<span class="text-muted">No rooms yet.</span>';
+    }
+  });
 }
 
 // ── Drag-to-reorder ────────────────────────────────────────────────────────

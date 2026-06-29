@@ -3,6 +3,8 @@ Initialise the database and create a default supervisor account.
 Run once: python init_db.py
 Re-running is safe — it skips existing data and only adds missing tables/seed rows.
 """
+from datetime import datetime
+
 from app.database import engine, Base
 from app.models import (
     User, RangeStateLog, Signal, ModulationType, FecType, SignalSource, AntennaType,
@@ -38,6 +40,15 @@ DEFAULT_DUTY_ROLES = [
     ("Supervisor", "#198754", 1),
     ("EA Safety",  "#dc3545", 2),
     ("Observer",   "#6c757d", 3),
+]
+
+# Range CBM-400 modems. Seeded idempotently into the device registry so signal
+# package entries can be mapped to a modem before the read-only sync poller runs.
+DEFAULT_CBM_DEVICES = [
+    ("CBM-400-1", "10.74.10.61"),
+    ("CBM-400-2", "10.74.10.62"),
+    ("CBM-400-3", "10.74.10.63"),
+    ("CBM-400-4", "10.74.10.64"),
 ]
 
 def _columns(conn, table):
@@ -78,12 +89,21 @@ def _migrate(conn):
         "ALTER TABLE signal_packages ADD COLUMN ttf FLOAT",
         "ALTER TABLE signal_packages ADD COLUMN ttf_direction VARCHAR(4) DEFAULT '+'",
         "ALTER TABLE signal_packages ADD COLUMN freq_unit VARCHAR(4) DEFAULT 'MHz'",
+        "ALTER TABLE signal_package_entries ADD COLUMN cbm_device_id INTEGER REFERENCES rf_devices(id)",
+        "ALTER TABLE signal_package_entries ADD COLUMN cbm_path VARCHAR(16)",
+        "ALTER TABLE signal_package_entries ADD COLUMN cbm_carrier VARCHAR(64)",
         "ALTER TABLE signals ADD COLUMN max_power_dbm FLOAT",
         "ALTER TABLE users ADD COLUMN default_freq_unit VARCHAR(4) DEFAULT 'MHz'",
         "ALTER TABLE users ADD COLUMN default_power_unit VARCHAR(4) DEFAULT 'dBm'",
         "ALTER TABLE users ADD COLUMN must_change_password BOOLEAN DEFAULT 0",
         "ALTER TABLE rf_devices ADD COLUMN device_model VARCHAR(128)",
         "ALTER TABLE rf_devices ADD COLUMN has_web_gui BOOLEAN DEFAULT 0",
+        "ALTER TABLE rf_devices ADD COLUMN cbm_sync_enabled BOOLEAN DEFAULT 0",
+        "ALTER TABLE rf_devices ADD COLUMN cbm_username VARCHAR(128)",
+        "ALTER TABLE rf_devices ADD COLUMN cbm_password_encrypted TEXT",
+        "ALTER TABLE rf_devices ADD COLUMN cbm_last_sync_at DATETIME",
+        "ALTER TABLE rf_devices ADD COLUMN cbm_last_sync_status VARCHAR(32)",
+        "ALTER TABLE rf_devices ADD COLUMN cbm_last_sync_error TEXT",
         "ALTER TABLE users ADD COLUMN duty_role VARCHAR(64)",
         "ALTER TABLE users ADD COLUMN duty_role_color VARCHAR(16)",
     ]
@@ -330,6 +350,133 @@ In an emergency requiring immediate cessation of RF transmission, follow your si
     ),
 ]
 
+CBM_SYNC_DOC = (
+    "CBM-400 Read-Only Signal Sync",
+    "cbm-400-read-only-signal-sync",
+    """# CBM-400 Read-Only Signal Sync
+
+This page explains how Project Range is intended to read signal settings from the Viasat CBM-400 EBEM modems so operators do not have to enter the same signal changes twice.
+
+> Current status: this feature is at the setup/manual-test stage. Project Range can store modem mappings and credentials, test a read-only CBM poll, and run a manual active-sync. Automatic timed polling still needs range-network testing before operational use.
+
+## What This Does
+
+Project Range does **not** configure the CBM-400 modem.
+
+The integration is designed to:
+
+- read current modem values from the CBM over the management network;
+- compare those values with the active Project Range signal;
+- write an automatic Project Range signal log entry when mapped modem values change;
+- keep the normal Project Range package and serial workflow as the source of the planned signal list.
+
+The integration is **read-only by policy**. Operators should continue to configure the modem using the approved EBEM/LCT/modem workflow.
+
+## How Project Range Knows Which Signal Belongs To Which Modem
+
+Project Range does not guess from modem state alone.
+
+Each signal in a **Signal Package** can be mapped to a CBM modem:
+
+- **CBM Modem**: the physical modem, such as `CBM-400-1`.
+- **CBM Path**: which part of the modem to read, such as `Tx`, `Rx`, `Tx/Rx`, or `DVB`.
+- **Carrier Label**: optional free text for local clarity.
+
+When a serial starts, Project Range creates the dashboard signals from the package. The CBM sync then only updates the active signal that has a matching package mapping.
+
+Example:
+
+| Package Signal | CBM Modem | CBM Path |
+|---|---|---|
+| S101 | CBM-400-1 | Tx |
+| S102 | CBM-400-2 | Tx |
+
+If S101 goes down on its modem and S102 comes up on its modem, Project Range can update S101 and S102 separately because the package tells it which signal owns which modem/path.
+
+If two active signals claim the same modem/path, Project Range skips that mapping instead of guessing.
+
+## Seeded CBM Devices
+
+The following CBMs are seeded into **Devices**:
+
+| Device | Address |
+|---|---|
+| CBM-400-1 | 10.74.10.61 |
+| CBM-400-2 | 10.74.10.62 |
+| CBM-400-3 | 10.74.10.63 |
+| CBM-400-4 | 10.74.10.64 |
+
+The reachability check uses port `22` because the first implementation targets SSH/ICC polling.
+
+## Supervisor Setup
+
+1. Go to **Devices**.
+2. Confirm each CBM is present and has the correct IP address.
+3. Expand a CBM row with the pencil button.
+4. Tick **Enable CBM read-only sync**.
+5. Enter the EBEM username and password.
+6. Save the device.
+7. Press the plug/test button on the CBM row to test a read-only poll.
+
+Passwords are stored encrypted on the server and are not shown back in the browser. If the password field is left blank while editing a device, the stored password is kept.
+
+Important: the server `SECRET_KEY` must remain stable. If `SECRET_KEY` changes, stored modem passwords cannot be decrypted and must be entered again.
+
+## Package Setup
+
+1. Go to **Packages**.
+2. Open the relevant package.
+3. For each signal, use the edit pencil.
+4. Set **CBM Modem** to the modem that carries that planned signal.
+5. Set **CBM Path** to the path Project Range should read.
+6. Save the signal.
+
+Keep package mappings clear and one-to-one for active serials. If the same CBM/path is reused by different signals at different times, update the package or use the package that matches the planned serial.
+
+## Manual Sync
+
+After the CBM devices and package mappings are configured:
+
+1. Start the serial as normal.
+2. Go to **Devices**.
+3. Click **Sync Active CBMs**.
+
+Project Range will:
+
+- inspect active serials;
+- find package signals with CBM mappings;
+- poll the enabled CBMs;
+- write automatic signal log entries only when values differ;
+- skip ambiguous mappings or CBMs that cannot be read.
+
+## Values Read From The CBM
+
+The first implementation uses EBEM ICC query commands over SSH:
+
+```text
+tx_cfg ?
+rx_cfg ?
+all_stat ?
+```
+
+These can provide values such as transmit operation, Tx IF frequency, Tx IF power, modulation, symbol rate, FEC/code, Rx IF frequency, receive level, Eb/N0, and modem/link/fault status.
+
+## What Still Needs To Be Proven
+
+Before using this operationally:
+
+1. Install the updated Python dependency (`paramiko`) by rebuilding Docker or running `pip install -r requirements.txt`.
+2. Enter real EBEM credentials for each CBM.
+3. Test polling each CBM from the range server.
+4. Confirm the ICC shell prompt/command flow matches the manual and the live firmware.
+5. Confirm field mapping with real modem output.
+6. Decide whether `TX_OP=OFF` should always mean Project Range status **Down**, or whether some states should map to **Configured** or **Standby**.
+7. Decide whether automatic timed polling should be enabled, and at what interval.
+
+Until those checks are complete, treat CBM sync as a manual test feature, not an operational automation.
+""",
+)
+
 
 def _seed_docs(db, admin_id: int):
     from datetime import datetime
@@ -355,6 +502,34 @@ def _seed_docs(db, admin_id: int):
         ))
     db.commit()
     print(f"Seeded {len(INITIAL_DOCS)} documentation pages.")
+
+
+def _ensure_doc(db, admin_id: int, title: str, slug: str, content: str):
+    """Create a shipped docs page if it is missing; never overwrite user edits."""
+    if db.query(DocPage).filter(DocPage.slug == slug).first():
+        return False
+    now = datetime.utcnow()
+    page = DocPage(
+        title=title,
+        slug=slug,
+        content=content,
+        is_published=True,
+        created_by_id=admin_id,
+    )
+    db.add(page)
+    db.flush()
+    db.add(DocVersion(
+        page_id=page.id,
+        version_number=1,
+        content=content,
+        change_summary="Seeded operational guide",
+        approval_status="approved",
+        created_by_id=admin_id,
+        approved_by_id=admin_id,
+        approved_at=now,
+    ))
+    db.commit()
+    return True
 
 
 def main():
@@ -428,11 +603,39 @@ def main():
         else:
             print("Duty roles already seeded — skipping.")
 
+        created_cbms = 0
+        for name, host in DEFAULT_CBM_DEVICES:
+            existing = db.query(RFDevice).filter(
+                (RFDevice.name == name) | (RFDevice.host == host)
+            ).first()
+            if existing:
+                continue
+            db.add(RFDevice(
+                name=name,
+                device_model="CBM-400",
+                device_type="modem",
+                host=host,
+                check_port=22,
+                has_web_gui=True,
+                cbm_sync_enabled=False,
+                notes="Seeded CBM-400 modem for read-only signal sync mapping.",
+                num_inputs=1,
+                num_outputs=1,
+            ))
+            created_cbms += 1
+        if created_cbms:
+            db.commit()
+            print(f"Seeded {created_cbms} CBM-400 modem devices.")
+
         # Seed initial documentation pages if none exist
         if not db.query(DocPage).first():
             admin = db.query(User).filter(User.username == "admin").first()
             if admin:
                 _seed_docs(db, admin.id)
+        admin = db.query(User).filter(User.username == "admin").first() or db.query(User).first()
+        if admin:
+            if _ensure_doc(db, admin.id, *CBM_SYNC_DOC):
+                print("Seeded CBM-400 read-only signal sync documentation page.")
 
     print("Done.")
 

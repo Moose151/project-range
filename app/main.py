@@ -11,10 +11,11 @@ from app.config import (
 from app.database import SessionLocal
 from app.models import User, Role
 from app.templating import templates
+from app import chat_state
 from app.routers import (
     auth, dashboard, calculator, logs, range_state, users, config, audit, sessions,
     packages, serials, history, docs, handover, preferences, devices, account, incidents, cda,
-    cease,
+    cease, chat,
 )
 
 app = FastAPI(title="SEW Range", version=APP_VERSION, docs_url=None, redoc_url=None)
@@ -44,7 +45,7 @@ async def security_middleware(request: Request, call_next):
         # Read-only enforcement: a Safety Supervisor account may not make changes,
         # except the explicitly allowed CEASE + own-password actions above.
         user_id = request.session.get("user_id")
-        if user_id and request.url.path not in SAFETY_SUPERVISOR_ALLOWED_WRITES:
+        if user_id and request.url.path not in SAFETY_SUPERVISOR_ALLOWED_WRITES and not request.url.path.startswith("/chat/"):
             db = SessionLocal()
             try:
                 u = db.query(User).filter(User.id == user_id).first()
@@ -55,6 +56,12 @@ async def security_middleware(request: Request, call_next):
                     )
             finally:
                 db.close()
+
+    user_id = request.session.get("user_id")
+    if user_id:
+        display_name = request.session.get("display_name") or "User"
+        role = request.session.get("role") or ""
+        chat_state.touch_user(user_id, display_name, role)
 
     response = await call_next(request)
     # Security headers. All assets are first-party; inline scripts/styles are used,
@@ -105,6 +112,7 @@ app.include_router(account.router)
 app.include_router(incidents.router)
 app.include_router(cda.router)
 app.include_router(cease.router)
+app.include_router(chat.router)
 
 
 @app.exception_handler(302)

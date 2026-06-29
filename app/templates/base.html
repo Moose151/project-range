@@ -9,7 +9,7 @@
   <!-- Vendored locally so styling works on LAN devices with no internet access -->
   <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="/static/vendor/bootstrap-icons/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=14">
+  <link rel="stylesheet" href="/static/css/app.css?v=15">
   <link rel="icon" type="image/png" href="/static/img/sew-range-logo.png">
 </head>
 <body>
@@ -245,6 +245,39 @@
 
 <!-- CEASE splash mount: the full-screen overlay is injected here by app.js when active -->
 <div id="ceaseRoot"></div>
+
+<!-- Instant chat: in-memory, terminal-local windows; messages are not persisted. -->
+<div id="chatDock" class="chat-dock" aria-live="polite">
+  <button type="button" id="chatLauncher" class="chat-launcher" title="Open chat" onclick="toggleChatRoster()">
+    <i class="bi bi-chat-dots-fill"></i>
+    <span id="chatUnreadBadge" class="chat-unread-badge d-none">0</span>
+  </button>
+  <div id="chatRoster" class="chat-roster shadow-lg d-none">
+    <div class="chat-roster-header">
+      <span><i class="bi bi-chat-dots me-1"></i>Chat</span>
+      <button type="button" class="btn btn-sm btn-link link-secondary p-0" title="Close" onclick="toggleChatRoster(false)">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="chat-roster-body">
+      <div class="d-flex align-items-center justify-content-between mb-1">
+        <span class="text-muted small">Online</span>
+        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="toggleChatGroupCreator()" title="Create group chat">
+          <i class="bi bi-people"></i>
+        </button>
+      </div>
+      <div id="chatOnlineUsers" class="chat-online-users small"></div>
+      <div id="chatGroupCreator" class="chat-group-creator d-none">
+        <input type="text" id="chatGroupTitle" class="form-control form-control-sm my-2" placeholder="Group name">
+        <div id="chatGroupUsers" class="chat-group-users small"></div>
+        <button type="button" class="btn btn-sm btn-primary w-100 mt-2" onclick="createChatGroup()">
+          <i class="bi bi-plus-lg me-1"></i>Create Group
+        </button>
+      </div>
+    </div>
+  </div>
+  <div id="chatWindows" class="chat-windows"></div>
+</div>
 {% else %}
 <!-- Logged-out pages: toast container still available for error messages -->
 <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1100" id="toastContainer"></div>
@@ -254,7 +287,7 @@
 
 <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="/static/vendor/htmx/htmx.min.js"></script>
-<script src="/static/js/app.js?v=14"></script>
+<script src="/static/js/app.js?v=15"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

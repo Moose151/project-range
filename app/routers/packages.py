@@ -9,7 +9,7 @@ from app.database import get_db
 from app.deps import get_current_user, get_current_range_state
 from app.models import (
     User, Signal, SignalPackage, SignalPackageEntry,
-    ModulationType, FecType, SignalSource, AntennaType, AuditLog,
+    ModulationType, FecType, SignalSource, AntennaType, AuditLog, RFDevice,
 )
 
 router = APIRouter(prefix="/packages")
@@ -18,6 +18,13 @@ from app.templating import templates
 BANDS = ["C", "X", "Ku", "Ka", "Other"]
 FREQ_UNITS = ["MHz", "GHz"]
 POWER_UNITS = ["dBm", "dBW", "W"]
+CBM_PATHS = [
+    ("", "None"),
+    ("tx", "Tx"),
+    ("rx", "Rx"),
+    ("tx_rx", "Tx/Rx"),
+    ("dvb", "DVB"),
+]
 
 
 def _dropdown_lists(db: Session) -> dict:
@@ -26,12 +33,23 @@ def _dropdown_lists(db: Session) -> dict:
     sources = [s.name for s in db.query(SignalSource).filter(SignalSource.is_active == True).order_by(SignalSource.display_order).all()]
     antennas = [a.name for a in db.query(AntennaType).filter(AntennaType.is_active == True).order_by(AntennaType.display_order).all()]
     signals = [s.name for s in db.query(Signal).filter(Signal.is_active == True).order_by(Signal.name).all()]
+    cbm_devices = (
+        db.query(RFDevice)
+        .filter(
+            RFDevice.is_active == True,
+            RFDevice.device_type == "modem",
+        )
+        .order_by(RFDevice.name)
+        .all()
+    )
     return {
         "mod_types": mod_types or ["BPSK", "QPSK", "8PSK", "16APSK", "32APSK"],
         "fec_types": fec_types or ["1/2", "2/3", "3/4", "5/6", "7/8", "8/9", "9/10"],
         "signal_sources": sources,
         "antenna_types": antennas,
         "registry_signals": signals,
+        "cbm_devices": cbm_devices,
+        "cbm_paths": CBM_PATHS,
         "bands": BANDS,
         "freq_units": FREQ_UNITS,
         "power_units": POWER_UNITS,
@@ -70,6 +88,9 @@ def _package_to_dict(pkg: SignalPackage) -> dict:
                 "eb_no": e.eb_no,
                 "source": e.source or "",
                 "antenna": e.antenna or "",
+                "cbm_device": e.cbm_device.name if e.cbm_device else "",
+                "cbm_path": e.cbm_path or "",
+                "cbm_carrier": e.cbm_carrier or "",
                 "notes": e.notes or "",
             }
             for e in pkg.signals
@@ -98,6 +119,8 @@ def _dict_to_entries(data: dict) -> list[dict]:
             "eb_no": _float_or_none(s.get("eb_no")),
             "source": str(s.get("source", "")).strip() or None,
             "antenna": str(s.get("antenna", "")).strip() or None,
+            "cbm_path": str(s.get("cbm_path", "")).strip() or None,
+            "cbm_carrier": str(s.get("cbm_carrier", "")).strip() or None,
             "notes": str(s.get("notes", "")).strip() or None,
             "display_order": i,
         })
@@ -253,6 +276,9 @@ async def package_signal_add(
     eb_no: Optional[float] = Form(None),
     source: str = Form(""),
     antenna: str = Form(""),
+    cbm_device_id: Optional[int] = Form(None),
+    cbm_path: str = Form(""),
+    cbm_carrier: str = Form(""),
     notes: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -276,6 +302,9 @@ async def package_signal_add(
         eb_no=eb_no,
         source=source.strip() or None,
         antenna=antenna.strip() or None,
+        cbm_device_id=cbm_device_id,
+        cbm_path=cbm_path or None,
+        cbm_carrier=cbm_carrier.strip() or None,
         notes=notes.strip() or None,
     )
     pkg.updated_at = datetime.utcnow()
@@ -304,6 +333,9 @@ async def package_signal_update(
     eb_no: Optional[float] = Form(None),
     source: str = Form(""),
     antenna: str = Form(""),
+    cbm_device_id: Optional[int] = Form(None),
+    cbm_path: str = Form(""),
+    cbm_carrier: str = Form(""),
     notes: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -326,6 +358,9 @@ async def package_signal_update(
         entry.eb_no = eb_no
         entry.source = source.strip() or None
         entry.antenna = antenna.strip() or None
+        entry.cbm_device_id = cbm_device_id
+        entry.cbm_path = cbm_path or None
+        entry.cbm_carrier = cbm_carrier.strip() or None
         entry.notes = notes.strip() or None
         pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id).first()
         if pkg:
@@ -394,6 +429,9 @@ async def package_duplicate(
             eb_no=entry.eb_no,
             source=entry.source,
             antenna=entry.antenna,
+            cbm_device_id=entry.cbm_device_id,
+            cbm_path=entry.cbm_path,
+            cbm_carrier=entry.cbm_carrier,
             notes=entry.notes,
         ))
     db.add(AuditLog(user_id=current_user.id, action_type="PACKAGE_DUPLICATE",

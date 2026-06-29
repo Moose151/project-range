@@ -7,6 +7,7 @@ from app.models import AuditLog
 from app.auth import (
     authenticate_user, login_lock_remaining, register_failed_login, reset_login_attempts,
 )
+from app import chat_state
 
 router = APIRouter()
 from app.templating import templates
@@ -74,5 +75,8 @@ async def login_submit(
 
 @router.get("/logout")
 async def logout(request: Request):
+    user_id = request.session.get("user_id")
+    if user_id:
+        chat_state.forget_user(user_id)
     request.session.clear()
     return RedirectResponse("/login", status_code=302)

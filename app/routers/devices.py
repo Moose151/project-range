@@ -1,4 +1,6 @@
 import asyncio
+from datetime import datetime
+from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -6,6 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, require_supervisor
+from app.cbm import CBMError, poll_cbm_ssh
+from app.cbm_sync import sync_active_cbms
+from app.crypto import decrypt_secret, encrypt_secret
 from app.models import RFDevice, DevicePort, DeviceLink, AuditLog, User
 from app.templating import templates
 
@@ -87,6 +92,18 @@ async def devices_list(
     })
 
 
+@router.post("/cbm/sync-active")
+async def devices_cbm_sync_active(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    result = sync_active_cbms(db, current_user.id)
+    message = f"CBM sync complete: {result.updated} updated, {result.skipped} skipped"
+    if result.errors:
+        message += f", {len(result.errors)} issue(s)"
+    return RedirectResponse(f"/devices?toast={quote_plus(message)}", status_code=302)
+
+
 @router.post("/new")
 async def device_create(
     name: str = Form(...),
@@ -95,6 +112,9 @@ async def device_create(
     host: str = Form(""),
     check_port: str = Form(""),
     has_web_gui: str = Form(""),
+    cbm_sync_enabled: str = Form(""),
+    cbm_username: str = Form(""),
+    cbm_password: str = Form(""),
     location: str = Form(""),
     num_inputs: int = Form(16),
     num_outputs: int = Form(16),
@@ -111,6 +131,9 @@ async def device_create(
             host=host.strip() or None,
             check_port=int(check_port) if check_port.strip().isdigit() else None,
             has_web_gui=bool(has_web_gui),
+            cbm_sync_enabled=bool(cbm_sync_enabled) if device_type == "modem" else False,
+            cbm_username=cbm_username.strip() or None,
+            cbm_password_encrypted=encrypt_secret(cbm_password.strip()) if cbm_password.strip() else None,
             location=location.strip() or None,
             num_inputs=max(0, min(num_inputs, 128)),
             num_outputs=max(0, min(num_outputs, 128)),
@@ -133,6 +156,10 @@ async def device_update(
     host: str = Form(""),
     check_port: str = Form(""),
     has_web_gui: str = Form(""),
+    cbm_sync_enabled: str = Form(""),
+    cbm_username: str = Form(""),
+    cbm_password: str = Form(""),
+    clear_cbm_password: str = Form(""),
     location: str = Form(""),
     num_inputs: int = Form(16),
     num_outputs: int = Form(16),
@@ -148,6 +175,12 @@ async def device_update(
         dev.host = host.strip() or None
         dev.check_port = int(check_port) if check_port.strip().isdigit() else None
         dev.has_web_gui = bool(has_web_gui)
+        dev.cbm_sync_enabled = bool(cbm_sync_enabled) if dev.device_type == "modem" else False
+        dev.cbm_username = cbm_username.strip() or None
+        if clear_cbm_password:
+            dev.cbm_password_encrypted = None
+        elif cbm_password.strip():
+            dev.cbm_password_encrypted = encrypt_secret(cbm_password.strip())
         dev.location = location.strip() or None
         dev.num_inputs = max(0, min(num_inputs, 128))
         dev.num_outputs = max(0, min(num_outputs, 128))
@@ -156,6 +189,64 @@ async def device_update(
                         entity_type="RFDevice", entity_id=dev.id, new_value=dev.name))
         db.commit()
     return RedirectResponse("/devices?toast=Device+updated", status_code=302)
+
+
+@router.post("/{dev_id}/cbm/test")
+async def device_cbm_test(
+    dev_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    dev = db.query(RFDevice).filter(RFDevice.id == dev_id).first()
+    if not dev or dev.device_type != "modem":
+        return RedirectResponse("/devices?toast=CBM+device+not+found", status_code=302)
+    if not dev.host or not dev.cbm_username or not dev.cbm_password_encrypted:
+        dev.cbm_last_sync_status = "missing_credentials"
+        dev.cbm_last_sync_error = "Host, username, and password are required."
+        db.commit()
+        return RedirectResponse("/devices?toast=CBM+credentials+required", status_code=302)
+
+    password = decrypt_secret(dev.cbm_password_encrypted)
+    if not password:
+        dev.cbm_last_sync_status = "credential_error"
+        dev.cbm_last_sync_error = "Stored password could not be decrypted. Check SECRET_KEY."
+        db.commit()
+        return RedirectResponse("/devices?toast=Stored+CBM+password+could+not+be+decrypted", status_code=302)
+
+    try:
+        snapshot = poll_cbm_ssh(dev.host, dev.cbm_username, password)
+        summary = snapshot.summary
+        dev.cbm_last_sync_at = datetime.utcnow()
+        dev.cbm_last_sync_status = "ok"
+        dev.cbm_last_sync_error = None
+        db.add(AuditLog(
+            user_id=current_user.id,
+            action_type="CBM_TEST",
+            entity_type="RFDevice",
+            entity_id=dev.id,
+            new_value=f"{dev.name}: {summary.get('modem_status') or 'poll ok'}",
+        ))
+        db.commit()
+        return RedirectResponse(
+            f"/devices?toast={quote_plus('CBM poll OK: ' + dev.name)}",
+            status_code=302,
+        )
+    except CBMError as exc:
+        dev.cbm_last_sync_at = datetime.utcnow()
+        dev.cbm_last_sync_status = "error"
+        dev.cbm_last_sync_error = str(exc)[:1000]
+        db.add(AuditLog(
+            user_id=current_user.id,
+            action_type="CBM_TEST_FAILED",
+            entity_type="RFDevice",
+            entity_id=dev.id,
+            new_value=f"{dev.name}: {dev.cbm_last_sync_error}",
+        ))
+        db.commit()
+        return RedirectResponse(
+            f"/devices?toast={quote_plus('CBM poll failed: ' + dev.name)}",
+            status_code=302,
+        )
 
 
 @router.post("/{dev_id}/delete")

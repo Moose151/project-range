@@ -123,6 +123,229 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// ── Instant chat: lightweight in-memory polling chat ─────────────────────────
+const chatState = {
+  me: null,
+  users: [],
+  rooms: {},
+  openRooms: {},
+  lastMessageIds: {},
+  unread: {},
+  rosterOpen: false,
+};
+window.chatState = chatState;
+
+function chatApi(path, opts = {}) {
+  return fetch(path, {
+    headers: { 'Accept': 'application/json', ...(opts.headers || {}) },
+    ...opts,
+  }).then(r => {
+    if (!r.ok) throw new Error('chat request failed');
+    return r.json();
+  });
+}
+
+function toggleChatRoster(force) {
+  const roster = document.getElementById('chatRoster');
+  if (!roster) return;
+  chatState.rosterOpen = typeof force === 'boolean' ? force : roster.classList.contains('d-none');
+  roster.classList.toggle('d-none', !chatState.rosterOpen);
+  if (chatState.rosterOpen) refreshChatState();
+}
+
+function toggleChatGroupCreator() {
+  document.getElementById('chatGroupCreator')?.classList.toggle('d-none');
+}
+
+function renderChatRoster() {
+  const online = document.getElementById('chatOnlineUsers');
+  const groupUsers = document.getElementById('chatGroupUsers');
+  if (!online || !groupUsers) return;
+  const others = chatState.users.filter(u => !chatState.me || u.id !== chatState.me.id);
+  online.innerHTML = others.length ? others.map(u => `
+    <button type="button" class="chat-user-row" ondblclick="openPrivateChat(${u.id})" title="Double-click to chat">
+      <span class="chat-presence-dot"></span>
+      <span class="text-truncate">${escapeHtml(u.display_name)}</span>
+    </button>
+  `).join('') : '<div class="text-muted py-2">No other users online.</div>';
+  groupUsers.innerHTML = others.length ? others.map(u => `
+    <label class="d-flex align-items-center gap-2 py-1">
+      <input class="form-check-input m-0" type="checkbox" value="${u.id}" data-chat-group-user>
+      <span class="text-truncate">${escapeHtml(u.display_name)}</span>
+    </label>
+  `).join('') : '<div class="text-muted py-2">No online users to add.</div>';
+}
+
+function mergeChatRooms(rooms) {
+  (rooms || []).forEach(room => { chatState.rooms[room.id] = room; });
+}
+
+async function refreshChatState() {
+  if (!document.getElementById('chatDock')) return;
+  try {
+    const data = await chatApi('/chat/state');
+    chatState.me = data.me;
+    chatState.users = data.online_users || [];
+    mergeChatRooms(data.rooms);
+    renderChatRoster();
+    window.renderDashboardChatWidget?.();
+  } catch (e) {}
+}
+
+async function openPrivateChat(userId) {
+  try {
+    const data = await chatApi('/chat/rooms/private', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ user_id: userId }),
+    });
+    mergeChatRooms([data.room]);
+    openChatWindow(data.room.id);
+  } catch (e) {
+    showToast?.('Could not open chat', 'danger');
+  }
+}
+
+async function createChatGroup() {
+  const ids = [...document.querySelectorAll('[data-chat-group-user]:checked')].map(x => x.value);
+  if (!ids.length) { showToast?.('Select at least one user', 'warning'); return; }
+  const title = document.getElementById('chatGroupTitle')?.value || 'Group Chat';
+  try {
+    const data = await chatApi('/chat/rooms/group', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ participant_ids: ids.join(','), title }),
+    });
+    mergeChatRooms([data.room]);
+    document.getElementById('chatGroupTitle').value = '';
+    document.querySelectorAll('[data-chat-group-user]').forEach(x => { x.checked = false; });
+    openChatWindow(data.room.id);
+  } catch (e) {
+    showToast?.('Could not create group chat', 'danger');
+  }
+}
+
+function openChatWindow(roomId) {
+  const room = chatState.rooms[roomId];
+  if (!room) return;
+  chatState.openRooms[roomId] = true;
+  chatState.unread[roomId] = 0;
+  const existing = document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"]`);
+  if (existing) {
+    existing.classList.remove('minimised', 'has-alert');
+    updateChatUnreadBadge();
+    return;
+  }
+  const windows = document.getElementById('chatWindows');
+  if (!windows) return;
+  const node = document.createElement('div');
+  node.className = 'chat-window';
+  node.dataset.chatWindow = roomId;
+  node.innerHTML = `
+    <div class="chat-window-header">
+      <i class="bi ${room.is_group ? 'bi-people-fill' : 'bi-person-fill'}"></i>
+      <div class="chat-window-title">${escapeHtml(room.title)}</div>
+      <button type="button" class="btn btn-sm btn-link link-secondary p-0 ms-auto" title="Minimise" onclick="minimiseChatWindow('${escapeHtml(roomId)}')"><i class="bi bi-dash-lg"></i></button>
+      <button type="button" class="btn btn-sm btn-link link-secondary p-0" title="Close" onclick="closeChatWindow('${escapeHtml(roomId)}')"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="chat-window-body" data-chat-messages></div>
+    <form class="chat-window-form" onsubmit="sendChatMessage(event, '${escapeHtml(roomId)}')">
+      <input type="text" class="form-control form-control-sm" name="body" autocomplete="off" maxlength="2000" placeholder="Message">
+      <button type="submit" class="btn btn-sm btn-primary" title="Send"><i class="bi bi-send"></i></button>
+    </form>`;
+  windows.appendChild(node);
+  pollChatRoom(roomId);
+  updateChatUnreadBadge();
+}
+
+function minimiseChatWindow(roomId) {
+  const win = document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"]`);
+  if (win) win.classList.toggle('minimised');
+}
+
+function closeChatWindow(roomId) {
+  document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"]`)?.remove();
+  delete chatState.openRooms[roomId];
+  chatState.unread[roomId] = 0;
+  updateChatUnreadBadge();
+}
+
+async function sendChatMessage(evt, roomId) {
+  evt.preventDefault();
+  const input = evt.target.querySelector('input[name="body"]');
+  const body = (input?.value || '').trim();
+  if (!body) return;
+  input.value = '';
+  try {
+    await chatApi('/chat/rooms/' + encodeURIComponent(roomId) + '/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ body }),
+    });
+    pollChatRoom(roomId);
+  } catch (e) {
+    showToast?.('Message not sent', 'danger');
+  }
+}
+
+function appendChatMessages(roomId, messages) {
+  const win = document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"]`);
+  const body = win?.querySelector('[data-chat-messages]');
+  if (!body) return;
+  let receivedNewFromOther = false;
+  messages.forEach(msg => {
+    chatState.lastMessageIds[roomId] = Math.max(chatState.lastMessageIds[roomId] || 0, msg.id);
+    const mine = chatState.me && msg.sender_id === chatState.me.id;
+    if (!mine) receivedNewFromOther = true;
+    body.insertAdjacentHTML('beforeend', `
+      <div class="chat-message ${mine ? 'mine' : ''}">
+        <div class="chat-message-meta">${mine ? 'You' : escapeHtml(msg.sender_name)} · ${escapeHtml(msg.sent_at)}</div>
+        <div class="chat-message-bubble">${escapeHtml(msg.body)}</div>
+      </div>`);
+  });
+  if (messages.length) body.scrollTop = body.scrollHeight;
+  if (receivedNewFromOther && win.classList.contains('minimised')) {
+    win.classList.add('has-alert');
+    chatState.unread[roomId] = (chatState.unread[roomId] || 0) + messages.filter(m => !chatState.me || m.sender_id !== chatState.me.id).length;
+    updateChatUnreadBadge();
+  }
+}
+
+async function pollChatRoom(roomId) {
+  if (!chatState.openRooms[roomId] && !chatState.rooms[roomId]) return;
+  try {
+    const after = chatState.lastMessageIds[roomId] || 0;
+    const data = await chatApi('/chat/rooms/' + encodeURIComponent(roomId) + '/messages?after=' + after);
+    if (data.room) mergeChatRooms([data.room]);
+    appendChatMessages(roomId, data.messages || []);
+  } catch (e) {}
+}
+
+function updateChatUnreadBadge() {
+  const badge = document.getElementById('chatUnreadBadge');
+  if (!badge) return;
+  const total = Object.values(chatState.unread).reduce((a, b) => a + b, 0);
+  badge.textContent = total > 99 ? '99+' : String(total);
+  badge.classList.toggle('d-none', total <= 0);
+}
+
+document.addEventListener('click', (evt) => {
+  const win = evt.target.closest?.('.chat-window');
+  if (win) {
+    const roomId = win.dataset.chatWindow;
+    win.classList.remove('has-alert');
+    chatState.unread[roomId] = 0;
+    updateChatUnreadBadge();
+  }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (!document.getElementById('chatDock')) return;
+  refreshChatState();
+  setInterval(refreshChatState, 10000);
+  setInterval(() => Object.keys(chatState.openRooms).forEach(pollChatRoom), 2500);
+});
+
 // ── Sidebar toggle ────────────────────────────────────────────────────────────
 const SIDEBAR_KEY = 'sidebarCollapsed';
 function toggleSidebar() {

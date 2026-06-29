@@ -56,6 +56,41 @@
         Has web GUI (link opens <code>http://&lt;host&gt;/</code>)
       </label>
     </div>
+    <div class="form-check mb-0">
+      <input class="form-check-input" type="checkbox" name="cbm_sync_enabled" value="1" id="cbm-sync-{{ action | replace('/', '_') }}"
+             {% if d and d.cbm_sync_enabled %}checked{% endif %}>
+      <label class="form-check-label small" for="cbm-sync-{{ action | replace('/', '_') }}">
+        Enable CBM read-only sync
+      </label>
+    </div>
+  </div>
+  <div class="col-12">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small mb-0">EBEM Username</label>
+        <input type="text" class="form-control form-control-sm" name="cbm_username"
+               value="{{ d.cbm_username or '' if d else '' }}" autocomplete="off">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">EBEM Password</label>
+        <input type="password" class="form-control form-control-sm" name="cbm_password"
+               placeholder="{% if d and d.cbm_password_encrypted %}Stored - leave blank to keep{% else %}Enter password{% endif %}"
+               autocomplete="new-password">
+      </div>
+      {% if d and d.cbm_password_encrypted %}
+      <div class="col-md-2">
+        <div class="form-check mb-1">
+          <input class="form-check-input" type="checkbox" name="clear_cbm_password" value="1" id="clear-cbm-{{ d.id }}">
+          <label class="form-check-label small" for="clear-cbm-{{ d.id }}">Clear stored password</label>
+        </div>
+      </div>
+      {% endif %}
+      <div class="col-md-4">
+        <div class="form-text mb-1">Credentials are stored encrypted and only used by the server for read-only EBEM polling.</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 d-flex align-items-center gap-3 flex-wrap">
     <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check2 me-1"></i>{{ submit_label }}</button>
     <span class="text-muted small">Host + Check Port enable the reachability badge. Inputs/Outputs for routing matrix.</span>
   </div>
@@ -67,6 +102,13 @@
   <a href="/devices/topology" class="btn btn-sm btn-outline-info ms-2">
     <i class="bi bi-diagram-3 me-1"></i>Topology
   </a>
+  {% if user.role == 'supervisor' %}
+  <form method="post" action="/devices/cbm/sync-active" class="ms-auto">
+    <button type="submit" class="btn btn-sm btn-outline-success">
+      <i class="bi bi-arrow-repeat me-1"></i>Sync Active CBMs
+    </button>
+  </form>
+  {% endif %}
   <span class="text-muted small ms-2" id="statusUpdated"></span>
 </div>
 
@@ -86,6 +128,7 @@
           <th>Host : Port</th>
           <th>Location</th>
           <th>Web GUI</th>
+          <th>CBM Sync</th>
           <th></th>
         </tr>
       </thead>
@@ -112,6 +155,30 @@
             <span class="text-muted small">—</span>
             {% endif %}
           </td>
+          <td>
+            {% if d.device_type == 'modem' and d.cbm_sync_enabled %}
+              {% if d.cbm_username and d.cbm_password_encrypted %}
+              <span class="badge bg-success">Ready</span>
+              {% else %}
+              <span class="badge bg-warning text-dark">Needs credentials</span>
+              {% endif %}
+              {% if d.cbm_last_sync_status %}
+              <div class="text-muted small">
+                {{ d.cbm_last_sync_status }}
+                {% if d.cbm_last_sync_at %} · {{ d.cbm_last_sync_at.strftime('%H:%M') }}{% endif %}
+              </div>
+              {% endif %}
+              {% if d.cbm_last_sync_error %}
+              <div class="text-danger small" title="{{ d.cbm_last_sync_error }}">
+                {{ d.cbm_last_sync_error[:60] }}{% if d.cbm_last_sync_error|length > 60 %}…{% endif %}
+              </div>
+              {% endif %}
+            {% elif d.device_type == 'modem' %}
+              <span class="text-muted small">Disabled</span>
+            {% else %}
+              <span class="text-muted small">—</span>
+            {% endif %}
+          </td>
           <td class="text-nowrap">
             {% if d.is_routing %}
             <a href="/devices/{{ d.id }}/routing" class="btn btn-sm btn-outline-info py-0 px-1" title="Routing matrix">
@@ -119,6 +186,13 @@
             </a>
             {% endif %}
             {% if user.role == 'supervisor' %}
+            {% if d.device_type == 'modem' %}
+            <form method="post" action="/devices/{{ d.id }}/cbm/test" class="d-inline">
+              <button type="submit" class="btn btn-sm btn-outline-success py-0 px-1" title="Test read-only CBM poll">
+                <i class="bi bi-plug"></i>
+              </button>
+            </form>
+            {% endif %}
             <button class="btn btn-sm btn-outline-secondary py-0 px-1" type="button"
                     data-bs-toggle="collapse" data-bs-target="#edit-{{ d.id }}" title="Edit">
               <i class="bi bi-pencil"></i>
@@ -132,13 +206,13 @@
         </tr>
         {% if user.role == 'supervisor' %}
         <tr class="collapse" id="edit-{{ d.id }}">
-          <td colspan="8" class="p-2 bg-body-tertiary">
+          <td colspan="9" class="p-2 bg-body-tertiary">
             {{ device_form(d, device_types, '/devices/' ~ d.id ~ '/update', 'Save') }}
           </td>
         </tr>
         {% endif %}
         {% else %}
-        <tr><td colspan="8" class="text-muted text-center py-3">No devices yet.</td></tr>
+        <tr><td colspan="9" class="text-muted text-center py-3">No devices yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
