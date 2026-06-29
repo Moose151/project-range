@@ -1,4 +1,5 @@
 from typing import Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -101,6 +102,72 @@ def _get_sources(db: Session) -> list[str]:
         if modem.name not in names:
             names.append(modem.name)
     return names
+
+
+def _source_key(value: str) -> str:
+    return "".join(ch for ch in value.lower() if ch.isalnum())
+
+
+def _cbm_source_device(db: Session, source: str, testing: bool) -> RFDevice | None:
+    name = source.strip()
+    if not name:
+        return None
+    key = _source_key(name)
+    devices = (
+        db.query(RFDevice)
+        .filter(RFDevice.is_active == True, RFDevice.device_type == "modem", RFDevice.is_testing == testing)
+        .order_by(RFDevice.name)
+        .all()
+    )
+    for device in devices:
+        if device.name == name or _source_key(device.name) == key:
+            return device
+    return None
+
+
+def _update_serial_package_signal_source(
+    db: Session,
+    serial: Serial | None,
+    signal_name: str,
+    source: str,
+    current_user: User,
+    testing: bool,
+) -> tuple[str | None, int]:
+    """Persist dashboard Source edits back to package signals for CBM mapping."""
+    if not serial:
+        return source.strip() or None, 0
+
+    source_name = source.strip()
+    cbm_device = _cbm_source_device(db, source_name, testing)
+    cbm_device_id = cbm_device.id if cbm_device else None
+    if cbm_device:
+        source_name = cbm_device.name
+
+    updated = 0
+    for link in serial.package_links:
+        for entry in link.package.signals:
+            if entry.signal_name != signal_name:
+                continue
+            previous = entry.source or ""
+            previous_device_id = entry.cbm_device_id
+            entry.source = source_name or None
+            entry.cbm_device_id = cbm_device_id
+            link.package.updated_at = datetime.utcnow()
+            updated += 1
+            if previous != (source_name or "") or previous_device_id != cbm_device_id:
+                db.add(AuditLog(
+                    user_id=current_user.id,
+                    action_type="PACKAGE_SIGNAL_SOURCE_UPDATE",
+                    entity_type="SignalPackageEntry",
+                    entity_id=entry.id,
+                    previous_value=previous,
+                    new_value=source_name or "",
+                    comment=(
+                        f"Dashboard source update for {signal_name} in serial {serial.display_title}. "
+                        f"CBM mapping {'set to device ' + str(cbm_device_id) if cbm_device_id else 'cleared or non-CBM source'}."
+                    ),
+                ))
+    return source_name or None, updated
 
 
 def _get_antennas(db: Session) -> list[str]:
@@ -340,6 +407,7 @@ async def dashboard_quick_update(
 ):
     range_state = get_current_range_state(db)
     testing = is_testing_state(db)
+    serial = None
     if serial_id is not None:
         serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
         if not serial:
@@ -403,6 +471,10 @@ async def dashboard_quick_update(
                         serial_id=serial_id,
                     ))
 
+    effective_source, package_sources_updated = _update_serial_package_signal_source(
+        db, serial, signal_name, source, current_user, testing,
+    )
+
     new_entry = SignalLog(
         operator_id=current_user.id,
         range_state=range_state,
@@ -421,7 +493,7 @@ async def dashboard_quick_update(
         power_unit=power_unit,
         eb_no=eb_no if eb_no is not None else (latest.eb_no if latest else None),
         engaged=latest.engaged if latest else False,
-        source=source or (latest.source if latest else None),
+        source=effective_source if source.strip() or package_sources_updated else (latest.source if latest else None),
         antenna=antenna or (latest.antenna if latest else None),
         notes=notes.strip() or None,
         entry_type="Dashboard",
@@ -444,6 +516,10 @@ async def dashboard_quick_update(
         entity_type="SignalLog",
         entity_id=new_entry.id,
         new_value=f"{signal_name}: {signal_status}",
+        comment=(
+            f"Dashboard Source applied to {package_sources_updated} package signal mapping(s): {effective_source or 'cleared'}"
+            if package_sources_updated else None
+        ),
     ))
     db.commit()
 

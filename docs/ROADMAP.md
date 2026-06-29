@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.17.11` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.17.14` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -17,7 +17,7 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.17.11)
+## ✅ Already delivered (through 0.17.14)
 
 Core of the MVP scope is in place:
 
@@ -49,6 +49,10 @@ Core of the MVP scope is in place:
 - CBM symbol-rate import/export conversion and imported package edit dropdown preservation
 - CBM Force Update issue details are written to audit logs and surfaced in dashboard toast messages
 - Imported package signals can be edited reliably and their CBM Source mapping corrected after import
+- CBM imports can capture package RF details before file selection, append configs into an existing package, and auto-calculate TxRF/RxRF from package LOs plus imported IF values
+- Package deletion is blocked with a clear error when a package is still assigned to any serial, preventing internal server errors and preserving serial history links
+- Dashboard Source edits on active serial signals now update the underlying package CBM source mapping as well as the displayed signal log row
+- Package/dashboard Source controls include an explicit **No modem assigned** state so CBM sync only follows the signal currently mapped to a real modem
 - **0.6.0:** TxLO/RxLO naming, version badge, fully offline (LAN) styling, Docker deploy on port 7474
 
 ---

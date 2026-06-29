@@ -17,6 +17,9 @@
 {% if toast %}
 <div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
 {% endif %}
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show py-2">{{ error }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
 
 {% if packages %}
 <div class="row g-3">
@@ -28,6 +31,9 @@
         <span class="fw-semibold">{{ pkg.name }}</span>
         <span class="badge bg-secondary ms-1">{{ pkg.signals | length }} signal{{ 's' if pkg.signals | length != 1 }}</span>
         <div class="ms-auto d-flex gap-1">
+          <a href="/packages/{{ pkg.id }}/import" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Import CBM config into this package">
+            <i class="bi bi-upload"></i>
+          </a>
           <a href="/packages/{{ pkg.id }}/export" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Export CBM config">
             <i class="bi bi-download"></i>
           </a>

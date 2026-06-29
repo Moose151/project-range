@@ -1,6 +1,7 @@
 import json
 import io
 import zipfile
+from urllib.parse import quote_plus
 from datetime import datetime
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
@@ -11,7 +12,7 @@ from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, is_testing_state
 from app.models import (
     User, Signal, SignalPackage, SignalPackageEntry,
-    ModulationType, FecType, SignalSource, AntennaType, AuditLog, RFDevice,
+    ModulationType, FecType, SignalSource, AntennaType, AuditLog, RFDevice, SerialPackage,
 )
 
 router = APIRouter(prefix="/packages")
@@ -395,6 +396,138 @@ def _cbm_entry_from_text(text: str, filename: str, display_order: int = 0) -> di
     }
 
 
+def _freq_to_mhz(value: float | None, unit: str | None) -> float | None:
+    if value is None:
+        return None
+    return value * 1000.0 if (unit or "MHz") == "GHz" else value
+
+
+def _round_freq(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return round(value, 6)
+
+
+def _package_rf_values(pkg: SignalPackage | None = None, form: dict | None = None) -> dict:
+    if pkg is not None:
+        return {
+            "tx_lo": pkg.tx_lo,
+            "rx_lo": pkg.rx_lo,
+            "ttf": pkg.ttf,
+            "ttf_direction": pkg.ttf_direction or "+",
+            "freq_unit": pkg.freq_unit or "MHz",
+        }
+    form = form or {}
+    return {
+        "tx_lo": _float_or_none(form.get("tx_lo")),
+        "rx_lo": _float_or_none(form.get("rx_lo")),
+        "ttf": _float_or_none(form.get("ttf")),
+        "ttf_direction": str(form.get("ttf_direction") or "+"),
+        "freq_unit": str(form.get("freq_unit") or "MHz"),
+    }
+
+
+def _apply_package_rf_to_entry(fields: dict, rf: dict) -> dict:
+    """Fill missing imported RF values from package LO/TTF settings.
+
+    CBM text exports normally provide IF values only. Store imported signal
+    frequencies in MHz so they remain directly comparable to modem reads.
+    """
+    unit = rf.get("freq_unit") or "MHz"
+    tx_lo = _freq_to_mhz(rf.get("tx_lo"), unit)
+    rx_lo = _freq_to_mhz(rf.get("rx_lo"), unit)
+    ttf = _freq_to_mhz(rf.get("ttf"), unit)
+    sign = -1 if rf.get("ttf_direction") == "-" else 1
+
+    tx_if = _freq_to_mhz(fields.get("tx_if"), fields.get("freq_unit") or "MHz")
+    tx_rf = _freq_to_mhz(fields.get("tx_rf"), fields.get("freq_unit") or "MHz")
+    rx_rf = _freq_to_mhz(fields.get("rx_rf"), fields.get("freq_unit") or "MHz")
+    rx_if = _freq_to_mhz(fields.get("rx_if"), fields.get("freq_unit") or "MHz")
+
+    if tx_rf is None and tx_if is not None and tx_lo is not None:
+        tx_rf = tx_if + tx_lo
+    if rx_rf is None and rx_if is not None and rx_lo is not None:
+        rx_rf = rx_if + rx_lo
+    if rx_rf is None and tx_rf is not None and ttf is not None:
+        rx_rf = tx_rf + sign * ttf
+    if tx_rf is None and rx_rf is not None and ttf is not None:
+        tx_rf = rx_rf - sign * ttf
+    if tx_if is None and tx_rf is not None and tx_lo is not None:
+        tx_if = tx_rf - tx_lo
+    if rx_if is None and rx_rf is not None and rx_lo is not None:
+        rx_if = rx_rf - rx_lo
+
+    fields.update({
+        "tx_if": _round_freq(tx_if),
+        "tx_rf": _round_freq(tx_rf),
+        "rx_rf": _round_freq(rx_rf),
+        "rx_if": _round_freq(rx_if),
+        "freq_unit": "MHz",
+    })
+    return fields
+
+
+async def _uploaded_signal_files(request: Request) -> list[tuple[str, bytes]]:
+    form = await request.form()
+    uploads = [item for _, item in form.multi_items() if hasattr(item, "filename") and item.filename]
+    if not uploads:
+        raise ValueError("Select at least one CBM .txt, .zip, or legacy Project Range .json file.")
+
+    files: list[tuple[str, bytes]] = []
+    for upload in uploads:
+        content = await upload.read()
+        if zipfile.is_zipfile(io.BytesIO(content)):
+            with zipfile.ZipFile(io.BytesIO(content)) as zf:
+                for name in zf.namelist():
+                    if name.endswith("/") or name.rsplit("/", 1)[-1].startswith("."):
+                        continue
+                    if name.lower().endswith((".txt", ".cfg", ".conf")):
+                        files.append((name, zf.read(name)))
+        else:
+            files.append((upload.filename, content))
+    return files
+
+
+def _entries_from_uploaded_files(files: list[tuple[str, bytes]], display_offset: int = 0) -> list[dict]:
+    entries = []
+    for i, (filename, content) in enumerate(files):
+        if filename.lower().endswith(".json"):
+            data = json.loads(content.decode("utf-8-sig"))
+            if not isinstance(data, dict) or "signals" not in data:
+                raise ValueError("JSON file must be a Project Range package object with a 'signals' list.")
+            for fields in _dict_to_entries(data):
+                fields["display_order"] = display_offset + len(entries)
+                entries.append(fields)
+            continue
+        text = content.decode("utf-8-sig", errors="replace")
+        entries.append(_cbm_entry_from_text(text, filename, display_order=display_offset + len(entries)))
+    if not entries:
+        raise ValueError("No CBM config text files were found to import.")
+    return entries
+
+
+def _add_imported_entries_to_package(
+    pkg: SignalPackage,
+    entries: list[dict],
+    db: Session,
+    testing: bool,
+    rf: dict | None = None,
+) -> int:
+    count = 0
+    rf = rf or _package_rf_values(pkg=pkg)
+    for fields in entries:
+        if not fields["signal_name"]:
+            continue
+        _apply_package_rf_to_entry(fields, rf)
+        device = _cbm_source_device(db, fields.get("source") or "", testing)
+        if device:
+            fields["source"] = device.name
+            fields["cbm_device_id"] = device.id
+        db.add(SignalPackageEntry(package_id=pkg.id, **fields))
+        count += 1
+    return count
+
+
 def _cbm_text_from_entry(entry: SignalPackageEntry) -> str:
     values = dict(CBM_DEFAULTS)
     values.update({
@@ -437,6 +570,7 @@ async def packages_list(
         "range_state": get_current_range_state(db),
         "packages": packages,
         "toast": request.query_params.get("toast", ""),
+        "error": request.query_params.get("error", ""),
         "page": "packages",
     })
 
@@ -775,11 +909,31 @@ async def package_delete(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    testing = is_testing_state(db)
     pkg = db.query(SignalPackage).filter(
         SignalPackage.id == pkg_id,
-        SignalPackage.is_testing == is_testing_state(db),
+        SignalPackage.is_testing == testing,
     ).first()
     if pkg:
+        links = (
+            db.query(SerialPackage)
+            .filter(SerialPackage.package_id == pkg_id)
+            .all()
+        )
+        if links:
+            titles = [link.serial.display_title for link in links[:3] if link.serial and link.serial.is_testing == testing]
+            suffix = f" ({', '.join(titles)}" + (", ..." if len(links) > 3 else "") + ")" if titles else ""
+            message = f"Cannot delete '{pkg.name}' because it is assigned to {len(links)} serial(s){suffix}. Remove it from those serials or keep the package for history."
+            db.add(AuditLog(
+                user_id=current_user.id,
+                action_type="PACKAGE_DELETE_BLOCKED",
+                entity_type="SignalPackage",
+                entity_id=pkg_id,
+                new_value=pkg.name,
+                comment=message,
+            ))
+            db.commit()
+            return RedirectResponse(f"/packages?error={quote_plus(message)}", status_code=302)
         db.delete(pkg)
         db.add(AuditLog(user_id=current_user.id, action_type="PACKAGE_DELETE",
                         entity_type="SignalPackage", entity_id=pkg_id, new_value=pkg.name))
@@ -836,7 +990,9 @@ async def package_import_page(
         "user": current_user,
         "range_state": get_current_range_state(db),
         "page": "packages",
+        "package": None,
         "error": None,
+        **_dropdown_lists(db),
     })
 
 
@@ -844,64 +1000,48 @@ async def package_import_page(
 async def package_import_submit(
     request: Request,
     package_name: str = Form(""),
+    description: str = Form(""),
+    band: str = Form(""),
+    antenna: str = Form(""),
+    tx_lo: Optional[float] = Form(None),
+    rx_lo: Optional[float] = Form(None),
+    ttf: Optional[float] = Form(None),
+    ttf_direction: str = Form("+"),
+    freq_unit: str = Form("MHz"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     error = None
     try:
-        form = await request.form()
-        uploads = [item for _, item in form.multi_items() if hasattr(item, "filename") and item.filename]
-        if not uploads:
-            raise ValueError("Select at least one CBM .txt, .zip, or legacy Project Range .json file.")
-
-        files: list[tuple[str, bytes]] = []
-        for upload in uploads:
-            content = await upload.read()
-            if zipfile.is_zipfile(io.BytesIO(content)):
-                with zipfile.ZipFile(io.BytesIO(content)) as zf:
-                    for name in zf.namelist():
-                        if name.endswith("/") or name.rsplit("/", 1)[-1].startswith("."):
-                            continue
-                        if name.lower().endswith((".txt", ".cfg", ".conf")):
-                            files.append((name, zf.read(name)))
-            else:
-                files.append((upload.filename, content))
-
+        files = await _uploaded_signal_files(request)
         if len(files) == 1 and files[0][0].lower().endswith(".json"):
             data = json.loads(files[0][1].decode("utf-8-sig"))
             if not isinstance(data, dict) or "signals" not in data:
                 raise ValueError("JSON file must be a Project Range package object with a 'signals' list.")
             return _import_json_package(data, files[0][0], db, current_user)
 
-        entries = []
-        for i, (filename, content) in enumerate(files):
-            if filename.lower().endswith(".json"):
-                continue
-            text = content.decode("utf-8-sig", errors="replace")
-            entries.append(_cbm_entry_from_text(text, filename, display_order=i))
-        if not entries:
-            raise ValueError("No CBM config text files were found to import.")
+        entries = _entries_from_uploaded_files(files)
 
         pkg_name = package_name.strip()
         if not pkg_name:
             pkg_name = entries[0]["signal_name"] if len(entries) == 1 else f"CBM Import {datetime.utcnow().strftime('%Y%m%d %H%MZ')}"
         pkg = SignalPackage(
             name=pkg_name,
-            description="Imported from CBM-400 signal configuration file(s).",
-            freq_unit="MHz",
+            description=description.strip() or "Imported from CBM-400 signal configuration file(s).",
+            band=band or None,
+            antenna=antenna.strip() or None,
+            tx_lo=tx_lo,
+            rx_lo=rx_lo,
+            ttf=ttf,
+            ttf_direction=ttf_direction or "+",
+            freq_unit=freq_unit or "MHz",
             created_by_id=current_user.id,
             is_testing=is_testing_state(db),
         )
         db.add(pkg)
         db.flush()
         testing = is_testing_state(db)
-        for fields in entries:
-            if fields["signal_name"]:
-                device = _cbm_source_device(db, fields.get("source") or "", testing)
-                if device:
-                    fields["source"] = device.name
-                    fields["cbm_device_id"] = device.id
-                db.add(SignalPackageEntry(package_id=pkg.id, **fields))
+        _add_imported_entries_to_package(pkg, entries, db, testing, _package_rf_values(pkg=pkg))
         db.add(AuditLog(user_id=current_user.id, action_type="PACKAGE_IMPORT",
                         entity_type="SignalPackage", entity_id=pkg.id, new_value=pkg.name))
         db.commit()
@@ -913,8 +1053,76 @@ async def package_import_submit(
         "user": current_user,
         "range_state": get_current_range_state(db),
         "page": "packages",
+        "package": None,
         "error": error,
+        **_dropdown_lists(db),
     })
+
+
+@router.get("/{pkg_id:int}/import", response_class=HTMLResponse)
+async def package_import_existing_page(
+    pkg_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    pkg = db.query(SignalPackage).filter(
+        SignalPackage.id == pkg_id,
+        SignalPackage.is_testing == is_testing_state(db),
+    ).first()
+    if not pkg:
+        return RedirectResponse("/packages", status_code=302)
+    return templates.TemplateResponse(request, "package_import.html", {
+        "user": current_user,
+        "range_state": get_current_range_state(db),
+        "page": "packages",
+        "package": pkg,
+        "error": None,
+        **_dropdown_lists(db),
+    })
+
+
+@router.post("/{pkg_id:int}/import")
+async def package_import_existing_submit(
+    pkg_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    testing = is_testing_state(db)
+    pkg = db.query(SignalPackage).filter(
+        SignalPackage.id == pkg_id,
+        SignalPackage.is_testing == testing,
+    ).first()
+    if not pkg:
+        return RedirectResponse("/packages", status_code=302)
+
+    try:
+        files = await _uploaded_signal_files(request)
+        entries = _entries_from_uploaded_files(files, display_offset=len(pkg.signals))
+        imported = _add_imported_entries_to_package(pkg, entries, db, testing, _package_rf_values(pkg=pkg))
+        if imported == 0:
+            raise ValueError("No named signals were found to import.")
+        pkg.updated_at = datetime.utcnow()
+        db.add(AuditLog(
+            user_id=current_user.id,
+            action_type="PACKAGE_IMPORT_SIGNALS",
+            entity_type="SignalPackage",
+            entity_id=pkg.id,
+            new_value=f"{imported} signal(s) imported into {pkg.name}",
+        ))
+        db.commit()
+        return RedirectResponse(f"/packages/{pkg.id}?toast={imported}+signal(s)+imported", status_code=302)
+    except Exception as e:
+        db.rollback()
+        return templates.TemplateResponse(request, "package_import.html", {
+            "user": current_user,
+            "range_state": get_current_range_state(db),
+            "page": "packages",
+            "package": pkg,
+            "error": str(e),
+            **_dropdown_lists(db),
+        })
 
 
 def _import_json_package(data: dict, filename: str, db: Session, current_user: User):

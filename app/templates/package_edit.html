@@ -9,6 +9,9 @@
   </h4>
   <div class="ms-auto d-flex gap-2">
     {% if package %}
+    <a href="/packages/{{ package.id }}/import" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-upload me-1"></i>Import CBM
+    </a>
     <a href="/packages/{{ package.id }}/export" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-download me-1"></i>Export CBM
     </a>
@@ -190,7 +193,7 @@
               <td class="small">{{ entry.inner_code or '—' }}</td>
               <td class="small">{{ entry.symbol_rate or '—' }}</td>
               <td class="small">{% if entry.power is not none %}{{ entry.power }} {{ entry.power_unit }}{% else %}—{% endif %}</td>
-              <td class="small text-muted">{{ entry.source or (entry.cbm_device.name if entry.cbm_device else '—') }}</td>
+              <td class="small text-muted">{{ entry.source or (entry.cbm_device.name if entry.cbm_device else 'No modem assigned') }}</td>
               <td class="small text-muted">{{ entry.cbm_path or '—' }}</td>
               <td class="text-nowrap">
                 <button type="button" class="btn btn-xs btn-outline-secondary btn-sm py-0 px-1"
@@ -305,9 +308,10 @@
             <div class="col-sm-8">
               <label class="form-label small">Source</label>
               <select class="form-select form-select-sm" name="source" id="f_source">
-                <option value="">—</option>
+                <option value="">No modem assigned</option>
                 {% for s in signal_sources %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
               </select>
+              <div class="form-text small">Leave unassigned until this signal is ready to be linked to a CBM.</div>
             </div>
             <div class="col-sm-4">
               <label class="form-label small">CBM Path</label>

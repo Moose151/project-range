@@ -64,7 +64,7 @@
         </button>
       </td>
       <td data-col="signal" class="fw-semibold"><a href="/logs?signal_name={{ log.signal_name }}" class="text-reset text-decoration-none" title="View history for {{ log.signal_name }}">{{ log.signal_name }}</a></td>
-      <td data-col="source" class="text-muted small">{{ log.source or '—' }}</td>
+      <td data-col="source" class="text-muted small">{{ log.source or 'No modem assigned' }}</td>
       <td data-col="status" style="min-width:150px">
         <div class="d-flex align-items-center gap-2">
           <div class="form-check form-switch mb-0" title="Toggle Up / Down">
@@ -152,8 +152,11 @@
               <div>
                 <label class="form-label small mb-1">Source</label>
                 <select class="form-select form-select-sm" name="source" style="width:120px">
-                  <option value="">—</option>
+                  <option value="">No modem assigned</option>
                   {% if signal_sources is defined %}
+                  {% if log.source and log.source not in signal_sources %}
+                  <option value="{{ log.source }}" selected>{{ log.source }}</option>
+                  {% endif %}
                   {% for src in signal_sources %}
                   <option value="{{ src }}" {% if log.source == src %}selected{% endif %}>{{ src }}</option>
                   {% endfor %}

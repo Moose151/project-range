@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.17.11` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.17.14` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -170,6 +170,19 @@
   - Package signal edit buttons now store imported row data in a safe `data-entry` payload instead of brittle inline JSON, fixing imported signals that could not be opened for editing.
   - When a package signal Source matches a CBM modem using punctuation-insensitive matching (`CBM400_2` vs `CBM-400-2`), saving the signal now stores the canonical modem Source name and updates the internal `cbm_device_id` mapping.
   - This allows operators to correct imported signals that mapped to the wrong CBM by editing the signal Source and saving.
+- **0.17.12 — Package import RF setup/append + delete guard:**
+  - New package CBM import now captures the package details first, including band, antenna, TxLO, RxLO, TTF direction/value, and frequency unit, then imports the selected CBM text/zip files.
+  - Imported CBM signals that only contain IF frequencies now auto-fill TxRF/RxRF from the package LOs and imported TxIF/RxIF values. Imported signal frequencies are stored in MHz to match modem reads.
+  - Existing packages now have **Import CBM** actions on the package list and package edit page, allowing operators to append CBM signal configs into an already-created package using that package's RF setup.
+  - Package deletion now checks serial assignments first. If any serial still references the package, the app shows a clear error and writes `PACKAGE_DELETE_BLOCKED` to audit instead of throwing an internal server error.
+- **0.17.13 — Dashboard Source edits update package CBM mapping:**
+  - Dashboard quick-edit Source changes now persist back to the matching signal package entry/entries for that active serial, including canonical CBM modem matching and `cbm_device_id` updates.
+  - The dashboard Source dropdown preserves existing source values that are not currently in App Config, preventing accidental blanking when editing imported or legacy source names.
+  - Dashboard updates write an audit comment when a Source change is applied back to package mappings.
+- **0.17.14 — Explicit unassigned CBM source option:**
+  - Package signal Source and dashboard quick-edit Source now show **No modem assigned** as the blank/default state, so operators no longer need to create a fake `nil` Source.
+  - Selecting **No modem assigned** clears the package signal Source and internal `cbm_device_id`. CBM sync intentionally ignores these entries, so only the signal currently mapped to a real CBM is updated from that modem.
+  - Operators can assign a CBM Source from the dashboard when a signal is ready to go Up; that Source change persists back to the package mapping from 0.17.13.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.

@@ -1,10 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Import Signal Package{% endblock %}
+{% block title %}{% if package %}Import Signals: {{ package.name }}{% else %}Import Signal Package{% endif %}{% endblock %}
 
 {% block content %}
 <div class="d-flex align-items-center mb-3 gap-2">
-  <h4 class="mb-0"><i class="bi bi-upload me-2"></i>Import Signal Package</h4>
-  <a href="/packages" class="btn btn-sm btn-outline-secondary ms-auto">
+  <h4 class="mb-0">
+    <i class="bi bi-upload me-2"></i>
+    {% if package %}Import Signals: {{ package.name }}{% else %}Import Signal Package{% endif %}
+  </h4>
+  <a href="{% if package %}/packages/{{ package.id }}{% else %}/packages{% endif %}" class="btn btn-sm btn-outline-secondary ms-auto">
     <i class="bi bi-arrow-left me-1"></i>Back
   </a>
 </div>
@@ -14,26 +17,90 @@
 {% endif %}
 
 <div class="row justify-content-center">
-  <div class="col-lg-7">
+  <div class="col-lg-8">
     <div class="card border-secondary">
-      <div class="card-header">Upload CBM-400 Config File(s)</div>
+      <div class="card-header">{% if package %}Existing Package RF Details{% else %}Package Details{% endif %}</div>
       <div class="card-body">
-        <form method="post" action="/packages/import" enctype="multipart/form-data">
+        <form method="post" action="{% if package %}/packages/{{ package.id }}/import{% else %}/packages/import{% endif %}" enctype="multipart/form-data">
+          {% if package %}
+          <div class="alert alert-secondary py-2 small mb-3">
+            <i class="bi bi-calculator me-1"></i>
+            Imported CBM signals use this package RF setup:
+            TxLO {{ package.tx_lo if package.tx_lo is not none else '—' }},
+            RxLO {{ package.rx_lo if package.rx_lo is not none else '—' }},
+            TTF {{ package.ttf_direction or '+' }}{{ package.ttf if package.ttf is not none else '—' }}
+            {{ package.freq_unit or 'MHz' }}.
+          </div>
+          {% else %}
           <div class="mb-3">
-            <label class="form-label">Package name (optional)</label>
+            <label class="form-label">Package Name</label>
             <input type="text" class="form-control" name="package_name"
                    placeholder="Defaults to signal name, or CBM Import timestamp for multiple files">
           </div>
+          <div class="mb-3">
+            <label class="form-label">Description <span class="text-muted small">(optional)</span></label>
+            <textarea class="form-control" name="description" rows="2">Imported from CBM-400 signal configuration file(s).</textarea>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-sm-6">
+              <label class="form-label small">Band</label>
+              <select class="form-select form-select-sm" name="band">
+                <option value="">—</option>
+                {% for b in bands %}
+                <option value="{{ b }}">{{ b }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small">Freq Unit</label>
+              <select class="form-select form-select-sm" name="freq_unit">
+                {% for u in freq_units %}
+                <option value="{{ u }}" {% if u == 'MHz' %}selected{% endif %}>{{ u }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small">TxLO</label>
+              <input type="number" class="form-control form-control-sm" name="tx_lo" step="any" placeholder="e.g. 9750">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small">RxLO</label>
+              <input type="number" class="form-control form-control-sm" name="rx_lo" step="any" placeholder="e.g. 10750">
+            </div>
+            <div class="col-sm-12">
+              <label class="form-label small">TTF</label>
+              <div class="input-group input-group-sm">
+                <select class="form-select" name="ttf_direction" style="max-width:64px">
+                  <option value="+" selected>+</option>
+                  <option value="-">−</option>
+                </select>
+                <input type="number" class="form-control" name="ttf" step="any" placeholder="TTF">
+              </div>
+            </div>
+            <div class="col-sm-12">
+              <label class="form-label small">Antenna</label>
+              <select class="form-select form-select-sm" name="antenna">
+                <option value="">—</option>
+                {% for a in antenna_types %}
+                <option value="{{ a }}">{{ a }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          {% endif %}
+
+          <hr class="border-secondary my-3">
           <div class="mb-3">
             <label class="form-label">Select CBM .txt file(s), a .zip of CBM configs, or legacy Project Range .json</label>
             <input type="file" class="form-control" name="files"
                    accept=".txt,.cfg,.conf,.zip,.json,text/plain,application/json,application/zip" multiple required>
             <div class="form-text">
               CBM imports use the modem's <code>STR_CFG</code> text export. Extra modem fields are ignored.
+              If TxRF/RxRF are not in the import, Project Range calculates them from the package LOs and imported IF values.
             </div>
           </div>
           <button type="submit" class="btn btn-primary">
-            <i class="bi bi-upload me-1"></i>Import Package
+            <i class="bi bi-upload me-1"></i>{% if package %}Import Signals{% else %}Import Package{% endif %}
           </button>
         </form>
       </div>
@@ -45,15 +112,16 @@
         <p class="text-muted small mb-2">
           The signal name comes from the filename. Project Range reads:
         </p>
-        <pre class="text-muted small mb-0" style="white-space:pre-wrap">TXIF_FRQ → TxIF MHz
-RXIF_FRQ → RxIF MHz
-TXIF_LVL → Power dBm
-TX_MOD/RX_MOD → Modulation
-TX_SMOP/RX_SMOP → Inner Code
-TX_SR/RX_SR → Symbol rate in kbps/ksps display units
-TX_CODE/RX_CODE → FEC rate
-CFG_NAME → Source
-TX_OP/RX_OP/ITA_ENGAGE → Notes only</pre>
+        <pre class="text-muted small mb-0" style="white-space:pre-wrap">TXIF_FRQ -> TxIF MHz
+RXIF_FRQ -> RxIF MHz
+Package TxLO/RxLO + imported IF values -> TxRF/RxRF MHz
+TXIF_LVL -> Power dBm
+TX_MOD/RX_MOD -> Modulation
+TX_SMOP/RX_SMOP -> Inner Code
+TX_SR/RX_SR -> Symbol rate in kbps/ksps display units
+TX_CODE/RX_CODE -> FEC rate
+CFG_NAME -> Source
+TX_OP/RX_OP/ITA_ENGAGE -> Notes only</pre>
       </div>
     </div>
   </div>
