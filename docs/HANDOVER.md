@@ -5,14 +5,15 @@
 
 ---
 
-## ⚑ Current Status & Handover — 2026-06-26 (READ THIS FIRST)
+## ⚑ Current Status & Handover — 2026-06-29 (READ THIS FIRST)
 
 > The detailed sections **below this block predate a large body of work** and are
-> partially stale (e.g. port, model/router lists, "dark only"). For *planned* work
+> partially stale (e.g. port, model/router lists, "dark only", **top navbar** —
+> the navbar has since been replaced by a left sidebar). For *planned* work
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.11.0` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.15.0` (single source: `app/config.py` `APP_VERSION`, shown bottom-right in UI).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -60,10 +61,31 @@
   - **Clock widgets:** multiple extra clock widgets can be added, each selectable as Zulu + local, Zulu only, or local only. The original combined clock remains hideable/showable.
   - **Quick Links** widget: compact shortcuts for New Log, Note, Serials, Range State, Incidents, and Handover.
   - Utility widgets reuse the dashboard widget container: drag reorder, collapse, remove, and layout persistence.
+- **0.12.0 — CDA (Controlled Data Area) windows:** Named CDA tables hold daily-recurring Zulu time windows; each window has `start_zulu`/`end_zulu` (`HH:MM`), an optional label, and an optional `max_power_dbm` (null = **No Fire**, value = **Reduced Power**). Many-to-many assignment of CDA tables to serials. Dashboard CDA widget shows the schedule plus a per-table **live countdown** (updated every second, colour-coded by proximity; flips to red "in window" while inside one; handles midnight-spanning + next-day wrap). New models `CDATable`, `CDAWindow`, `SerialCDATable` (`models.py`); router `cda.py`; templates `cda_tables.html`, `cda_table_edit.html`; nav "CDA". Tables auto-create via `create_all`.
+  - **24-hour time only** (no AM/PM): window time inputs are `type="text"` with JS auto-format — type `HHMM` (4 digits) and a colon is inserted; server normalises `HHMM`/`HH:MM` via `_parse_zulu_time`.
+  - **CSV import/export:** per-table `GET /cda/{id}/export.csv` (opens in Excel/LibreOffice) and supervisor `POST /cda/{id}/import` (additive/non-destructive, handles Excel BOM via `utf-8-sig`).
+- **Login tiling bug fix:** the login `<body>` was a Bootstrap flex container, so browsers treated `<script>`/other children as flex items → duplicated/tiled login fields. Fixed by moving the centring flex onto an inner wrapper `<div>`; `<body>` keeps only `class="bg-body"`.
+- **0.13.0 — Complete UI overhaul (navigation + dashboard):**
+  - **Left sidebar replaces the top navbar.** Collapsible (hamburger in a slim top bar), icon-only when collapsed on desktop, fixed overlay + backdrop on mobile; state persisted in localStorage (`sidebarCollapsed`). Sections: Dashboard · Operations · Resources · Calculators · Records · Admin (supervisor-only). Top bar also has a persistent **Back** button and the light/dark toggle. The old overlapping Settings/Admin dropdowns are gone — links live in coherent sidebar sections; user name + Password + Logout sit in the sidebar footer.
+  - **Dashboard is a 2-column CSS grid** (`.widget-grid`), not a single column — widgets can sit **side by side**. Every widget header has a **span toggle** (half ↔ full width, `.span-1`), persisted in the layout. Drag-reorder / tab-merge / collapse all still work.
+  - **Hardcoded summary cards removed** (Range State, Active Signals, Faulted, Last State Change). **Faulted is gone entirely.** Active-signals **Up count** now lives in the range-state banner (HTMX `GET /status/active-count`, refreshed each poll via OOB swap). Range State, Active Signals, and Last State Change are now **optional dashboard widgets**.
+  - **New calculator widgets** (client-side, in `app.js`): **Basic Calculator** (full numpad), **RF Frequency**, **Power Converter**. Calculator sidebar links highlight per-calc via a new `page_name` (`rf`/`power`/`eirp`/`basic`) added to `calculator.py`.
+  - Files: `base.html` (rewritten), `app/static/css/app.css` (sidebar + grid + calc styles), `app/static/js/app.js` (sidebar toggle, span toggle, calc widgets), `dashboard.html`, `partials/dashboard_fragment.html` (OOB now updates banner Up count). `partials/dashboard_summary.html` is now unused/dead.
+- **app.js cache-busting fix + Basic Calculator page:** `base.html` loaded `app.js` with **no version query string**, so browsers served the stale pre-overhaul copy → the sidebar-collapse and span-toggle buttons silently did nothing. Now pinned (`app.js?v=14`, `app.css?v=14`); **bump these on any future JS/CSS change.** Also added a standalone `GET /calculator/basic` page (reuses the widget's calculator logic) and a Basic Calculator link in the sidebar Calculators section. *(A one-time hard refresh clears any stale tab.)*
+- **0.14.0 — Safety Supervisor (read-only) role + range-wide CEASE alert:**
+  - **New `Role.SAFETY_SUPERVISOR`** (value `safety_supervisor`) — a **read-only** account. Enforced centrally in `main.py` `security_middleware`: all non-safe HTTP methods are blocked for these users, except an allow-list (`SAFETY_SUPERVISOR_ALLOWED_WRITES`). **Middleware ordering changed:** `SessionMiddleware` is now added **last** so it is outermost and `request.session` is populated before the read-only check runs. Users admin shows the role with a distinct red badge + explanatory note.
+  - **CEASE:** a big red pulsing **CEASE** button pinned to the bottom of the sidebar, on every screen, pressable by **any** user (incl. Safety Supervisor). Pressing it requires a **reason** (logged). A full-screen red **CEASE splash** then appears on every connected screen showing who/when/why, with a **Dismiss** any user can press. New model `CeaseEvent`; router `cease.py` with `GET /cease/state` (JSON), `POST /cease/raise`, `POST /cease/dismiss`. Driven by a 3-second JSON poll in `app.js` that rebuilds the overlay only when the active event id changes (no flicker). Both raise and dismiss are audit-logged. **Note:** CEASE is a visual/logged "all-stop" alert only — it does **not** change range state or stop hardware (possible future enhancement).
+- **0.15.0 — Configurable duty-role tags (visual position indicator):**
+  - A **duty-role tag** is a coloured badge showing what position a user is filling right now (e.g. Operator, Supervisor, EA Safety). **Separate from the permission role; grants no access.**
+  - New admin-managed **`DutyRole`** list (Admin → Config → **Duty Roles** tab): add / rename / recolour (colour picker) / enable-disable / drag-reorder / delete, with full CRUD in `config.py`. Renaming or recolouring **propagates** to anyone currently wearing the tag; deleting clears it from them.
+  - Users **self-select** their current role on `/preferences` (dedicated `POST /preferences/duty-role`). The chosen **name + colour are denormalised** onto `User.duty_role` / `User.duty_role_color` so the badge renders anywhere without a lookup. Shown in the **sidebar footer** (own) and a new **Duty Role column** in the Users admin list (the existing permission column is relabelled **"Account"**).
+  - Read-only Safety Supervisors **may** set their own tag (personal display setting — `/preferences/duty-role` is in the middleware allow-list); all other writes stay blocked.
+  - Seeded defaults: Operator, Supervisor, EA Safety, Observer. Additive migration adds `users.duty_role` + `users.duty_role_color`; `duty_roles` table auto-creates.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with operator feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.
-2. **Dashboard widget browser QA** — 0.10.0/0.11.0 dashboard widgets were verified at compile/template level only. Needs a browser pass for drag/order persistence, hide/show/remove, docs rendering, note download, and timezone rendering.
+2. **Browser QA of the UI overhaul + new features (0.12.0–0.15.0)** — all verified at compile/template + endpoint level (and CEASE/duty-role flows curl-tested end-to-end), but **not click-tested in a real browser**. Needs a pass over: sidebar collapse/expand + mobile overlay; dashboard grid side-by-side + span toggle persistence; new optional widgets (Range State, Active Signals, Last State Change) + calculator widgets; CDA countdown colour transitions; the CEASE splash appearing/dismissing across two sessions; duty-role badge rendering and colour contrast.
+3. **Possible CEASE enhancement** — currently CEASE is a visual/logged all-stop alert only. The user may later want it to also force the range to Standby / record against the range-state log. Not requested yet; confirm before building.
 
 ### Also pending (from ROADMAP)
 - **Deferred infra (user's call):** HTTPS/TLS, PostgreSQL (+ Alembic). Cookies are TLS-ready (`SESSION_HTTPS_ONLY=1`).
@@ -71,7 +93,13 @@
 
 ### Model/template changes the next assistant needs to know
 - **`AppSetting`** — new key/value table in `models.py`; `init_db.py` seeds `local_timezone=UTC`. Do not make timezone per-user unless the requirement changes.
-- **Settings area** — visible Settings dropdown is shipped in `base.html` (Preferences, Password, supervisor Admin Config). A dedicated tabbed `/settings` page is still optional if the nav dropdown is not enough.
+- **Navigation is a LEFT SIDEBAR now**, not a top navbar (since 0.13.0). The old `base.html` navbar/Settings/Admin dropdowns are gone. New nav links go in the sidebar sections in `base.html`; per-calc highlight uses `page` + `page_name`.
+- **`Role` enum has THREE values:** `operator`, `supervisor`, `safety_supervisor` (read-only). Read-only is enforced in `main.py` `security_middleware` (blocks non-safe methods; allow-list `SAFETY_SUPERVISOR_ALLOWED_WRITES`). `SessionMiddleware` must stay **added last** (outermost) or `request.session` is empty in that check.
+- **New models since 0.11.0:** `CDATable`, `CDAWindow`, `SerialCDATable` (CDA); `CeaseEvent` (CEASE); `DutyRole` + `User.duty_role`/`User.duty_role_color` (duty tags). All tables auto-create via `create_all`; the two `users` columns are additive migrations in `init_db.py`.
+- **New routers:** `cda.py`, `cease.py` (both registered in `main.py`). Duty-role CRUD lives in `config.py`; duty-role self-set in `preferences.py`.
+- **Static cache-busting is mandatory:** `base.html` references `app.css?v=N` and `app.js?v=N` (currently **14**). **Bump N on every CSS/JS change** — without it, browsers serve a stale file and new JS handlers silently break (this exact bug hit the 0.13.0 sidebar/span buttons).
+- **`partials/dashboard_summary.html` is now dead code** (the hardcoded summary row was removed in 0.13.0). Safe to delete; left in place for now.
+- **Settings area** — now reached via the sidebar (user footer → Preferences/Password; supervisor → Admin → App Config). The old Settings dropdown is gone.
 - **`DeviceLink` and `RFDevice` new columns are fully implemented** — `device_model`, `has_web_gui`, and the `device_links` table are all in place. Device type list now includes `antenna`. No further migration needed for those.
 
 ### Caveats / verification gaps
@@ -79,9 +107,13 @@
 - Login throttle is **in-memory** (per-process) — fine for single-container; revisit if multiple workers/HA.
 - Topology SVG diagram is rendered entirely client-side in vanilla JS from embedded JSON — positions are auto-calculated by device type layer. No layout persistence; positions reset on page load. Works well for small topologies (< ~20 devices).
 - The "Serial created before confirmation" DB artefact still exists: if an operator clicks "Create & Start", the serial is committed before the confirmation page, so abandoning that page leaves an `is_started=False` serial in the DB. This is now less of a concern since pending serials are a first-class feature — the operator can just delete it from the Pending list. But worth knowing.
+- **CEASE / duty-role propagation are eventually-consistent via polling/DB**, not push: the CEASE splash appears on other screens within the **3-second poll** interval; fine for a single container, revisit if you ever run multiple workers behind a load balancer with sticky-less sessions.
+- **Duty-role badge** uses white text on the configured colour with a text-shadow — very light colours read poorly. Admins should pick mid/dark colours, or a future tweak could auto-pick text colour by luminance.
+- **Read-only Safety Supervisor** is enforced by HTTP method + path allow-list, not per-endpoint. If you add a new write action a Safety Supervisor *should* be able to do (like the duty-role tag), add its exact path to `SAFETY_SUPERVISOR_ALLOWED_WRITES` in `main.py`.
 
 ### Working conventions
 - Each milestone: implement → **build+boot+smoke-test in Docker** → bump `APP_VERSION` in `app/config.py` → tick ROADMAP.md → **commit + push to `main`** (user pulls onto the range server directly; they prefer no PRs/branches — commit straight to `main`).
+- **Bump the `?v=N` cache key on `app.css`/`app.js` in `base.html` whenever you touch either file** — browsers cache them aggressively and a stale JS file silently breaks new handlers.
 - Keep everything **offline-capable** (no CDNs at all). Keep `docker-entrypoint.sh` LF.
 - `init_db.py` migration pattern: new columns use `ALTER TABLE ADD COLUMN` in try/except (silent if already exists); renames use the `_rename_column()` helper that checks existing columns first.
 
