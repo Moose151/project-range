@@ -31,9 +31,9 @@ SESSION_TIMEOUT_MINUTES = int(os.environ.get("SESSION_TIMEOUT_MINUTES", "480"))
 # inactivity (enforced server-side); "remember this terminal" sessions skip that
 # inactivity check and persist up to this cookie lifetime.
 SESSION_MAX_AGE_DAYS = int(os.environ.get("SESSION_MAX_AGE_DAYS", "30"))
-# Single source of truth for the app version (shown bottom-right in the UI and
+# Single source of truth for the app version (shown in the top-right UI and
 # reported as the FastAPI app version). Bump on each release.
-APP_VERSION = "0.17.3"
+APP_VERSION = "0.17.4"
 
 FREQUENCY_BANDS = {
     "C":  {"tx_min": 5.850, "tx_max": 6.725, "rx_min": 3.625, "rx_max": 4.200},

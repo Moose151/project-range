@@ -5,6 +5,73 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+// ── Page position / tab restore ──────────────────────────────────────────────
+// Normal POST/GET forms intentionally reload the page in several places. Keep
+// the operator on the tab/scroll position they were using after that reload.
+const PAGE_UI_STATE_PREFIX = 'projectRangePageUiState:';
+const PAGE_UI_STATE_MAX_AGE_MS = 10 * 60 * 1000;
+
+function pageUiStateKey() {
+  return PAGE_UI_STATE_PREFIX + window.location.pathname;
+}
+
+function activeTabTargets() {
+  return [...document.querySelectorAll('[data-bs-toggle="tab"].active')]
+    .map(el => el.getAttribute('data-bs-target') || el.getAttribute('href'))
+    .filter(Boolean);
+}
+
+function savePageUiState({ restoreScroll = false } = {}) {
+  try {
+    sessionStorage.setItem(pageUiStateKey(), JSON.stringify({
+      scrollY: window.scrollY || document.documentElement.scrollTop || 0,
+      restoreScroll,
+      activeTabs: activeTabTargets(),
+      savedAt: Date.now(),
+    }));
+  } catch (e) {}
+}
+
+function restorePageUiState() {
+  let state = null;
+  try {
+    state = JSON.parse(sessionStorage.getItem(pageUiStateKey()) || 'null');
+  } catch (e) {}
+  if (!state || Date.now() - (state.savedAt || 0) > PAGE_UI_STATE_MAX_AGE_MS) return;
+
+  (state.activeTabs || []).forEach(target => {
+    const trigger = [...document.querySelectorAll('[data-bs-toggle="tab"]')]
+      .find(el => (el.getAttribute('data-bs-target') || el.getAttribute('href')) === target);
+    if (trigger && window.bootstrap) bootstrap.Tab.getOrCreateInstance(trigger).show();
+  });
+
+  if (state.restoreScroll) {
+    window.requestAnimationFrame(() => window.scrollTo(0, state.scrollY || 0));
+    state.restoreScroll = false;
+    try { sessionStorage.setItem(pageUiStateKey(), JSON.stringify(state)); } catch (e) {}
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  restorePageUiState();
+  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(el => {
+    el.addEventListener('shown.bs.tab', () => savePageUiState());
+  });
+});
+
+document.addEventListener('submit', event => {
+  if (event.target instanceof HTMLFormElement && !event.target.hasAttribute('data-no-ui-restore')) {
+    savePageUiState({ restoreScroll: true });
+  }
+}, true);
+
+document.addEventListener('change', event => {
+  const el = event.target;
+  if (el instanceof HTMLSelectElement && el.form && !el.form.hasAttribute('data-no-ui-restore')) {
+    savePageUiState({ restoreScroll: true });
+  }
+}, true);
+
 // ── Light / dark theme (persisted per terminal via localStorage) ──────────────
 const RANGE_THEME_KEY = 'rangeTheme';
 function syncThemeIcon(theme) {
