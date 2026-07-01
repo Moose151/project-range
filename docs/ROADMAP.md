@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.18.4` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.18.5` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -19,7 +19,7 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.18.4)
+## ✅ Already delivered (through 0.18.5)
 
 Core of the MVP scope is in place:
 
@@ -65,6 +65,9 @@ Core of the MVP scope is in place:
 - Observers can request documentation edits through the approval queue
 - Chat launcher now shows unread rooms, room list, sender context, and group member management
 - Chat delivery now de-dupes overlapping polls/sends, keeps open chat windows live, clears viewed notification bubbles reliably, and separates offline group-add candidates into a collapsed list
+- Observer accounts can use calculators, docs, chat, CEASE, duty-role selection, dashboard Engaged toggles, and incident submission-for-approval while package/serial configuration remains read-only with clear hints
+- CDA tables can be assigned to active serials directly from the CDA table detail page after windows are created
+- Basic Calculator operator entry now moves cleanly to the second operand without requiring backspace
 - **0.6.0:** TxLO/RxLO naming, version badge, fully offline (LAN) styling, Docker deploy on port 7474
 
 ---

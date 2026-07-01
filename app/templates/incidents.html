@@ -19,8 +19,17 @@
 
 <!-- Log a new incident -->
 <div class="card border-secondary mb-3">
-  <div class="card-header"><i class="bi bi-plus-lg me-1"></i>Log an Incident / Fault</div>
+  <div class="card-header">
+    <i class="bi bi-plus-lg me-1"></i>
+    {% if user.role == 'observer' %}Submit Incident / Fault for Approval{% else %}Log an Incident / Fault{% endif %}
+  </div>
   <div class="card-body">
+    {% if user.role == 'observer' %}
+    <div class="alert alert-info py-2 small">
+      <i class="bi bi-eye me-1"></i>
+      Observer incident reports are sent to administrators for approval before appearing on the active incident list.
+    </div>
+    {% endif %}
     <form method="post" action="/incidents/new" class="row g-2">
       <div class="col-md-5">
         <label class="form-label small mb-0">Title</label>
@@ -48,11 +57,62 @@
         <textarea class="form-control form-control-sm" name="description" rows="2" placeholder="What happened, when, what was done"></textarea>
       </div>
       <div class="col-12">
-        <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check2 me-1"></i>Log Incident</button>
+        <button type="submit" class="btn btn-sm btn-primary">
+          <i class="bi bi-check2 me-1"></i>{% if user.role == 'observer' %}Submit for Approval{% else %}Log Incident{% endif %}
+        </button>
       </div>
     </form>
   </div>
 </div>
+
+{% if pending_incidents %}
+<div class="card border-warning mb-3">
+  <div class="card-header text-warning">
+    <i class="bi bi-hourglass-split me-1"></i>
+    {% if user.role == 'administrator' %}Pending Incident Approval{% else %}Your Pending Incident Reports{% endif %}
+  </div>
+  <div class="card-body p-0 overflow-auto">
+    <table class="table table-dark table-sm align-middle mb-0">
+      <thead class="table-secondary">
+        <tr>
+          <th>Submitted</th><th>Severity</th><th>Title</th><th>Affected</th><th>Reported by</th>
+          {% if user.role == 'administrator' %}<th style="width:320px">Approval</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in pending_incidents %}
+        <tr>
+          <td class="text-muted small text-nowrap">{{ i.created_at.strftime('%d/%m %H:%M') if i.created_at else '' }}</td>
+          <td><span class="badge {{ sev_class.get(i.severity, 'bg-secondary') }}">{{ i.severity|capitalize }}</span></td>
+          <td class="fw-semibold">{{ i.title }}
+            {% if i.description %}<div class="text-muted small">{{ i.description }}</div>{% endif %}
+          </td>
+          <td class="small">{{ i.affected or '—' }}</td>
+          <td class="small text-muted">{{ i.reported_by.display_name if i.reported_by else '' }}</td>
+          {% if user.role == 'administrator' %}
+          <td>
+            <div class="d-flex gap-1 align-items-center">
+              <form method="post" action="/incidents/{{ i.id }}/approve">
+                <button type="submit" class="btn btn-sm btn-outline-success py-0">
+                  <i class="bi bi-check2 me-1"></i>Approve
+                </button>
+              </form>
+              <form method="post" action="/incidents/{{ i.id }}/reject" class="d-flex gap-1">
+                <input type="text" name="rejection_reason" class="form-control form-control-sm py-0" placeholder="reject reason">
+                <button type="submit" class="btn btn-sm btn-outline-danger py-0">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
 
 <!-- Filter -->
 <div class="mb-2">
@@ -67,7 +127,10 @@
   <div class="card-body p-0 overflow-auto">
     <table class="table table-dark table-sm align-middle mb-0">
       <thead class="table-secondary">
-        <tr><th>When</th><th>Severity</th><th>Status</th><th>Title</th><th>Affected</th><th>Reported by</th><th style="width:280px">Update</th></tr>
+        <tr>
+          <th>When</th><th>Severity</th><th>Status</th><th>Title</th><th>Affected</th><th>Reported by</th>
+          {% if user.role != 'observer' %}<th style="width:280px">Update</th>{% endif %}
+        </tr>
       </thead>
       <tbody>
         {% for i in incidents %}
@@ -81,6 +144,7 @@
           </td>
           <td class="small">{{ i.affected or '—' }}</td>
           <td class="small text-muted">{{ i.reported_by.display_name if i.reported_by else '' }}</td>
+          {% if user.role != 'observer' %}
           <td>
             <form method="post" action="/incidents/{{ i.id }}/update" class="d-flex gap-1 align-items-center">
               <select name="status" class="form-select form-select-sm py-0" style="max-width:130px">
@@ -90,9 +154,10 @@
               <button type="submit" class="btn btn-sm btn-outline-primary py-0 px-1" title="Save"><i class="bi bi-check2"></i></button>
             </form>
           </td>
+          {% endif %}
         </tr>
         {% else %}
-        <tr><td colspan="7" class="text-center text-muted py-3">No incidents logged.</td></tr>
+        <tr><td colspan="{{ 7 if user.role != 'observer' else 6 }}" class="text-center text-muted py-3">No incidents logged.</td></tr>
         {% endfor %}
       </tbody>
     </table>

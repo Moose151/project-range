@@ -7,8 +7,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user, get_current_range_state, is_testing_state
-from app.models import Incident, Serial, AuditLog, User
+from app.deps import get_current_user, get_current_range_state, is_testing_state, require_supervisor
+from app.models import Incident, Serial, AuditLog, User, Role
 from app.templating import templates
 
 router = APIRouter(prefix="/incidents")
@@ -26,14 +26,25 @@ async def incidents_list(
     current_user: User = Depends(get_current_user),
 ):
     testing = is_testing_state(db)
-    q = db.query(Incident).filter(Incident.is_testing == testing)
+    q = db.query(Incident).filter(
+        Incident.is_testing == testing,
+        Incident.approval_status == "approved",
+    )
     if status in STATUSES:
         q = q.filter(Incident.status == status)
     incidents = q.order_by(Incident.created_at.desc()).all()
     open_count = db.query(Incident).filter(
         Incident.status.in_(["open", "investigating"]),
         Incident.is_testing == testing,
+        Incident.approval_status == "approved",
     ).count()
+    pending_q = db.query(Incident).filter(
+        Incident.is_testing == testing,
+        Incident.approval_status == "pending",
+    )
+    if current_user.role != Role.ADMINISTRATOR:
+        pending_q = pending_q.filter(Incident.reported_by_id == current_user.id)
+    pending_incidents = pending_q.order_by(Incident.created_at.asc()).all()
     return templates.TemplateResponse(request, "incidents.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
@@ -42,6 +53,7 @@ async def incidents_list(
         "statuses": STATUSES,
         "filter_status": status,
         "open_count": open_count,
+        "pending_incidents": pending_incidents,
         "serials": db.query(Serial).filter(Serial.closed_at == None, Serial.is_testing == testing).order_by(Serial.opened_at.desc()).all(),
         "toast": request.query_params.get("toast", ""),
         "page": "incidents",
@@ -76,13 +88,74 @@ async def incident_create(
             serial_id=serial.id if serial else None,
             reported_by_id=current_user.id,
             is_testing=testing,
+            approval_status="pending" if current_user.role == Role.OBSERVER else "approved",
         )
         db.add(inc)
         db.flush()
-        db.add(AuditLog(user_id=current_user.id, action_type="INCIDENT_CREATE",
+        if inc.approval_status == "pending":
+            action = "INCIDENT_SUBMIT_PENDING"
+            toast = "Incident+submitted+for+administrator+approval"
+        else:
+            action = "INCIDENT_CREATE"
+            toast = "Incident+logged"
+        db.add(AuditLog(user_id=current_user.id, action_type=action,
                         entity_type="Incident", entity_id=inc.id, new_value=inc.title))
         db.commit()
-    return RedirectResponse("/incidents?toast=Incident+logged", status_code=302)
+        return RedirectResponse(f"/incidents?toast={toast}", status_code=302)
+    return RedirectResponse("/incidents", status_code=302)
+
+
+@router.post("/{inc_id}/approve")
+async def incident_approve(
+    inc_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    inc = db.query(Incident).filter(
+        Incident.id == inc_id,
+        Incident.is_testing == is_testing_state(db),
+        Incident.approval_status == "pending",
+    ).first()
+    if inc:
+        inc.approval_status = "approved"
+        inc.approved_by_id = current_user.id
+        inc.approved_at = datetime.utcnow()
+        db.add(AuditLog(
+            user_id=current_user.id,
+            action_type="INCIDENT_APPROVE",
+            entity_type="Incident",
+            entity_id=inc.id,
+            new_value=inc.title,
+        ))
+        db.commit()
+    return RedirectResponse("/incidents?toast=Incident+approved", status_code=302)
+
+
+@router.post("/{inc_id}/reject")
+async def incident_reject(
+    inc_id: int,
+    rejection_reason: str = Form(""),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    inc = db.query(Incident).filter(
+        Incident.id == inc_id,
+        Incident.is_testing == is_testing_state(db),
+        Incident.approval_status == "pending",
+    ).first()
+    if inc:
+        inc.approval_status = "rejected"
+        inc.rejection_reason = rejection_reason.strip() or None
+        db.add(AuditLog(
+            user_id=current_user.id,
+            action_type="INCIDENT_REJECT",
+            entity_type="Incident",
+            entity_id=inc.id,
+            previous_value=inc.title,
+            new_value=inc.rejection_reason,
+        ))
+        db.commit()
+    return RedirectResponse("/incidents?toast=Incident+rejected", status_code=302)
 
 
 @router.post("/{inc_id}/update")
@@ -93,7 +166,11 @@ async def incident_update(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    inc = db.query(Incident).filter(Incident.id == inc_id, Incident.is_testing == is_testing_state(db)).first()
+    inc = db.query(Incident).filter(
+        Incident.id == inc_id,
+        Incident.is_testing == is_testing_state(db),
+        Incident.approval_status == "approved",
+    ).first()
     if inc:
         prev = inc.status
         if status in STATUSES:
@@ -117,7 +194,10 @@ async def incidents_export(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    incidents = db.query(Incident).filter(Incident.is_testing == is_testing_state(db)).order_by(Incident.created_at.desc()).all()
+    incidents = db.query(Incident).filter(
+        Incident.is_testing == is_testing_state(db),
+        Incident.approval_status == "approved",
+    ).order_by(Incident.created_at.desc()).all()
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["ID", "Created", "Severity", "Status", "Title", "Affected",

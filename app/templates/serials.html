@@ -4,15 +4,27 @@
 {% block content %}
 <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
   <h4 class="mb-0"><i class="bi bi-collection-play me-2"></i>Active Serials</h4>
+  {% if user.role == 'observer' %}
+  <span class="badge text-bg-secondary">Observer read-only</span>
+  {% endif %}
   <div class="ms-auto d-flex gap-2">
     <a href="/history" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-clock-history me-1"></i>History
     </a>
+    {% if user.role != 'observer' %}
     <button type="button" class="btn btn-sm btn-success" data-bs-toggle="collapse" data-bs-target="#newSerialPanel" aria-expanded="false" aria-controls="newSerialPanel">
       <i class="bi bi-plus-lg me-1"></i>New Serial
     </button>
+    {% endif %}
   </div>
 </div>
+
+{% if user.role == 'observer' %}
+<div class="alert alert-info py-2">
+  <i class="bi bi-eye me-2"></i>
+  Observer accounts can view active, pending, and historical serials, but cannot create, start, end, or reconfigure them.
+</div>
+{% endif %}
 
 {% if toast %}
 <div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
@@ -37,6 +49,7 @@
             </div>
             {% endif %}
           </div>
+          {% if user.role != 'observer' %}
           <div class="d-flex gap-2">
             <a href="/serials/{{ serial.id }}/start" class="btn btn-sm btn-success">
               <i class="bi bi-play-circle me-1"></i>Start
@@ -48,6 +61,7 @@
               </button>
             </form>
           </div>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -81,7 +95,7 @@
         {% endif %}
 
         <!-- Add package to serial -->
-        {% if packages %}
+        {% if packages and user.role != 'observer' %}
         <form method="post" action="/serials/{{ serial.id }}/packages/add" class="d-flex gap-2 mt-2">
           <select class="form-select form-select-sm" name="package_id">
             {% for pkg in packages %}
@@ -102,18 +116,20 @@
             {% for link in serial.cda_links %}
             <span class="badge bg-warning text-dark d-flex align-items-center gap-1">
               <i class="bi bi-shield-exclamation"></i>{{ link.cda_table.name }}
+              {% if user.role != 'observer' %}
               <form method="post" action="/serials/{{ serial.id }}/cda/{{ link.cda_table_id }}/remove"
                     class="d-inline ms-1" onsubmit="return confirm('Remove CDA table {{ link.cda_table.name | e }}?')">
                 <button type="submit" class="btn btn-sm p-0 border-0 bg-transparent text-dark lh-1"
                         title="Remove CDA table" style="font-size:0.7rem">✕</button>
               </form>
+              {% endif %}
             </span>
             {% endfor %}
           </div>
           {% else %}
           <span class="text-muted small fst-italic">None assigned</span>
           {% endif %}
-          {% if cda_tables %}
+          {% if cda_tables and user.role != 'observer' %}
           <form method="post" action="/serials/{{ serial.id }}/cda/assign" class="d-flex gap-2 mt-1">
             <select class="form-select form-select-sm" name="cda_table_id">
               {% for ct in cda_tables %}
@@ -124,7 +140,7 @@
               <i class="bi bi-shield-exclamation me-1"></i>Assign CDA
             </button>
           </form>
-          {% else %}
+          {% elif user.role != 'observer' %}
           <div class="text-muted small"><a href="/cda" class="text-muted">Create a CDA table</a> to assign one.</div>
           {% endif %}
         </div>
@@ -133,12 +149,14 @@
         <a href="/" class="btn btn-sm btn-outline-primary">
           <i class="bi bi-speedometer2 me-1"></i>Dashboard
         </a>
+        {% if user.role != 'observer' %}
         <form method="post" action="/serials/{{ serial.id }}/end" class="ms-auto"
               onsubmit="return confirm('End serial {{ serial.title | e }}? It will be moved to history.')">
           <button type="submit" class="btn btn-sm btn-danger">
             <i class="bi bi-stop-circle me-1"></i>End Serial
           </button>
         </form>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -147,11 +165,15 @@
 {% else %}
 <div class="alert alert-secondary d-flex align-items-center gap-3 mb-4">
   <i class="bi bi-collection-play fs-4 text-muted"></i>
-  <div>No active serials. Use <strong>New Serial</strong> to prepare or start one.</div>
+  <div>
+    No active serials.
+    {% if user.role != 'observer' %}Use <strong>New Serial</strong> to prepare or start one.{% else %}A User or Administrator must start a serial before it appears here.{% endif %}
+  </div>
 </div>
 {% endif %}
 
 <!-- Create new serial -->
+{% if user.role != 'observer' %}
 <div id="newSerialPanel" class="collapse">
 <div class="row justify-content-center">
   <div class="col-lg-6">
@@ -213,4 +235,5 @@
   </div>
 </div>
 </div>
+{% endif %}
 {% endblock %}

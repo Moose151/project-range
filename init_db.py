@@ -118,6 +118,10 @@ def _migrate(conn):
         "ALTER TABLE device_links ADD COLUMN is_testing BOOLEAN DEFAULT 0",
         "ALTER TABLE cda_tables ADD COLUMN is_testing BOOLEAN DEFAULT 0",
         "ALTER TABLE incidents ADD COLUMN is_testing BOOLEAN DEFAULT 0",
+        "ALTER TABLE incidents ADD COLUMN approval_status VARCHAR(16) DEFAULT 'approved'",
+        "ALTER TABLE incidents ADD COLUMN approved_by_id INTEGER REFERENCES users(id)",
+        "ALTER TABLE incidents ADD COLUMN approved_at DATETIME",
+        "ALTER TABLE incidents ADD COLUMN rejection_reason TEXT",
         "ALTER TABLE cease_events ADD COLUMN is_testing BOOLEAN DEFAULT 0",
     ]
     for sql in migrations:

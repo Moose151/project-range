@@ -821,7 +821,14 @@ function toggleWidgetSpan(btn) {
 // ── Basic math calculator ─────────────────────────────────────────────────────
 // State is per-instance, keyed by widget id stored on the DOM element.
 const calcState = {};
-function calcKey(id) { return calcState[id] || (calcState[id] = { expr: '', current: '0', hasResult: false }); }
+function calcKey(id) {
+  return calcState[id] || (calcState[id] = {
+    expr: '',
+    current: '0',
+    hasResult: false,
+    awaitingOperand: false,
+  });
+}
 
 function calcPress(id, val) {
   const s = calcKey(id);
@@ -830,9 +837,10 @@ function calcPress(id, val) {
   if (!disp) return;
 
   if (val === 'C') {
-    s.expr = ''; s.current = '0'; s.hasResult = false;
+    s.expr = ''; s.current = '0'; s.hasResult = false; s.awaitingOperand = false;
   } else if (val === '⌫') {
-    if (s.current.length > 1) s.current = s.current.slice(0, -1);
+    if (s.awaitingOperand) s.current = '0';
+    else if (s.current.length > 1) s.current = s.current.slice(0, -1);
     else s.current = '0';
     s.hasResult = false;
   } else if (val === '±') {
@@ -841,14 +849,15 @@ function calcPress(id, val) {
     const v = parseFloat(s.current);
     if (!isNaN(v)) s.current = String(v / 100);
   } else if (['+', '−', '×', '÷'].includes(val)) {
-    if (s.expr && !s.hasResult) {
+    if (s.expr && !s.hasResult && !s.awaitingOperand) {
       // chain: evaluate current expression first
       try { s.current = String(evalCalcExpr(s.expr + s.current)); } catch (e) {}
     }
     s.expr = s.current + ' ' + val + ' ';
     s.hasResult = false;
+    s.awaitingOperand = true;
   } else if (val === '=') {
-    if (s.expr) {
+    if (s.expr && !s.awaitingOperand) {
       const full = s.expr + s.current;
       try {
         const result = evalCalcExpr(full);
@@ -856,14 +865,25 @@ function calcPress(id, val) {
         s.current = formatCalcNum(result);
         s.expr = '';
         s.hasResult = true;
+        s.awaitingOperand = false;
       } catch (e) { s.current = 'Error'; s.expr = ''; }
     }
   } else if (val === '.') {
-    if (s.hasResult) { s.current = '0.'; s.hasResult = false; s.expr = ''; }
+    if (s.hasResult || s.awaitingOperand || s.current === 'Error') {
+      if (s.hasResult) s.expr = '';
+      s.current = '0.';
+      s.hasResult = false;
+      s.awaitingOperand = false;
+    }
     else if (!s.current.includes('.')) s.current += '.';
   } else {
     // digit
-    if (s.hasResult) { s.current = val; s.hasResult = false; s.expr = ''; }
+    if (s.hasResult || s.awaitingOperand || s.current === 'Error') {
+      if (s.hasResult) s.expr = '';
+      s.current = val;
+      s.hasResult = false;
+      s.awaitingOperand = false;
+    }
     else s.current = s.current === '0' ? val : s.current + val;
   }
 

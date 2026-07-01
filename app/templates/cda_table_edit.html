@@ -119,11 +119,37 @@
           <i class="bi bi-play-circle text-success"></i>
           <span>{{ serial.title }}</span>
           <span class="text-muted small ms-auto">Started {{ serial.opened_at.strftime('%d/%m/%y %H:%M') }}Z</span>
+          {% if user.role != 'observer' %}
+          <form method="post" action="/cda/{{ table.id }}/serials/{{ serial.id }}/remove"
+                onsubmit="return confirm('Remove CDA table {{ table.name | e }} from {{ serial.title | e }}?')">
+            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Remove from serial">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </form>
+          {% endif %}
         </li>
         {% endfor %}
       </ul>
       {% else %}
       <div class="card-body text-muted fst-italic small">Not currently assigned to any active serial.</div>
+      {% endif %}
+      {% if user.role != 'observer' %}
+      <div class="card-footer">
+        {% if unassigned_active_serials %}
+        <form method="post" action="/cda/{{ table.id }}/serials/assign" class="d-flex gap-2">
+          <select class="form-select form-select-sm" name="serial_id">
+            {% for serial in unassigned_active_serials %}
+            <option value="{{ serial.id }}">{{ serial.title }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-sm btn-outline-warning text-nowrap">
+            <i class="bi bi-plus-lg me-1"></i>Assign Serial
+          </button>
+        </form>
+        {% else %}
+        <div class="text-muted small">No unassigned active serials are available.</div>
+        {% endif %}
+      </div>
       {% endif %}
     </div>
   </div>

@@ -87,11 +87,21 @@ async def cda_detail(
         .filter(SerialCDATable.cda_table_id == table_id, Serial.closed_at == None, Serial.is_testing == testing)
         .all()
     )
+    assigned_ids = [s.id for s in assigned_serials]
+    unassigned_active_serials_q = db.query(Serial).filter(
+        Serial.closed_at == None,
+        Serial.is_started == True,
+        Serial.is_testing == testing,
+    )
+    if assigned_ids:
+        unassigned_active_serials_q = unassigned_active_serials_q.filter(~Serial.id.in_(assigned_ids))
+    unassigned_active_serials = unassigned_active_serials_q.order_by(Serial.opened_at.asc()).all()
     return templates.TemplateResponse(request, "cda_table_edit.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
         "table": table,
         "assigned_serials": assigned_serials,
+        "unassigned_active_serials": unassigned_active_serials,
         "toast": request.query_params.get("toast", ""),
         "page": "cda",
     })
@@ -259,6 +269,68 @@ async def cda_import_csv(
     if skipped:
         msg += f",+{skipped}+row{'s' if skipped != 1 else ''}+skipped"
     return RedirectResponse(f"/cda/{table_id}?toast={msg}", status_code=302)
+
+
+@router.post("/{table_id}/serials/assign")
+async def cda_assign_serial(
+    table_id: int,
+    serial_id: int = Form(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    testing = is_testing_state(db)
+    table = db.query(CDATable).filter(CDATable.id == table_id, CDATable.is_testing == testing).first()
+    serial = db.query(Serial).filter(
+        Serial.id == serial_id,
+        Serial.closed_at == None,
+        Serial.is_started == True,
+        Serial.is_testing == testing,
+    ).first()
+    if table and serial:
+        existing = db.query(SerialCDATable).filter(
+            SerialCDATable.serial_id == serial_id,
+            SerialCDATable.cda_table_id == table_id,
+        ).first()
+        if not existing:
+            db.add(SerialCDATable(serial_id=serial_id, cda_table_id=table_id))
+            db.add(AuditLog(
+                user_id=current_user.id,
+                action_type="CDA_ASSIGN_SERIAL",
+                entity_type="CDATable",
+                entity_id=table_id,
+                new_value=f"{table.name} assigned to {serial.title}",
+            ))
+            db.commit()
+    return RedirectResponse(f"/cda/{table_id}?toast=CDA+table+assigned+to+serial", status_code=302)
+
+
+@router.post("/{table_id}/serials/{serial_id}/remove")
+async def cda_remove_serial(
+    table_id: int,
+    serial_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    testing = is_testing_state(db)
+    table = db.query(CDATable).filter(CDATable.id == table_id, CDATable.is_testing == testing).first()
+    serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
+    if not table or not serial:
+        return RedirectResponse("/cda", status_code=302)
+    link = db.query(SerialCDATable).filter(
+        SerialCDATable.serial_id == serial_id,
+        SerialCDATable.cda_table_id == table_id,
+    ).first()
+    if link:
+        db.add(AuditLog(
+            user_id=current_user.id,
+            action_type="CDA_REMOVE_SERIAL",
+            entity_type="CDATable",
+            entity_id=table_id,
+            previous_value=f"{table.name} assigned to {serial.title}",
+        ))
+        db.delete(link)
+        db.commit()
+    return RedirectResponse(f"/cda/{table_id}?toast=CDA+table+removed+from+serial", status_code=302)
 
 
 @router.post("/{table_id}/windows/{window_id}/delete")

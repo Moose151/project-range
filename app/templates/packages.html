@@ -4,6 +4,10 @@
 {% block content %}
 <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
   <h4 class="mb-0"><i class="bi bi-box-seam me-2"></i>Signal Packages</h4>
+  {% if user.role == 'observer' %}
+  <span class="badge text-bg-secondary">Observer read-only</span>
+  {% endif %}
+  {% if user.role != 'observer' %}
   <div class="ms-auto d-flex gap-2">
     <a href="/packages/import" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-upload me-1"></i>Import CBM
@@ -12,7 +16,15 @@
       <i class="bi bi-plus-lg me-1"></i>New Package
     </a>
   </div>
+  {% endif %}
 </div>
+
+{% if user.role == 'observer' %}
+<div class="alert alert-info py-2">
+  <i class="bi bi-eye me-2"></i>
+  Observer accounts can view and export signal packages, but cannot create, import, edit, duplicate, or delete them.
+</div>
+{% endif %}
 
 {% if toast %}
 <div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
@@ -31,19 +43,23 @@
         <span class="fw-semibold">{{ pkg.name }}</span>
         <span class="badge bg-secondary ms-1">{{ pkg.signals | length }} signal{{ 's' if pkg.signals | length != 1 }}</span>
         <div class="ms-auto d-flex gap-1">
+          {% if user.role != 'observer' %}
           <a href="/packages/{{ pkg.id }}/import" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Import CBM config into this package">
             <i class="bi bi-upload"></i>
           </a>
+          {% endif %}
           <a href="/packages/{{ pkg.id }}/export" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Export CBM config">
             <i class="bi bi-download"></i>
           </a>
-          <a href="/packages/{{ pkg.id }}" class="btn btn-sm btn-outline-primary py-0 px-2">
-            <i class="bi bi-pencil"></i>
+          <a href="/packages/{{ pkg.id }}" class="btn btn-sm btn-outline-primary py-0 px-2" title="{% if user.role == 'observer' %}View package{% else %}Edit package{% endif %}">
+            <i class="bi {% if user.role == 'observer' %}bi-eye{% else %}bi-pencil{% endif %}"></i>
           </a>
+          {% if user.role != 'observer' %}
           <form method="post" action="/packages/{{ pkg.id }}/delete" class="d-inline"
                 onsubmit="return confirm('Delete package {{ pkg.name | e }}? This cannot be undone.')">
             <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2"><i class="bi bi-trash"></i></button>
           </form>
+          {% endif %}
         </div>
       </div>
       <div class="card-body py-2">
@@ -60,7 +76,7 @@
           {% endfor %}
         </div>
         {% else %}
-        <span class="text-muted small fst-italic">No signals yet — <a href="/packages/{{ pkg.id }}">add signals</a></span>
+        <span class="text-muted small fst-italic">No signals yet{% if user.role != 'observer' %} — <a href="/packages/{{ pkg.id }}">add signals</a>{% endif %}</span>
         {% endif %}
       </div>
       <div class="card-footer text-muted small d-flex justify-content-between">
@@ -75,9 +91,13 @@
 <div class="text-center text-muted py-5">
   <i class="bi bi-box-seam display-4 d-block mb-3"></i>
   No signal packages yet.<br>
+  {% if user.role != 'observer' %}
   <a href="/packages/new" class="btn btn-success mt-3">Create your first package</a>
   <span class="text-muted mx-2">or</span>
   <a href="/packages/import" class="btn btn-outline-secondary mt-3">Import from CBM config</a>
+  {% else %}
+  <div class="small mt-2">A User or Administrator must create packages before they appear here.</div>
+  {% endif %}
 </div>
 {% endif %}
 {% endblock %}

@@ -4,10 +4,20 @@
 {% block content %}
 <div class="d-flex align-items-center mb-3 gap-2">
   <h4 class="mb-0"><i class="bi bi-play-circle me-2"></i>Confirm Serial Start</h4>
+  {% if user.role == 'observer' %}
+  <span class="badge text-bg-secondary">Observer read-only</span>
+  {% endif %}
   <a href="/serials" class="btn btn-sm btn-outline-secondary ms-auto">
     <i class="bi bi-arrow-left me-1"></i>Back
   </a>
 </div>
+
+{% if user.role == 'observer' %}
+<div class="alert alert-info py-2">
+  <i class="bi bi-eye me-2"></i>
+  Observer accounts can preview this serial, but cannot start or configure it.
+</div>
+{% endif %}
 
 <div class="row justify-content-center">
   <div class="col-lg-7">
@@ -78,11 +88,13 @@
 
     <div class="d-flex gap-2 justify-content-end">
       <a href="/serials" class="btn btn-outline-secondary">Cancel</a>
+      {% if user.role != 'observer' %}
       <form method="post" action="/serials/{{ serial.id }}/start">
         <button type="submit" class="btn btn-success">
           <i class="bi bi-play-circle me-1"></i>Confirm — Start Serial
         </button>
       </form>
+      {% endif %}
     </div>
   </div>
 </div>

@@ -220,6 +220,7 @@ async def user_delete(
     db.query(LogSession).filter(LogSession.closed_by_id == target.id).update({"closed_by_id": None})
     db.query(DocPage).filter(DocPage.updated_by_id == target.id).update({"updated_by_id": None})
     db.query(DocVersion).filter(DocVersion.approved_by_id == target.id).update({"approved_by_id": None})
+    db.query(Incident).filter(Incident.approved_by_id == target.id).update({"approved_by_id": None})
     db.query(Incident).filter(Incident.resolved_by_id == target.id).update({"resolved_by_id": None})
     db.query(CeaseEvent).filter(CeaseEvent.dismissed_by_id == target.id).update({"dismissed_by_id": None})
     username = target.username

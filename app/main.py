@@ -31,11 +31,16 @@ SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 # their own duty-role tag (a personal display setting, not operational data).
 SAFETY_SUPERVISOR_ALLOWED_WRITES = {
     "/cease/raise", "/cease/dismiss", "/account/password", "/preferences/duty-role",
+    "/dashboard/engaged-toggle", "/incidents/new",
 }
 
 
 def _observer_write_allowed(path: str) -> bool:
     if path in SAFETY_SUPERVISOR_ALLOWED_WRITES:
+        return True
+    # Calculators are non-operational utilities. Their POST routes only return
+    # calculation results and may store harmless defaults in the user's session.
+    if path.startswith("/calculator/"):
         return True
     # Observers may request documentation edits, but cannot approve, reject,
     # restore, create pages, or perform other write actions.

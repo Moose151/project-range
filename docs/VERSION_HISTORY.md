@@ -4,9 +4,18 @@ This document records the major user-facing changes shipped in each beta version
 For planned work, see [ROADMAP.md](ROADMAP.md). For deep implementation notes and
 handover details, see [HANDOVER.md](HANDOVER.md).
 
-Current version: **0.18.4**
+Current version: **0.18.5**
 
 ---
+
+## 0.18.5 — Observer Utilities, CDA Assignment, and Calculator Usability
+
+- Observers can use calculator POST actions and toggle dashboard signal **Engaged** states while remaining blocked from package/serial configuration.
+- Observers can submit incident/fault reports for administrator approval; approved reports then appear in the active incident list.
+- Package and Serial pages now show Observer read-only hints and hide create/import/edit/start/end/delete controls from Observer accounts.
+- CDA table detail pages can now assign or remove the table from active serials after the CDA table/windows have been created.
+- Improved the Basic Calculator so pressing an operator prepares entry of the second number instead of appending digits to the first number.
+- Static cache keys bumped to `app.css?v=24` and `app.js?v=24`.
 
 ## 0.18.4 — Chat Live Delivery and Member Picker Fixes
 

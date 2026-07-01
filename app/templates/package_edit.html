@@ -7,20 +7,27 @@
     <i class="bi bi-box-seam me-2"></i>
     {% if package %}{{ package.name }}{% else %}New Signal Package{% endif %}
   </h4>
+  {% if user.role == 'observer' %}
+  <span class="badge text-bg-secondary">Observer read-only</span>
+  {% endif %}
   <div class="ms-auto d-flex gap-2">
     {% if package %}
+    {% if user.role != 'observer' %}
     <a href="/packages/{{ package.id }}/import" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-upload me-1"></i>Import CBM
     </a>
+    {% endif %}
     <a href="/packages/{{ package.id }}/export" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-download me-1"></i>Export CBM
     </a>
+    {% if user.role != 'observer' %}
     <form method="post" action="/packages/{{ package.id }}/duplicate"
           onsubmit="return confirm('Duplicate package {{ package.name | e }}?')">
       <button type="submit" class="btn btn-sm btn-outline-secondary">
         <i class="bi bi-copy me-1"></i>Duplicate
       </button>
     </form>
+    {% endif %}
     {% endif %}
     <a href="/packages" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-arrow-left me-1"></i>All Packages
@@ -31,6 +38,12 @@
 {% if toast %}
 <div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
 {% endif %}
+{% if user.role == 'observer' %}
+<div class="alert alert-info py-2">
+  <i class="bi bi-eye me-2"></i>
+  Observer accounts can inspect package settings and export configs, but cannot create, edit, import, duplicate, reorder, or delete package content.
+</div>
+{% endif %}
 
 <div class="row g-4">
   <!-- Package metadata -->
@@ -39,6 +52,7 @@
       <div class="card-header">Package Details</div>
       <div class="card-body">
         <form method="post" action="{% if package %}/packages/{{ package.id }}/update{% else %}/packages/new{% endif %}">
+          {% if user.role == 'observer' %}<fieldset disabled>{% endif %}
           <div class="mb-3">
             <label class="form-label">Package Name <span class="text-danger">*</span></label>
             <input type="text" class="form-control" name="name"
@@ -114,9 +128,12 @@
           </div>
           {% endif %}
 
+          {% if user.role == 'observer' %}</fieldset>{% endif %}
+          {% if user.role != 'observer' %}
           <button type="submit" class="btn btn-primary w-100">
             {% if package %}<i class="bi bi-check2 me-1"></i>Save Details{% else %}<i class="bi bi-plus-lg me-1"></i>Create Package{% endif %}
           </button>
+          {% endif %}
         </form>
       </div>
       {% if package %}
@@ -126,7 +143,7 @@
       {% endif %}
     </div>
 
-    {% if package %}
+    {% if package and user.role != 'observer' %}
     <!-- Add signal from registry -->
     <div class="card border-secondary mt-3">
       <div class="card-header small text-muted"><i class="bi bi-lightning me-1"></i>Quick-add from Registry</div>
@@ -155,13 +172,15 @@
     <div class="card border-secondary mb-3">
       <div class="card-header d-flex align-items-center">
         <span><i class="bi bi-list-ul me-1"></i>Signals ({{ package.signals | length }})</span>
+        {% if user.role != 'observer' %}
         <span class="text-muted small ms-2">drag <i class="bi bi-grip-vertical"></i> to reorder</span>
+        {% endif %}
       </div>
       <div class="card-body p-0 overflow-auto">
         <table class="table table-dark table-hover table-sm align-middle mb-0">
           <thead class="table-secondary">
             <tr>
-              <th style="width:28px"></th>
+              {% if user.role != 'observer' %}<th style="width:28px"></th>{% endif %}
               <th>Name</th>
               <th>TxIF</th>
               <th>TxRF</th>
@@ -175,13 +194,13 @@
               <th>Power</th>
               <th>Source</th>
               <th>Path</th>
-              <th></th>
+              {% if user.role != 'observer' %}<th></th>{% endif %}
             </tr>
           </thead>
           <tbody id="tbody-signals">
             {% for entry in package.signals %}
             <tr data-id="{{ entry.id }}">
-              <td class="drag-handle text-muted ps-2" style="cursor:grab"><i class="bi bi-grip-vertical"></i></td>
+              {% if user.role != 'observer' %}<td class="drag-handle text-muted ps-2" style="cursor:grab"><i class="bi bi-grip-vertical"></i></td>{% endif %}
               <td class="fw-semibold">{{ entry.signal_name }}</td>
               <td>{{ entry.tx_if or '—' }}</td>
               <td>{{ entry.tx_rf or '—' }}</td>
@@ -195,6 +214,7 @@
               <td class="small">{% if entry.power is not none %}{{ entry.power }} {{ entry.power_unit }}{% else %}—{% endif %}</td>
               <td class="small text-muted">{{ entry.source or (entry.cbm_device.name if entry.cbm_device else 'No modem assigned') }}</td>
               <td class="small text-muted">{{ entry.cbm_path or '—' }}</td>
+              {% if user.role != 'observer' %}
               <td class="text-nowrap">
                 <button type="button" class="btn btn-xs btn-outline-secondary btn-sm py-0 px-1"
                         data-entry='{{ {
@@ -224,6 +244,7 @@
                   <button type="submit" class="btn btn-xs btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-trash"></i></button>
                 </form>
               </td>
+              {% endif %}
             </tr>
             {% endfor %}
           </tbody>
@@ -233,6 +254,7 @@
     {% endif %}
 
     <!-- Add / Edit signal form -->
+    {% if user.role != 'observer' %}
     <div class="card border-secondary" id="signalFormCard">
       <div class="card-header" id="signalFormTitle"><i class="bi bi-plus-lg me-1"></i>Add Signal</div>
       <div class="card-body">
@@ -335,12 +357,18 @@
         </form>
       </div>
     </div>
+    {% else %}
+    <div class="alert alert-secondary">
+      <i class="bi bi-lock me-2"></i>
+      Signal configuration is read-only for Observer accounts.
+    </div>
+    {% endif %}
   </div>
   {% else %}
   <div class="col-lg-8">
     <div class="alert alert-info">
       <i class="bi bi-info-circle me-2"></i>
-      Create the package first, then you can add signals to it.
+      {% if user.role == 'observer' %}A User or Administrator must create packages before they can be configured.{% else %}Create the package first, then you can add signals to it.{% endif %}
     </div>
   </div>
   {% endif %}

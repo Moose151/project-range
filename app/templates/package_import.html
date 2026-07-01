@@ -7,6 +7,9 @@
     <i class="bi bi-upload me-2"></i>
     {% if package %}Import Signals: {{ package.name }}{% else %}Import Signal Package{% endif %}
   </h4>
+  {% if user.role == 'observer' %}
+  <span class="badge text-bg-secondary">Observer read-only</span>
+  {% endif %}
   <a href="{% if package %}/packages/{{ package.id }}{% else %}/packages{% endif %}" class="btn btn-sm btn-outline-secondary ms-auto">
     <i class="bi bi-arrow-left me-1"></i>Back
   </a>
@@ -15,6 +18,12 @@
 {% if error %}
 <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>{{ error }}</div>
 {% endif %}
+{% if user.role == 'observer' %}
+<div class="alert alert-info py-2">
+  <i class="bi bi-eye me-2"></i>
+  Observer accounts can view package information, but cannot import CBM configs or create packages.
+</div>
+{% endif %}
 
 <div class="row justify-content-center">
   <div class="col-lg-8">
@@ -22,6 +31,7 @@
       <div class="card-header">{% if package %}Existing Package RF Details{% else %}Package Details{% endif %}</div>
       <div class="card-body">
         <form method="post" action="{% if package %}/packages/{{ package.id }}/import{% else %}/packages/import{% endif %}" enctype="multipart/form-data">
+          {% if user.role == 'observer' %}<fieldset disabled>{% endif %}
           {% if package %}
           <div class="alert alert-secondary py-2 small mb-3">
             <i class="bi bi-calculator me-1"></i>
@@ -99,9 +109,12 @@
               If TxRF/RxRF are not in the import, Project Range calculates them from the package LOs and imported IF values.
             </div>
           </div>
+          {% if user.role == 'observer' %}</fieldset>{% endif %}
+          {% if user.role != 'observer' %}
           <button type="submit" class="btn btn-primary">
             <i class="bi bi-upload me-1"></i>{% if package %}Import Signals{% else %}Import Package{% endif %}
           </button>
+          {% endif %}
         </form>
       </div>
     </div>
