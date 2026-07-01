@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.18.3` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.18.4` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -203,6 +203,11 @@
   - Group chat windows now have a member-management panel (`person-plus` button) and call `POST /chat/rooms/{room_id}/members` to add active users after creation.
   - `/chat/state` returns `available_users` and room `participant_details` for richer chat UI rendering.
   - Static cache keys bumped to `app.css?v=21` / `app.js?v=21`.
+- **0.18.4 — Chat live delivery + duplicate-send guard:**
+  - Group-create and group-member add pickers now show online users first and tuck offline users into a collapsed **Offline** section.
+  - Floating chat windows and dashboard chat widgets now guard against overlapping polls and duplicate submits.
+  - Message rendering uses server message IDs to skip messages already present on screen, which keeps open chat windows live without duplicate rows.
+  - Static cache keys bumped to `app.css?v=22` / `app.js?v=22`.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.
@@ -239,7 +244,7 @@
 - **`Role` enum has THREE stored values:** `administrator`, `user`, `observer` (read-only). Old aliases `SUPERVISOR`, `OPERATOR`, and `SAFETY_SUPERVISOR` still map to the new values for compatibility with existing internal checks. Read-only is enforced in `main.py` `security_middleware` (blocks non-safe methods; allow-list `SAFETY_SUPERVISOR_ALLOWED_WRITES`). `SessionMiddleware` must stay **added last** (outermost) or `request.session` is empty in that check.
 - **New models since 0.11.0:** `CDATable`, `CDAWindow`, `SerialCDATable` (CDA); `CeaseEvent` (CEASE); `DutyRole` + `User.duty_role`/`User.duty_role_color` (duty tags). All tables auto-create via `create_all`; the two `users` columns are additive migrations in `init_db.py`.
 - **New routers:** `cda.py`, `cease.py` (both registered in `main.py`). Duty-role CRUD lives in `config.py`; duty-role self-set in `preferences.py`.
-- **Static cache-busting is mandatory:** `base.html` references `app.css?v=N` and `app.js?v=N` (both currently **20**). **Bump N on every CSS/JS change** — without it, browsers serve a stale file and new JS handlers silently break (this exact bug hit the 0.13.0 sidebar/span buttons).
+- **Static cache-busting is mandatory:** `base.html` references `app.css?v=N` and `app.js?v=N` (both currently **22**). **Bump N on every CSS/JS change** — without it, browsers serve a stale file and new JS handlers silently break (this exact bug hit the 0.13.0 sidebar/span buttons).
 - **`partials/dashboard_summary.html` is now dead code** (the hardcoded summary row was removed in 0.13.0). Safe to delete; left in place for now.
 - **Settings area** — now reached via the sidebar (user footer → Preferences/Password; administrator → Admin → App Config). The old Settings dropdown is gone.
 - **`DeviceLink` and `RFDevice` new columns are fully implemented** — `device_model`, `has_web_gui`, and the `device_links` table are all in place. Device type list now includes `antenna`. No further migration needed for those.

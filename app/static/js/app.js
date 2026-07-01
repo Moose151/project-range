@@ -297,6 +297,8 @@ const chatState = {
   roomSeen: {},
   unread: savedChatState.unread || {},
   unreadSenders: savedChatState.unreadSenders || {},
+  pollingRooms: {},
+  sendingRooms: {},
   rosterOpen: false,
 };
 window.chatState = chatState;
@@ -356,6 +358,38 @@ function chatRoomButton(room, { unreadOnly = false } = {}) {
     </button>`;
 }
 
+function splitChatUsersByPresence(users) {
+  const onlineIds = new Set((chatState.users || []).map(u => u.id));
+  return {
+    online: (users || []).filter(u => onlineIds.has(u.id)),
+    offline: (users || []).filter(u => !onlineIds.has(u.id)),
+  };
+}
+
+function chatUserCheckboxRows(users, attrName, { muted = false } = {}) {
+  return (users || []).map(u => `
+    <label class="d-flex align-items-center gap-2 py-1 ${muted ? 'chat-user-offline' : ''}">
+      <input class="form-check-input m-0" type="checkbox" value="${u.id}" ${attrName}>
+      <span class="text-truncate">${escapeHtml(u.display_name)}</span>
+      ${chatRoleBadge(u)}
+    </label>
+  `).join('');
+}
+
+function chatUserPickerHtml(users, attrName, emptyText) {
+  const split = splitChatUsersByPresence(users);
+  const onlineHtml = split.online.length
+    ? chatUserCheckboxRows(split.online, attrName)
+    : `<div class="text-muted small py-1">${escapeHtml(emptyText)}</div>`;
+  const offlineHtml = split.offline.length ? `
+    <details class="chat-offline-users mt-1">
+      <summary>Offline (${split.offline.length})</summary>
+      <div class="pt-1">${chatUserCheckboxRows(split.offline, attrName, { muted: true })}</div>
+    </details>
+  ` : '';
+  return onlineHtml + offlineHtml;
+}
+
 function renderChatRoster() {
   const online = document.getElementById('chatOnlineUsers');
   const groupUsers = document.getElementById('chatGroupUsers');
@@ -379,13 +413,9 @@ function renderChatRoster() {
       ${chatRoleBadge(u)}
     </button>
   `).join('') : '<div class="text-muted py-2">No other users online.</div>';
-  groupUsers.innerHTML = availableOthers.length ? availableOthers.map(u => `
-    <label class="d-flex align-items-center gap-2 py-1">
-      <input class="form-check-input m-0" type="checkbox" value="${u.id}" data-chat-group-user>
-      <span class="text-truncate">${escapeHtml(u.display_name)}</span>
-      ${chatRoleBadge(u)}
-    </label>
-  `).join('') : '<div class="text-muted py-2">No users available to add.</div>';
+  groupUsers.innerHTML = availableOthers.length
+    ? chatUserPickerHtml(availableOthers, 'data-chat-group-user', 'No online users available.')
+    : '<div class="text-muted py-2">No users available to add.</div>';
 }
 
 function chatRoleBadge(user) {
@@ -533,13 +563,9 @@ function groupMembersPanel(room) {
   const members = people.map(p => `
     <span class="badge rounded-pill text-bg-secondary me-1 mb-1">${escapeHtml(p.display_name)}${chatRoleBadge(p)}</span>
   `).join('') || '<span class="text-muted">No members listed.</span>';
-  const addList = available.length ? available.map(u => `
-    <label class="d-flex align-items-center gap-2 py-1">
-      <input class="form-check-input m-0" type="checkbox" value="${u.id}" data-chat-add-member>
-      <span class="text-truncate">${escapeHtml(u.display_name)}</span>
-      ${chatRoleBadge(u)}
-    </label>
-  `).join('') : '<div class="text-muted small">No users available to add.</div>';
+  const addList = available.length
+    ? chatUserPickerHtml(available, 'data-chat-add-member', 'No online users available.')
+    : '<div class="text-muted small">No users available to add.</div>';
   return `
     <div class="small text-muted mb-1">Members</div>
     <div class="mb-2">${members}</div>
@@ -585,19 +611,32 @@ async function addSelectedGroupMembers(roomId) {
 
 async function sendChatMessage(evt, roomId) {
   evt.preventDefault();
-  const input = evt.target.querySelector('input[name="body"]');
+  if (chatState.sendingRooms[roomId]) return;
+  const form = evt.target;
+  const input = form.querySelector('input[name="body"]');
+  const button = form.querySelector('button[type="submit"]');
   const body = (input?.value || '').trim();
   if (!body) return;
+  chatState.sendingRooms[roomId] = true;
+  input?.toggleAttribute('disabled', true);
+  button?.toggleAttribute('disabled', true);
   input.value = '';
   try {
-    await chatApi('/chat/rooms/' + encodeURIComponent(roomId) + '/messages', {
+    const data = await chatApi('/chat/rooms/' + encodeURIComponent(roomId) + '/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ body }),
     });
+    if (data.message) appendChatMessages(roomId, [data.message], { alert: false });
     pollChatRoom(roomId);
   } catch (e) {
+    if (input) input.value = body;
     showToast?.('Message not sent', 'danger');
+  } finally {
+    delete chatState.sendingRooms[roomId];
+    input?.toggleAttribute('disabled', false);
+    button?.toggleAttribute('disabled', false);
+    input?.focus();
   }
 }
 
@@ -609,26 +648,31 @@ function appendChatMessages(roomId, messages, opts = {}) {
   const roomOpen = Boolean(win && body);
   let receivedNewFromOther = false;
   if (full && body) body.innerHTML = '';
+  const appendedMessages = [];
   messages.forEach(msg => {
     chatState.lastMessageIds[roomId] = Math.max(chatState.lastMessageIds[roomId] || 0, msg.id);
+    if (body?.querySelector(`[data-chat-message-id="${CSS.escape(String(msg.id))}"]`)) return;
     const mine = chatState.me && msg.sender_id === chatState.me.id;
     if (!mine) receivedNewFromOther = true;
+    appendedMessages.push(msg);
     if (body) {
+      const noMessages = body.querySelector('[data-chat-empty]');
+      if (noMessages) noMessages.remove();
       body.insertAdjacentHTML('beforeend', `
-        <div class="chat-message ${mine ? 'mine' : ''}">
+        <div class="chat-message ${mine ? 'mine' : ''}" data-chat-message-id="${escapeHtml(String(msg.id))}">
           <div class="chat-message-meta">${mine ? 'You' : escapeHtml(msg.sender_name)} · ${escapeHtml(msg.sent_at)}</div>
           <div class="chat-message-bubble">${escapeHtml(msg.body)}</div>
         </div>`);
     }
   });
-  if (messages.length && body) body.scrollTop = body.scrollHeight;
-  const unreadNew = messages.filter(m => !chatState.me || m.sender_id !== chatState.me.id).length;
+  if (appendedMessages.length && body) body.scrollTop = body.scrollHeight;
+  const unreadNew = appendedMessages.filter(m => !chatState.me || m.sender_id !== chatState.me.id).length;
   const shouldAlert = receivedNewFromOther && (!roomOpen || win.classList.contains('minimised'));
   if (alert && shouldAlert) {
     if (win) win.classList.add('has-alert');
     chatState.unread[roomId] = (chatState.unread[roomId] || 0) + unreadNew;
     const senders = new Set(chatState.unreadSenders[roomId] || []);
-    messages.filter(m => !chatState.me || m.sender_id !== chatState.me.id).forEach(m => senders.add(m.sender_name));
+    appendedMessages.filter(m => !chatState.me || m.sender_id !== chatState.me.id).forEach(m => senders.add(m.sender_name));
     chatState.unreadSenders[roomId] = [...senders];
     updateChatUnreadBadge();
     renderChatRoster();
@@ -646,12 +690,17 @@ function appendChatMessages(roomId, messages, opts = {}) {
 
 async function pollChatRoom(roomId, opts = {}) {
   if (!chatState.openRooms[roomId] && !chatState.rooms[roomId]) return;
+  if (!opts.full && chatState.pollingRooms[roomId]) return;
+  chatState.pollingRooms[roomId] = true;
   try {
     const after = opts.full ? 0 : (chatState.lastMessageIds[roomId] || 0);
     const data = await chatApi('/chat/rooms/' + encodeURIComponent(roomId) + '/messages?after=' + after);
     if (data.room) mergeChatRooms([data.room]);
     appendChatMessages(roomId, data.messages || [], opts);
-  } catch (e) {}
+  } catch (e) {
+  } finally {
+    delete chatState.pollingRooms[roomId];
+  }
 }
 
 function pollKnownChatRooms() {

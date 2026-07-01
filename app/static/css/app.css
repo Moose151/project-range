@@ -405,6 +405,20 @@ code {
   max-height: 9rem;
   overflow: auto;
 }
+.chat-offline-users summary {
+  cursor: pointer;
+  color: var(--bs-secondary-color);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.2rem 0;
+}
+.chat-offline-users[open] {
+  border-top: 1px solid var(--bs-border-color);
+  margin-top: 0.35rem;
+}
+.chat-user-offline {
+  opacity: 0.72;
+}
 .chat-windows {
   display: flex;
   align-items: flex-end;

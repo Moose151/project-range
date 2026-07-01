@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.18.3` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.18.4` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -19,7 +19,7 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.18.3)
+## ✅ Already delivered (through 0.18.4)
 
 Core of the MVP scope is in place:
 
@@ -64,6 +64,7 @@ Core of the MVP scope is in place:
 - In-app Version History page available at `/docs/version-history`
 - Observers can request documentation edits through the approval queue
 - Chat launcher now shows unread rooms, room list, sender context, and group member management
+- Chat delivery now de-dupes overlapping polls/sends, keeps open chat windows live, and separates offline group-add candidates into a collapsed list
 - **0.6.0:** TxLO/RxLO naming, version badge, fully offline (LAN) styling, Docker deploy on port 7474
 
 ---

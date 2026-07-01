@@ -4,9 +4,17 @@ This document records the major user-facing changes shipped in each beta version
 For planned work, see [ROADMAP.md](ROADMAP.md). For deep implementation notes and
 handover details, see [HANDOVER.md](HANDOVER.md).
 
-Current version: **0.18.3**
+Current version: **0.18.4**
 
 ---
+
+## 0.18.4 — Chat Live Delivery and Member Picker Fixes
+
+- Group chat member pickers now show online users first, with offline users in a collapsed **Offline** list.
+- Fixed open chat windows missing new messages until the window was closed and reopened.
+- Added per-room polling guards and message-id de-duplication so overlapping refreshes do not render repeats.
+- Added send guards to floating chat windows and dashboard chat widgets so one click/Enter press creates one message.
+- Static cache keys bumped to `app.css?v=22` and `app.js?v=22`.
 
 ## 0.18.3 — Chat Room Inbox, Group Member Management, and Notification Clarity
 

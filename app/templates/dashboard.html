@@ -661,6 +661,10 @@ function selectDashboardChatRoom(widgetId, roomId) {
 async function loadDashboardChatMessages(widgetId, roomId, full = false) {
   const widget = document.querySelector(`[data-dashboard-chat-widget="${CSS.escape(widgetId)}"]`);
   if (!widget || !roomId) return;
+  const pollKey = `${widgetId}:${roomId}`;
+  window.dashboardChatPolling = window.dashboardChatPolling || {};
+  if (!full && window.dashboardChatPolling[pollKey]) return;
+  window.dashboardChatPolling[pollKey] = true;
   const pane = widget.querySelector('[data-dashboard-chat-messages]');
   const after = full ? 0 : parseInt(widget.dataset.lastMessageId || '0', 10);
   try {
@@ -668,12 +672,14 @@ async function loadDashboardChatMessages(widgetId, roomId, full = false) {
     if (data.room) window.chatState.rooms[roomId] = data.room;
     const messages = data.messages || [];
     if (full) pane.innerHTML = '';
-    if (!messages.length && full) pane.innerHTML = '<div class="text-muted small">No messages yet.</div>';
+    if (!messages.length && full) pane.innerHTML = '<div class="text-muted small" data-dashboard-chat-empty>No messages yet.</div>';
     messages.forEach(msg => {
       widget.dataset.lastMessageId = String(Math.max(parseInt(widget.dataset.lastMessageId || '0', 10), msg.id));
+      if (pane.querySelector(`[data-chat-message-id="${CSS.escape(String(msg.id))}"]`)) return;
       const mine = window.chatState?.me && msg.sender_id === window.chatState.me.id;
+      pane.querySelector('[data-dashboard-chat-empty]')?.remove();
       pane.insertAdjacentHTML('beforeend', `
-        <div class="chat-message ${mine ? 'mine' : ''}">
+        <div class="chat-message ${mine ? 'mine' : ''}" data-chat-message-id="${escapeHtml(String(msg.id))}">
           <div class="chat-message-meta">${mine ? 'You' : escapeHtml(msg.sender_name)} · ${escapeHtml(msg.sent_at)}</div>
           <div class="chat-message-bubble">${escapeHtml(msg.body)}</div>
         </div>`);
@@ -681,7 +687,10 @@ async function loadDashboardChatMessages(widgetId, roomId, full = false) {
     if (messages.length || full) pane.scrollTop = pane.scrollHeight;
     window.chatState.unread[roomId] = 0;
     updateChatUnreadBadge?.();
-  } catch (e) {}
+  } catch (e) {
+  } finally {
+    delete window.dashboardChatPolling[pollKey];
+  }
 }
 
 async function sendDashboardChatMessage(evt, widgetId) {
@@ -689,18 +698,42 @@ async function sendDashboardChatMessage(evt, widgetId) {
   const widget = document.querySelector(`[data-dashboard-chat-widget="${CSS.escape(widgetId)}"]`);
   const roomId = widget?.dataset.selectedRoom || '';
   const input = widget?.querySelector('.dashboard-chat-form input[name="body"]');
+  const button = widget?.querySelector('.dashboard-chat-form button[type="submit"]');
   const body = (input?.value || '').trim();
   if (!roomId || !body) return;
+  if (widget.dataset.sending === '1') return;
+  widget.dataset.sending = '1';
+  input?.toggleAttribute('disabled', true);
+  button?.toggleAttribute('disabled', true);
   input.value = '';
   try {
-    await chatApi('/chat/rooms/' + encodeURIComponent(roomId) + '/messages', {
+    const data = await chatApi('/chat/rooms/' + encodeURIComponent(roomId) + '/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ body }),
     });
+    if (data.message) {
+      const pane = widget.querySelector('[data-dashboard-chat-messages]');
+      widget.dataset.lastMessageId = String(Math.max(parseInt(widget.dataset.lastMessageId || '0', 10), data.message.id));
+      if (!pane.querySelector(`[data-chat-message-id="${CSS.escape(String(data.message.id))}"]`)) {
+        pane.querySelector('[data-dashboard-chat-empty]')?.remove();
+        pane.insertAdjacentHTML('beforeend', `
+          <div class="chat-message mine" data-chat-message-id="${escapeHtml(String(data.message.id))}">
+            <div class="chat-message-meta">You · ${escapeHtml(data.message.sent_at)}</div>
+            <div class="chat-message-bubble">${escapeHtml(data.message.body)}</div>
+          </div>`);
+        pane.scrollTop = pane.scrollHeight;
+      }
+    }
     loadDashboardChatMessages(widgetId, roomId);
   } catch (e) {
+    if (input) input.value = body;
     showToast?.('Message not sent', 'danger');
+  } finally {
+    delete widget.dataset.sending;
+    input?.toggleAttribute('disabled', false);
+    button?.toggleAttribute('disabled', false);
+    input?.focus();
   }
 }
 
