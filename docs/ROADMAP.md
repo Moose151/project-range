@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.18.1` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.18.2` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -19,7 +19,7 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.18.1)
+## ✅ Already delivered (through 0.18.2)
 
 Core of the MVP scope is in place:
 

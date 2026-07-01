@@ -31,8 +31,10 @@ env/
 *.swp
 .DS_Store
 
-# Docs not needed at runtime
-docs/
+# Most docs are not needed at runtime, but VERSION_HISTORY.md is rendered by
+# the in-app /docs/version-history page.
+docs/*
+!docs/VERSION_HISTORY.md
 README.md
 
 # Logs

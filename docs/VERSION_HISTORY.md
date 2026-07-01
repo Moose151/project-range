@@ -4,9 +4,14 @@ This document records the major user-facing changes shipped in each beta version
 For planned work, see [ROADMAP.md](ROADMAP.md). For deep implementation notes and
 handover details, see [HANDOVER.md](HANDOVER.md).
 
-Current version: **0.18.1**
+Current version: **0.18.2**
 
 ---
+
+## 0.18.2 — Version History Docker Packaging Fix
+
+- Fixed the in-app Version History page in Docker deployments by allowing `docs/VERSION_HISTORY.md` into the image.
+- Previously the app route worked, but `.dockerignore` excluded the `docs/` folder, so the page showed "No version history document found."
 
 ## 0.18.1 — In-App Version History and Observer Document Edit Requests
 
