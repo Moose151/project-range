@@ -64,7 +64,7 @@ Core of the MVP scope is in place:
 - In-app Version History page available at `/docs/version-history`
 - Observers can request documentation edits through the approval queue
 - Chat launcher now shows unread rooms, room list, sender context, and group member management
-- Chat delivery now de-dupes overlapping polls/sends, keeps open chat windows live, and separates offline group-add candidates into a collapsed list
+- Chat delivery now de-dupes overlapping polls/sends, keeps open chat windows live, clears viewed notification bubbles reliably, and separates offline group-add candidates into a collapsed list
 - **0.6.0:** TxLO/RxLO naming, version badge, fully offline (LAN) styling, Docker deploy on port 7474
 
 ---

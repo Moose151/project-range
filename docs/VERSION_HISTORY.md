@@ -14,7 +14,8 @@ Current version: **0.18.4**
 - Fixed open chat windows missing new messages until the window was closed and reopened.
 - Added per-room polling guards and message-id de-duplication so overlapping refreshes do not render repeats.
 - Added send guards to floating chat windows and dashboard chat widgets so one click/Enter press creates one message.
-- Static cache keys bumped to `app.css?v=22` and `app.js?v=22`.
+- Fixed the bottom-right chat notification bubble so it clears as soon as all messages in a room have been viewed.
+- Static cache keys bumped to `app.css?v=23` and `app.js?v=23`.
 
 ## 0.18.3 — Chat Room Inbox, Group Member Management, and Notification Clarity
 

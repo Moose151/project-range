@@ -358,6 +358,20 @@ function chatRoomButton(room, { unreadOnly = false } = {}) {
     </button>`;
 }
 
+function clearChatUnread(roomId, { redraw = true } = {}) {
+  if (!roomId) return;
+  chatState.unread[roomId] = 0;
+  chatState.unreadSenders[roomId] = [];
+  chatState.roomSeen[roomId] = true;
+  document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"]`)?.classList.remove('has-alert');
+  updateChatUnreadBadge();
+  if (redraw) {
+    renderChatRoster();
+    window.renderDashboardChatWidget?.();
+  }
+  saveChatSessionState();
+}
+
 function splitChatUsersByPresence(users) {
   const onlineIds = new Set((chatState.users || []).map(u => u.id));
   return {
@@ -492,14 +506,12 @@ function openChatWindow(roomId) {
   const room = chatState.rooms[roomId];
   if (!room) return;
   chatState.openRooms[roomId] = true;
-  chatState.unread[roomId] = 0;
-  chatState.unreadSenders[roomId] = [];
-  chatState.roomSeen[roomId] = true;
+  clearChatUnread(roomId, { redraw: false });
   const existing = document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"]`);
   if (existing) {
     existing.classList.remove('minimised', 'has-alert');
-    updateChatUnreadBadge();
     renderChatRoster();
+    window.renderDashboardChatWidget?.();
     pollChatRoom(roomId, { full: true, alert: false });
     return;
   }
@@ -527,8 +539,8 @@ function openChatWindow(roomId) {
     </form>`;
   windows.appendChild(node);
   pollChatRoom(roomId, { full: true, alert: false });
-  updateChatUnreadBadge();
   renderChatRoster();
+  window.renderDashboardChatWidget?.();
 }
 
 function toggleChatWindowMinimised(roomId) {
@@ -536,24 +548,14 @@ function toggleChatWindowMinimised(roomId) {
   if (!win) return;
   win.classList.toggle('minimised');
   if (!win.classList.contains('minimised')) {
-    win.classList.remove('has-alert');
-    chatState.unread[roomId] = 0;
-    chatState.unreadSenders[roomId] = [];
-    chatState.roomSeen[roomId] = true;
-    updateChatUnreadBadge();
-    renderChatRoster();
-    saveChatSessionState();
+    clearChatUnread(roomId);
   }
 }
 
 function closeChatWindow(roomId) {
   document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"]`)?.remove();
   delete chatState.openRooms[roomId];
-  chatState.unread[roomId] = 0;
-  chatState.unreadSenders[roomId] = [];
-  updateChatUnreadBadge();
-  renderChatRoster();
-  saveChatSessionState();
+  clearChatUnread(roomId);
 }
 
 function groupMembersPanel(room) {
@@ -680,10 +682,7 @@ function appendChatMessages(roomId, messages, opts = {}) {
     if (room && !roomOpen) showToast?.(`New chat message: ${escapeHtml(room.title)}`, 'info');
   }
   if (!alert && roomOpen && !win.classList.contains('minimised')) {
-    chatState.unread[roomId] = 0;
-    chatState.unreadSenders[roomId] = [];
-    updateChatUnreadBadge();
-    renderChatRoster();
+    clearChatUnread(roomId);
   }
   saveChatSessionState();
 }
@@ -719,10 +718,7 @@ document.addEventListener('click', (evt) => {
   const win = evt.target.closest?.('.chat-window');
   if (win) {
     const roomId = win.dataset.chatWindow;
-    win.classList.remove('has-alert');
-    chatState.unread[roomId] = 0;
-    updateChatUnreadBadge();
-    saveChatSessionState();
+    if (!win.classList.contains('minimised')) clearChatUnread(roomId);
   }
 });
 

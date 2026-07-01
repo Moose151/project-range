@@ -649,9 +649,7 @@ function selectDashboardChatRoom(widgetId, roomId) {
   widget.dataset.lastMessageId = '0';
   setDashboardChatEnabled(widget, Boolean(roomId));
   if (roomId) {
-    window.chatState.unread[roomId] = 0;
-    window.chatState.roomSeen[roomId] = true;
-    updateChatUnreadBadge?.();
+    clearChatUnread?.(roomId, { redraw: false });
     loadDashboardChatMessages(widgetId, roomId, true);
   } else {
     widget.querySelector('[data-dashboard-chat-messages]').innerHTML = '<div class="text-muted small">Select an online user or existing room.</div>';
@@ -685,8 +683,7 @@ async function loadDashboardChatMessages(widgetId, roomId, full = false) {
         </div>`);
     });
     if (messages.length || full) pane.scrollTop = pane.scrollHeight;
-    window.chatState.unread[roomId] = 0;
-    updateChatUnreadBadge?.();
+    clearChatUnread?.(roomId, { redraw: false });
   } catch (e) {
   } finally {
     delete window.dashboardChatPolling[pollKey];
