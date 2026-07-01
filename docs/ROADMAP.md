@@ -1,11 +1,13 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.18.0` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.18.1` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
 the MVP success criteria in [Scope.txt](Scope.txt), with the day-to-day features
 operators have asked for.
+
+For a chronological release-by-release summary, see [VERSION_HISTORY.md](VERSION_HISTORY.md).
 
 ## Versioning
 
@@ -17,7 +19,7 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.18.0)
+## ✅ Already delivered (through 0.18.1)
 
 Core of the MVP scope is in place:
 
@@ -59,6 +61,8 @@ Core of the MVP scope is in place:
 - Signal packages assigned only to closed serials can now be deleted while preserving log history
 - Chat presence ages out faster and sends an offline beacon on browser/page close
 - EBEM/CBM read-only sync runs automatically every 5 seconds by default (`CBM_AUTO_SYNC_SECONDS`, `0` disables)
+- In-app Version History page available at `/docs/version-history`
+- Observers can request documentation edits through the approval queue
 - **0.6.0:** TxLO/RxLO naming, version badge, fully offline (LAN) styling, Docker deploy on port 7474
 
 ---

@@ -34,6 +34,14 @@ SAFETY_SUPERVISOR_ALLOWED_WRITES = {
 }
 
 
+def _observer_write_allowed(path: str) -> bool:
+    if path in SAFETY_SUPERVISOR_ALLOWED_WRITES:
+        return True
+    # Observers may request documentation edits, but cannot approve, reject,
+    # restore, create pages, or perform other write actions.
+    return path.startswith("/docs/") and path.endswith("/edit")
+
+
 @app.middleware("http")
 async def security_middleware(request: Request, call_next):
     # CSRF defence: for state-changing methods, require a same-origin Origin/Referer.
@@ -49,7 +57,7 @@ async def security_middleware(request: Request, call_next):
         # Read-only enforcement: an Observer account may not make changes,
         # except the explicitly allowed CEASE + own-password actions above.
         user_id = request.session.get("user_id")
-        if user_id and request.url.path not in SAFETY_SUPERVISOR_ALLOWED_WRITES and not request.url.path.startswith("/chat/"):
+        if user_id and not _observer_write_allowed(request.url.path) and not request.url.path.startswith("/chat/"):
             db = SessionLocal()
             try:
                 u = db.query(User).filter(User.id == user_id, User.is_archived == False).first()

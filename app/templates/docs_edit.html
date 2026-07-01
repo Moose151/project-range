@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{% if mode == 'new' %}New Page{% elif mode == 'propose' %}Propose Edit — {{ doc_page.title }}{% else %}Edit — {{ doc_page.title }}{% endif %}{% endblock %}
+{% block title %}{% if mode == 'new' %}New Page{% elif mode == 'propose' and user.role == 'observer' %}Request Edit — {{ doc_page.title }}{% elif mode == 'propose' %}Propose Edit — {{ doc_page.title }}{% else %}Edit — {{ doc_page.title }}{% endif %}{% endblock %}
 
 {% block content %}
 <div class="d-flex align-items-center mb-3 gap-2">
@@ -8,11 +8,12 @@
       <ol class="breadcrumb mb-1">
         <li class="breadcrumb-item"><a href="/docs">Documentation</a></li>
         {% if doc_page %}<li class="breadcrumb-item"><a href="/docs/{{ doc_page.slug }}">{{ doc_page.title }}</a></li>{% endif %}
-        <li class="breadcrumb-item active">{% if mode == 'new' %}New Page{% elif mode == 'propose' %}Propose Edit{% else %}Edit{% endif %}</li>
+        <li class="breadcrumb-item active">{% if mode == 'new' %}New Page{% elif mode == 'propose' and user.role == 'observer' %}Request Edit{% elif mode == 'propose' %}Propose Edit{% else %}Edit{% endif %}</li>
       </ol>
     </nav>
     <h4 class="mb-0">
       {% if mode == 'new' %}<i class="bi bi-file-earmark-plus me-2"></i>New Documentation Page
+      {% elif mode == 'propose' and user.role == 'observer' %}<i class="bi bi-pencil-square me-2"></i>Request Edit — {{ doc_page.title }}
       {% elif mode == 'propose' %}<i class="bi bi-pencil-square me-2"></i>Propose Edit — {{ doc_page.title }}
       {% else %}<i class="bi bi-pencil me-2"></i>Edit — {{ doc_page.title }}{% endif %}
     </h4>
@@ -22,7 +23,7 @@
 {% if mode == 'propose' %}
 <div class="alert alert-info py-2 mb-3">
   <i class="bi bi-info-circle me-1"></i>
-  Your edit will be submitted for administrator review. It will not appear on the page until approved.
+  Your edit request will be submitted for administrator review. It will not appear on the page until approved.
 </div>
 {% endif %}
 
@@ -59,6 +60,7 @@
       <div class="d-flex gap-2">
         <button type="submit" class="btn btn-primary">
           {% if mode == 'new' %}<i class="bi bi-plus-lg me-1"></i>Create Page
+          {% elif mode == 'propose' and user.role == 'observer' %}<i class="bi bi-send me-1"></i>Submit Request
           {% elif mode == 'propose' %}<i class="bi bi-send me-1"></i>Submit Proposal
           {% else %}<i class="bi bi-check-lg me-1"></i>Save Changes{% endif %}
         </button>

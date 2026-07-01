@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import bleach
@@ -15,6 +16,8 @@ from app.models import AuditLog, DocPage, DocVersion, User
 
 router = APIRouter(prefix="/docs")
 from app.templating import templates
+
+VERSION_HISTORY_PATH = Path(__file__).resolve().parents[2] / "docs" / "VERSION_HISTORY.md"
 
 ALLOWED_TAGS = list(bleach.sanitizer.ALLOWED_TAGS) + [
     "h1", "h2", "h3", "h4", "h5", "h6",
@@ -176,6 +179,22 @@ async def docs_proposals(
         "proposals": proposals,
         "page": "docs",
         "toast": request.query_params.get("toast", ""),
+    })
+
+
+@router.get("/version-history", response_class=HTMLResponse)
+async def docs_version_history(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    content = VERSION_HISTORY_PATH.read_text(encoding="utf-8") if VERSION_HISTORY_PATH.exists() else "# Version History\n\nNo version history document found."
+    rendered = _render_markdown(content)
+    return templates.TemplateResponse(request, "version_history.html", {
+        "user": current_user,
+        "range_state": get_current_range_state(db),
+        "rendered": rendered,
+        "page": "version_history",
     })
 
 

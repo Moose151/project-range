@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.18.0` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.18.1` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -190,6 +190,10 @@
   - Package deletion now blocks only active/pending serial assignments. If all package references are from closed serials in history, the old `serial_packages` links are removed and the package can be deleted; signal log history remains intact.
   - Chat presence now uses a shorter 25-second online window plus a `/chat/offline` `sendBeacon` on browser/page close. This cannot make browser-close detection perfect, but stale users disappear much faster and normal logout still removes them immediately.
   - EBEM/CBM read-only sync now runs automatically every **5 seconds** in a FastAPI background task using the existing `sync_active_cbms` path. Configure with `CBM_AUTO_SYNC_SECONDS` (`0` disables). The task skips overlapping runs and executes polling in a worker thread so SSH reads do not block web requests.
+- **0.18.1 — In-app Version History + Observer document edit requests:**
+  - Added `docs/VERSION_HISTORY.md` as a chronological release history and exposed it in-app at `/docs/version-history`.
+  - Sidebar Records now includes **Version History** for all logged-in users.
+  - Observers can now request edits to documentation pages using the existing docs proposal workflow. The global Observer write middleware allows only `POST /docs/{slug}/edit` for this purpose; approvals/rejections/restores/page creation remain administrator-only.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.
