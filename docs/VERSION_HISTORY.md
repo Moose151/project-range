@@ -4,9 +4,18 @@ This document records the major user-facing changes shipped in each beta version
 For planned work, see [ROADMAP.md](ROADMAP.md). For deep implementation notes and
 handover details, see [HANDOVER.md](HANDOVER.md).
 
-Current version: **0.18.2**
+Current version: **0.18.3**
 
 ---
+
+## 0.18.3 — Chat Room Inbox, Group Member Management, and Notification Clarity
+
+- Fixed group chat usability by adding visible **Unread** and **Chats** lists to the chat launcher.
+- Users can now open group/private rooms from the chat launcher instead of relying on a toast or dashboard widget.
+- Unread notifications now show which chat room has unread messages and who sent them.
+- Added group member management from an open group chat window.
+- Group creators/members can add active users to an existing group chat after it has been created.
+- Dashboard chat room dropdowns now show unread counts.
 
 ## 0.18.2 — Version History Docker Packaging Fix
 

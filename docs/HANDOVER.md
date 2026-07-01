@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.18.2` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.18.3` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -197,6 +197,12 @@
 - **0.18.2 — Version History Docker packaging fix:**
   - `.dockerignore` now excludes most docs but explicitly includes `docs/VERSION_HISTORY.md`, because `/docs/version-history` renders that markdown at runtime.
   - This fixes Docker deployments showing "No version history document found" even though the file exists in git.
+- **0.18.3 — Chat room inbox + group member management:**
+  - Chat launcher now has **Unread** and **Chats** sections, so group/private rooms can be opened from the chat UI after a notification.
+  - Unread state tracks room counts plus sender names, so opening the contacts/chat menu shows where notifications came from.
+  - Group chat windows now have a member-management panel (`person-plus` button) and call `POST /chat/rooms/{room_id}/members` to add active users after creation.
+  - `/chat/state` returns `available_users` and room `participant_details` for richer chat UI rendering.
+  - Static cache keys bumped to `app.css?v=21` / `app.js?v=21`.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.

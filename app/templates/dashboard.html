@@ -608,7 +608,7 @@ function renderDashboardChatWidget() {
     if (select) {
       const current = selected || select.value || '';
       select.innerHTML = '<option value="">Select a chat...</option>' + roomList.map(room =>
-        `<option value="${escapeHtml(room.id)}" ${current === room.id ? 'selected' : ''}>${escapeHtml(room.title)}</option>`
+        `<option value="${escapeHtml(room.id)}" ${current === room.id ? 'selected' : ''}>${escapeHtml(room.title)}${window.chatState?.unread?.[room.id] ? ` (${window.chatState.unread[room.id]} new)` : ''}</option>`
       ).join('');
       if (current && roomList.some(room => room.id === current)) select.value = current;
     }

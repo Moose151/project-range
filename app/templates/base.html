@@ -9,7 +9,7 @@
   <!-- Vendored locally so styling works on LAN devices with no internet access -->
   <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="/static/vendor/bootstrap-icons/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=20">
+  <link rel="stylesheet" href="/static/css/app.css?v=21">
   <link rel="icon" type="image/png" href="/static/img/sew-range-logo.png">
   <!-- Installable-app (PWA) metadata: lets browsers add "Range Dashboard" to the
        desktop with the logo as its icon. See the Desktop App tab in System Config. -->
@@ -277,6 +277,14 @@
       </button>
     </div>
     <div class="chat-roster-body">
+      <div id="chatUnreadSection" class="chat-section d-none">
+        <div class="chat-section-title text-warning"><i class="bi bi-bell-fill me-1"></i>Unread</div>
+        <div id="chatUnreadRooms" class="small"></div>
+      </div>
+      <div class="chat-section">
+        <div class="chat-section-title"><i class="bi bi-chat-left-text me-1"></i>Chats</div>
+        <div id="chatRoomList" class="small"></div>
+      </div>
       <div class="d-flex align-items-center justify-content-between mb-1">
         <span class="text-muted small">Online</span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="toggleChatGroupCreator()" title="Create group chat">
@@ -302,7 +310,7 @@
 
 <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="/static/vendor/htmx/htmx.min.js"></script>
-<script src="/static/js/app.js?v=20"></script>
+<script src="/static/js/app.js?v=21"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

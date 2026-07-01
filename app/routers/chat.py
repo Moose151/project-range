@@ -33,6 +33,23 @@ def _room_title(room, current_user: User, db: Session | None = None) -> str:
 
 def _room_payload(room, current_user: User, db: Session | None = None) -> dict:
     other = _room_peer(room, current_user, db)
+    participants = []
+    if db is not None:
+        users = (
+            db.query(User)
+            .filter(User.id.in_(room.participant_ids), User.is_active == True, User.is_archived == False)
+            .order_by(User.display_name)
+            .all()
+        )
+        participants = [
+            {
+                "id": user.id,
+                "display_name": user.display_name,
+                "duty_role": user.duty_role or "",
+                "duty_role_color": user.duty_role_color or "",
+            }
+            for user in users
+        ]
     return {
         "id": room.id,
         "title": other.display_name if other else _room_title(room, current_user, db),
@@ -40,6 +57,7 @@ def _room_payload(room, current_user: User, db: Session | None = None) -> dict:
         "title_duty_role_color": other.duty_role_color if other else "",
         "is_group": room.is_group,
         "participants": sorted(room.participant_ids),
+        "participant_details": participants,
         "last_message_id": chat_state.last_message_id(room),
         "unread_hint": False,
     }
@@ -56,6 +74,15 @@ def _message_payload(msg) -> dict:
     }
 
 
+def _user_payload(user: User) -> dict:
+    return {
+        "id": user.id,
+        "display_name": user.display_name,
+        "duty_role": user.duty_role or "",
+        "duty_role_color": user.duty_role_color or "",
+    }
+
+
 @router.get("/state")
 async def chat_state_endpoint(
     current_user: User = Depends(get_current_user),
@@ -68,9 +95,16 @@ async def chat_state_endpoint(
         current_user.duty_role or "",
         current_user.duty_role_color or "",
     )
+    available_users = (
+        db.query(User)
+        .filter(User.is_active == True, User.is_archived == False)
+        .order_by(User.display_name)
+        .all()
+    )
     return JSONResponse({
         "me": {"id": current_user.id, "display_name": current_user.display_name},
         "online_users": chat_state.online_users(),
+        "available_users": [_user_payload(user) for user in available_users],
         "rooms": [_room_payload(room, current_user, db) for room in chat_state.user_rooms(current_user.id)],
     })
 
@@ -118,6 +152,29 @@ async def chat_group_room(
         .all()
     ] if ids else []
     room = chat_state.create_group_room(current_user.id, active_ids, title)
+    return JSONResponse({"room": _room_payload(room, current_user, db)})
+
+
+@router.post("/rooms/{room_id}/members")
+async def chat_add_group_members(
+    room_id: str,
+    participant_ids: str = Form(""),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    ids = []
+    for raw in participant_ids.split(","):
+        raw = raw.strip()
+        if raw.isdigit():
+            ids.append(int(raw))
+    active_ids = [
+        uid for (uid,) in db.query(User.id)
+        .filter(User.id.in_(ids), User.is_active == True, User.is_archived == False)
+        .all()
+    ] if ids else []
+    room = chat_state.add_group_members(room_id, current_user.id, active_ids)
+    if not room:
+        return JSONResponse({"error": "Group chat not found"}, status_code=404)
     return JSONResponse({"room": _room_payload(room, current_user, db)})
 
 

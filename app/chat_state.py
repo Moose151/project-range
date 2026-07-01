@@ -108,6 +108,15 @@ def create_group_room(creator_id: int, participant_ids: list[int], title: str) -
         return room
 
 
+def add_group_members(room_id: str, requester_id: int, participant_ids: list[int]) -> ChatRoom | None:
+    with _lock:
+        room = _rooms.get(room_id)
+        if room is None or not room.is_group or requester_id not in room.participant_ids:
+            return None
+        room.participant_ids.update(participant_ids)
+        return room
+
+
 def user_rooms(user_id: int) -> list[ChatRoom]:
     with _lock:
         return [room for room in _rooms.values() if user_id in room.participant_ids]

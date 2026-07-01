@@ -281,6 +281,7 @@ function saveChatSessionState() {
     sessionStorage.setItem('projectRangeChatState', JSON.stringify({
       lastMessageIds: chatState.lastMessageIds,
       unread: chatState.unread,
+      unreadSenders: chatState.unreadSenders,
     }));
   } catch (e) {}
 }
@@ -289,11 +290,13 @@ const savedChatState = loadChatSessionState();
 const chatState = {
   me: null,
   users: [],
+  availableUsers: [],
   rooms: {},
   openRooms: {},
   lastMessageIds: savedChatState.lastMessageIds || {},
   roomSeen: {},
   unread: savedChatState.unread || {},
+  unreadSenders: savedChatState.unreadSenders || {},
   rosterOpen: false,
 };
 window.chatState = chatState;
@@ -320,25 +323,69 @@ function toggleChatGroupCreator() {
   document.getElementById('chatGroupCreator')?.classList.toggle('d-none');
 }
 
+function chatRoomIcon(room) {
+  return room.is_group ? 'bi-people-fill' : 'bi-person-fill';
+}
+
+function chatRoomParticipants(room) {
+  const people = room.participant_details || [];
+  if (!people.length || !chatState.me) return '';
+  const names = people
+    .filter(p => p.id !== chatState.me.id)
+    .map(p => p.display_name)
+    .slice(0, 4);
+  const extra = Math.max(0, people.length - 1 - names.length);
+  return names.join(', ') + (extra ? `, +${extra}` : '');
+}
+
+function chatRoomButton(room, { unreadOnly = false } = {}) {
+  const unread = chatState.unread[room.id] || 0;
+  const senders = [...(chatState.unreadSenders[room.id] || [])].filter(Boolean);
+  const senderText = senders.length ? senders.slice(0, 3).join(', ') : '';
+  const meta = unreadOnly && senderText
+    ? `${unread} new from ${escapeHtml(senderText)}`
+    : (chatRoomParticipants(room) || (room.is_group ? 'Group chat' : 'Private chat'));
+  return `
+    <button type="button" class="chat-room-row ${unread ? 'has-unread' : ''}" onclick="openChatWindow('${escapeHtml(room.id)}')">
+      <i class="bi ${chatRoomIcon(room)}"></i>
+      <span class="chat-room-main">
+        <span class="chat-room-title">${escapeHtml(room.title)}</span>
+        <span class="chat-room-meta">${meta}</span>
+      </span>
+      ${unread ? `<span class="chat-room-count">${unread > 99 ? '99+' : unread}</span>` : ''}
+    </button>`;
+}
+
 function renderChatRoster() {
   const online = document.getElementById('chatOnlineUsers');
   const groupUsers = document.getElementById('chatGroupUsers');
-  if (!online || !groupUsers) return;
-  const others = chatState.users.filter(u => !chatState.me || u.id !== chatState.me.id);
-  online.innerHTML = others.length ? others.map(u => `
-    <button type="button" class="chat-user-row" ondblclick="openPrivateChat(${u.id})" title="Double-click to chat">
+  const roomListEl = document.getElementById('chatRoomList');
+  const unreadSection = document.getElementById('chatUnreadSection');
+  const unreadRoomsEl = document.getElementById('chatUnreadRooms');
+  if (!online || !groupUsers || !roomListEl || !unreadSection || !unreadRoomsEl) return;
+  const onlineOthers = chatState.users.filter(u => !chatState.me || u.id !== chatState.me.id);
+  const availableOthers = (chatState.availableUsers || chatState.users || []).filter(u => !chatState.me || u.id !== chatState.me.id);
+  const rooms = Object.values(chatState.rooms).sort((a, b) => (chatState.unread[b.id] || 0) - (chatState.unread[a.id] || 0) || a.title.localeCompare(b.title));
+  const unreadRooms = rooms.filter(room => (chatState.unread[room.id] || 0) > 0);
+  unreadSection.classList.toggle('d-none', unreadRooms.length === 0);
+  unreadRoomsEl.innerHTML = unreadRooms.map(room => chatRoomButton(room, { unreadOnly: true })).join('');
+  roomListEl.innerHTML = rooms.length
+    ? rooms.map(room => chatRoomButton(room)).join('')
+    : '<div class="text-muted py-2">No chats yet. Select an online user or create a group.</div>';
+  online.innerHTML = onlineOthers.length ? onlineOthers.map(u => `
+    <button type="button" class="chat-user-row" onclick="openPrivateChat(${u.id})" title="Open private chat">
       <span class="chat-presence-dot"></span>
       <span class="text-truncate">${escapeHtml(u.display_name)}</span>
       ${chatRoleBadge(u)}
     </button>
   `).join('') : '<div class="text-muted py-2">No other users online.</div>';
-  groupUsers.innerHTML = others.length ? others.map(u => `
+  groupUsers.innerHTML = availableOthers.length ? availableOthers.map(u => `
     <label class="d-flex align-items-center gap-2 py-1">
       <input class="form-check-input m-0" type="checkbox" value="${u.id}" data-chat-group-user>
       <span class="text-truncate">${escapeHtml(u.display_name)}</span>
       ${chatRoleBadge(u)}
     </label>
-  `).join('') : '<div class="text-muted py-2">No online users to add.</div>';
+  `).join('') : '<div class="text-muted py-2">No users available to add.</div>';
 }
 
 function chatRoleBadge(user) {
@@ -370,6 +417,7 @@ async function refreshChatState() {
     const data = await chatApi('/chat/state');
     chatState.me = data.me;
     chatState.users = data.online_users || [];
+    chatState.availableUsers = data.available_users || chatState.users || [];
     mergeChatRooms(data.rooms);
     pollKnownChatRooms();
     renderChatRoster();
@@ -415,11 +463,13 @@ function openChatWindow(roomId) {
   if (!room) return;
   chatState.openRooms[roomId] = true;
   chatState.unread[roomId] = 0;
+  chatState.unreadSenders[roomId] = [];
   chatState.roomSeen[roomId] = true;
   const existing = document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"]`);
   if (existing) {
     existing.classList.remove('minimised', 'has-alert');
     updateChatUnreadBadge();
+    renderChatRoster();
     pollChatRoom(roomId, { full: true, alert: false });
     return;
   }
@@ -435,9 +485,11 @@ function openChatWindow(roomId) {
         <span class="text-truncate">${escapeHtml(room.title)}</span>
         ${chatRoomDutyBadge(room)}
       </div>
-      <button type="button" class="btn btn-sm btn-link link-secondary p-0 ms-auto" title="Minimise" onclick="event.stopPropagation(); toggleChatWindowMinimised('${escapeHtml(roomId)}')"><i class="bi bi-dash-lg"></i></button>
+      ${room.is_group ? `<button type="button" class="btn btn-sm btn-link link-secondary p-0 ms-auto" title="Manage members" onclick="event.stopPropagation(); toggleGroupMembers('${escapeHtml(roomId)}')"><i class="bi bi-person-plus"></i></button>` : ''}
+      <button type="button" class="btn btn-sm btn-link link-secondary p-0 ${room.is_group ? '' : 'ms-auto'}" title="Minimise" onclick="event.stopPropagation(); toggleChatWindowMinimised('${escapeHtml(roomId)}')"><i class="bi bi-dash-lg"></i></button>
       <button type="button" class="btn btn-sm btn-link link-secondary p-0" title="Close" onclick="event.stopPropagation(); closeChatWindow('${escapeHtml(roomId)}')"><i class="bi bi-x-lg"></i></button>
     </div>
+    ${room.is_group ? `<div class="chat-group-members d-none" data-chat-group-members>${groupMembersPanel(room)}</div>` : ''}
     <div class="chat-window-body" data-chat-messages></div>
     <form class="chat-window-form" onsubmit="sendChatMessage(event, '${escapeHtml(roomId)}')">
       <input type="text" class="form-control form-control-sm" name="body" autocomplete="off" maxlength="2000" placeholder="Message">
@@ -446,6 +498,7 @@ function openChatWindow(roomId) {
   windows.appendChild(node);
   pollChatRoom(roomId, { full: true, alert: false });
   updateChatUnreadBadge();
+  renderChatRoster();
 }
 
 function toggleChatWindowMinimised(roomId) {
@@ -455,8 +508,10 @@ function toggleChatWindowMinimised(roomId) {
   if (!win.classList.contains('minimised')) {
     win.classList.remove('has-alert');
     chatState.unread[roomId] = 0;
+    chatState.unreadSenders[roomId] = [];
     chatState.roomSeen[roomId] = true;
     updateChatUnreadBadge();
+    renderChatRoster();
     saveChatSessionState();
   }
 }
@@ -465,8 +520,67 @@ function closeChatWindow(roomId) {
   document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"]`)?.remove();
   delete chatState.openRooms[roomId];
   chatState.unread[roomId] = 0;
+  chatState.unreadSenders[roomId] = [];
   updateChatUnreadBadge();
+  renderChatRoster();
   saveChatSessionState();
+}
+
+function groupMembersPanel(room) {
+  const people = room.participant_details || [];
+  const participantIds = new Set(room.participants || []);
+  const available = (chatState.availableUsers || chatState.users || []).filter(u => !participantIds.has(u.id));
+  const members = people.map(p => `
+    <span class="badge rounded-pill text-bg-secondary me-1 mb-1">${escapeHtml(p.display_name)}${chatRoleBadge(p)}</span>
+  `).join('') || '<span class="text-muted">No members listed.</span>';
+  const addList = available.length ? available.map(u => `
+    <label class="d-flex align-items-center gap-2 py-1">
+      <input class="form-check-input m-0" type="checkbox" value="${u.id}" data-chat-add-member>
+      <span class="text-truncate">${escapeHtml(u.display_name)}</span>
+      ${chatRoleBadge(u)}
+    </label>
+  `).join('') : '<div class="text-muted small">No users available to add.</div>';
+  return `
+    <div class="small text-muted mb-1">Members</div>
+    <div class="mb-2">${members}</div>
+    <div class="small text-muted mb-1">Add users</div>
+    <div class="chat-add-members-list">${addList}</div>
+    <button type="button" class="btn btn-sm btn-primary mt-2" onclick="addSelectedGroupMembers('${escapeHtml(room.id)}')">
+      <i class="bi bi-person-plus me-1"></i>Add Selected
+    </button>`;
+}
+
+function refreshGroupMembersPanel(roomId) {
+  const room = chatState.rooms[roomId];
+  const panel = document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"] [data-chat-group-members]`);
+  if (room && panel) panel.innerHTML = groupMembersPanel(room);
+}
+
+function toggleGroupMembers(roomId) {
+  const panel = document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"] [data-chat-group-members]`);
+  if (!panel) return;
+  panel.classList.toggle('d-none');
+  refreshGroupMembersPanel(roomId);
+}
+
+async function addSelectedGroupMembers(roomId) {
+  const panel = document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"] [data-chat-group-members]`);
+  const ids = [...(panel?.querySelectorAll('[data-chat-add-member]:checked') || [])].map(x => x.value);
+  if (!ids.length) { showToast?.('Select at least one user to add', 'warning'); return; }
+  try {
+    const data = await chatApi('/chat/rooms/' + encodeURIComponent(roomId) + '/members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ participant_ids: ids.join(',') }),
+    });
+    mergeChatRooms([data.room]);
+    refreshGroupMembersPanel(roomId);
+    renderChatRoster();
+    window.renderDashboardChatWidget?.();
+    showToast?.('Group members updated', 'success');
+  } catch (e) {
+    showToast?.('Could not add group members', 'danger');
+  }
 }
 
 async function sendChatMessage(evt, roomId) {
@@ -513,13 +627,19 @@ function appendChatMessages(roomId, messages, opts = {}) {
   if (alert && shouldAlert) {
     if (win) win.classList.add('has-alert');
     chatState.unread[roomId] = (chatState.unread[roomId] || 0) + unreadNew;
+    const senders = new Set(chatState.unreadSenders[roomId] || []);
+    messages.filter(m => !chatState.me || m.sender_id !== chatState.me.id).forEach(m => senders.add(m.sender_name));
+    chatState.unreadSenders[roomId] = [...senders];
     updateChatUnreadBadge();
+    renderChatRoster();
     const room = chatState.rooms[roomId];
     if (room && !roomOpen) showToast?.(`New chat message: ${escapeHtml(room.title)}`, 'info');
   }
   if (!alert && roomOpen && !win.classList.contains('minimised')) {
     chatState.unread[roomId] = 0;
+    chatState.unreadSenders[roomId] = [];
     updateChatUnreadBadge();
+    renderChatRoster();
   }
   saveChatSessionState();
 }
