@@ -75,6 +75,14 @@ async def chat_state_endpoint(
     })
 
 
+@router.post("/offline")
+async def chat_offline(
+    current_user: User = Depends(get_current_user),
+):
+    chat_state.forget_user(current_user.id)
+    return JSONResponse({"ok": True})
+
+
 @router.post("/rooms/private")
 async def chat_private_room(
     user_id: int = Form(...),

@@ -3,14 +3,14 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from urllib.parse import quote_plus
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials, is_testing_state
 from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage, SerialCDATable, CDAWindow, RFDevice
 from app.cbm_sync import sync_active_cbms
-from app.rf_config import serial_package_rf_config
+from app.rf_config import serial_package_rf_config, recalculate_from_values
 from app.signal_warnings import warning_flags_for
 from app.settings import get_local_timezone
 from app.routers.docs import _render_markdown
@@ -19,8 +19,20 @@ from app.routers.docs import _render_markdown
 class _SignalUpdate(BaseModel):
     signal_name: str
     signal_status: str
+    modulation: Optional[str] = None
+    fec: Optional[str] = None
+    symbol_rate: Optional[str] = None
+    source: Optional[str] = None
+    antenna: Optional[str] = None
     power: Optional[float] = None
     power_unit: str = "dBm"
+    eb_no: Optional[float] = None
+    tx_if: Optional[float] = None
+    tx_rf: Optional[float] = None
+    rx_rf: Optional[float] = None
+    rx_if: Optional[float] = None
+    notes: Optional[str] = None
+    changed_fields: list[str] = Field(default_factory=list)
 
 
 class _BulkUpdateBody(BaseModel):
@@ -345,6 +357,43 @@ def _pkg_rf_by_signal(db: Session, serial_id: int, signals: list[SignalLog]) -> 
     }
 
 
+def _blank_to_none(value):
+    return None if value == "" else value
+
+
+def _dashboard_values_from_update(
+    db: Session,
+    serial_id: int | None,
+    latest: SignalLog | None,
+    upd: _SignalUpdate,
+) -> dict:
+    values = {
+        "signal_status": upd.signal_status,
+        "tx_if": upd.tx_if if "tx_if" in upd.changed_fields else (latest.tx_if if latest else None),
+        "tx_rf": upd.tx_rf if "tx_rf" in upd.changed_fields else (latest.tx_rf if latest else None),
+        "rx_rf": upd.rx_rf if "rx_rf" in upd.changed_fields else (latest.rx_rf if latest else None),
+        "rx_if": upd.rx_if if "rx_if" in upd.changed_fields else (latest.rx_if if latest else None),
+        "freq_unit": latest.freq_unit if latest else "MHz",
+        "band": latest.band if latest else None,
+        "modulation": _blank_to_none(upd.modulation) if "modulation" in upd.changed_fields else (latest.modulation if latest else None),
+        "symbol_rate": _blank_to_none(upd.symbol_rate) if "symbol_rate" in upd.changed_fields else (latest.symbol_rate if latest else None),
+        "fec": _blank_to_none(upd.fec) if "fec" in upd.changed_fields else (latest.fec if latest else None),
+        "power": upd.power if "power" in upd.changed_fields else (latest.power if latest else None),
+        "power_unit": upd.power_unit or (latest.power_unit if latest else "dBm"),
+        "eb_no": upd.eb_no if "eb_no" in upd.changed_fields else (latest.eb_no if latest else None),
+        "source": _blank_to_none(upd.source) if "source" in upd.changed_fields else (latest.source if latest else None),
+        "antenna": _blank_to_none(upd.antenna) if "antenna" in upd.changed_fields else (latest.antenna if latest else None),
+    }
+    if serial_id is not None:
+        rf = serial_package_rf_config(db, serial_id, upd.signal_name)
+        freq_changed = [f for f in ("tx_if", "tx_rf", "rx_rf", "rx_if") if f in upd.changed_fields]
+        values = recalculate_from_values(values, rf, preferred=freq_changed or None)
+        if rf:
+            values["band"] = values.get("band") or rf.get("band")
+            values["antenna"] = values.get("antenna") or rf.get("antenna")
+    return values
+
+
 @router.get("/dashboard/fragment/{serial_id}", response_class=HTMLResponse)
 async def dashboard_fragment(
     serial_id: int,
@@ -597,34 +646,45 @@ async def dashboard_bulk_update(
                             entry_type="Automatic", updated_by_id=current_user.id, serial_id=serial_id,
                         ))
 
+        effective_source = None
+        if "source" in upd.changed_fields:
+            effective_source, _ = _update_serial_package_signal_source(
+                db, serial, upd.signal_name, upd.source or "", current_user, testing,
+            )
+
+        values = _dashboard_values_from_update(db, serial_id, latest, upd)
+        if "source" in upd.changed_fields:
+            values["source"] = effective_source
+
         new_entry = SignalLog(
             operator_id=current_user.id, range_state=range_state,
-            signal_name=upd.signal_name, signal_status=upd.signal_status,
-            tx_if=latest.tx_if if latest else None,
-            tx_rf=latest.tx_rf if latest else None,
-            rx_rf=latest.rx_rf if latest else None,
-            rx_if=latest.rx_if if latest else None,
-            freq_unit=latest.freq_unit if latest else "MHz",
-            band=latest.band if latest else None,
-            modulation=latest.modulation if latest else None,
-            symbol_rate=latest.symbol_rate if latest else None,
-            fec=latest.fec if latest else None,
-            power=upd.power if upd.power is not None else (latest.power if latest else None),
-            power_unit=upd.power_unit,
-            eb_no=latest.eb_no if latest else None,
+            signal_name=upd.signal_name, signal_status=values["signal_status"],
+            tx_if=values["tx_if"],
+            tx_rf=values["tx_rf"],
+            rx_rf=values["rx_rf"],
+            rx_if=values["rx_if"],
+            freq_unit=values["freq_unit"],
+            band=values["band"],
+            modulation=values["modulation"],
+            symbol_rate=values["symbol_rate"],
+            fec=values["fec"],
+            power=values["power"],
+            power_unit=values["power_unit"],
+            eb_no=values["eb_no"],
             engaged=latest.engaged if latest else False,
-            source=latest.source if latest else None,
-            antenna=latest.antenna if latest else None,
+            source=values["source"],
+            antenna=values["antenna"],
+            notes=(upd.notes or "").strip() or None,
             entry_type="Dashboard", updated_by_id=current_user.id,
             serial_id=serial_id if serial_id is not None else (latest.serial_id if latest else None),
             warning_flags=warning_flags_for(
                 db, upd.signal_name,
-                upd.power if upd.power is not None else (latest.power if latest else None),
-                upd.power_unit,
-                tx_rf=latest.tx_rf if latest else None,
-                rx_rf=latest.rx_rf if latest else None,
-                freq_unit=latest.freq_unit if latest else "MHz",
-                band=latest.band if latest else None,
+                values["power"],
+                values["power_unit"],
+                tx_rf=values["tx_rf"],
+                rx_rf=values["rx_rf"],
+                freq_unit=values["freq_unit"],
+                band=values["band"],
             ),
         )
         db.add(new_entry)
@@ -635,6 +695,7 @@ async def dashboard_bulk_update(
             user_id=current_user.id, action_type="DASHBOARD_UPDATE",
             entity_type="SignalLog",
             new_value=f"{upd.signal_name}: {upd.signal_status}",
+            comment=", ".join(upd.changed_fields) if upd.changed_fields else None,
         ))
     db.commit()
 

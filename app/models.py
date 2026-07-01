@@ -59,6 +59,7 @@ class User(Base):
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    active_session_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
     # User preferences
     default_freq_unit: Mapped[str] = mapped_column(String(4), default="MHz")
     default_power_unit: Mapped[str] = mapped_column(String(4), default="dBm")

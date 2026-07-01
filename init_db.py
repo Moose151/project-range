@@ -97,6 +97,7 @@ def _migrate(conn):
         "ALTER TABLE users ADD COLUMN default_freq_unit VARCHAR(4) DEFAULT 'MHz'",
         "ALTER TABLE users ADD COLUMN default_power_unit VARCHAR(4) DEFAULT 'dBm'",
         "ALTER TABLE users ADD COLUMN must_change_password BOOLEAN DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN active_session_token VARCHAR(64)",
         "ALTER TABLE rf_devices ADD COLUMN device_model VARCHAR(128)",
         "ALTER TABLE rf_devices ADD COLUMN has_web_gui BOOLEAN DEFAULT 0",
         "ALTER TABLE rf_devices ADD COLUMN cbm_sync_enabled BOOLEAN DEFAULT 0",

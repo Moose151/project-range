@@ -565,6 +565,19 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(pollKnownChatRooms, 2500);
 });
 
+function markChatOffline() {
+  if (!document.getElementById('chatDock')) return;
+  try {
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/chat/offline', new Blob([], { type: 'application/x-www-form-urlencoded' }));
+    } else {
+      fetch('/chat/offline', { method: 'POST', keepalive: true });
+    }
+  } catch (e) {}
+}
+
+window.addEventListener('pagehide', markChatOffline);
+
 // ── Sidebar toggle ────────────────────────────────────────────────────────────
 const SIDEBAR_KEY = 'sidebarCollapsed';
 function toggleSidebar() {

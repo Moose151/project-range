@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from threading import Lock
 
 
-ONLINE_WINDOW = timedelta(seconds=45)
+ONLINE_WINDOW = timedelta(seconds=25)
 
 
 @dataclass

@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.17.14` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.18.0` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -17,7 +17,7 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.17.14)
+## ✅ Already delivered (through 0.18.0)
 
 Core of the MVP scope is in place:
 
@@ -53,6 +53,12 @@ Core of the MVP scope is in place:
 - Package deletion is blocked with a clear error when a package is still assigned to any serial, preventing internal server errors and preserving serial history links
 - Dashboard Source edits on active serial signals now update the underlying package CBM source mapping as well as the displayed signal log row
 - Package/dashboard Source controls include an explicit **No modem assigned** state so CBM sync only follows the signal currently mapped to a real modem
+- Single-session enforcement: a user logging in somewhere else invalidates their previous session
+- Dashboard quick-edit now stages all signal parameters/frequencies into one serial-widget bulk submit
+- Dashboard and EBEM sync recalculate TxRF/RxRF when TxIF/RxIF or any related frequency changes
+- Signal packages assigned only to closed serials can now be deleted while preserving log history
+- Chat presence ages out faster and sends an offline beacon on browser/page close
+- EBEM/CBM read-only sync runs automatically every 5 seconds by default (`CBM_AUTO_SYNC_SECONDS`, `0` disables)
 - **0.6.0:** TxLO/RxLO naming, version badge, fully offline (LAN) styling, Docker deploy on port 7474
 
 ---
@@ -275,17 +281,16 @@ Current foundation now in place:
 
 Future target: **full CBM integration complete**.
 
-- [ ] Add live automatic modem-driven updates so active dashboard signal values can
+- [x] Add live automatic modem-driven updates so active dashboard signal values can
   update from enabled CBM modems without operator double-entry.
-- [ ] Add a dashboard **Force CBM Update** action that runs the same sync on demand
+- [x] Add a dashboard **Force CBM Update** action that runs the same sync on demand
   and reports per-modem success/errors.
-- [ ] Build the background poller only after real hardware testing confirms the
-  CBM SSH/ICC output, status mapping, credentials, timeouts, and retry behaviour.
-- [ ] Write automatic `SignalLog` rows only when modem-derived values change, and
-  define how those rows behave while the range is in Testing mode.
-- [ ] Add safeguards for ambiguous mappings, for example when a modem changes from
-  one SOI/config to another and Project Range needs to know which package signal
-  should receive the update.
+- [x] Write automatic `SignalLog` rows only when modem-derived values change and
+  keep Testing-state sync scoped to Testing data.
+- [x] Add safeguards for ambiguous active mappings so one modem/path cannot update
+  multiple package signals silently.
+- [ ] Validate the automatic poller against real hardware: CBM SSH/ICC output,
+  status mapping, credentials, timeouts, retry behaviour, and audit volume.
 
 ### Other future enhancements (Scope §12)
 

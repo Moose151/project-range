@@ -12,6 +12,7 @@ from app.cbm import CBMError, CBMSnapshot, poll_cbm_ssh
 from app.crypto import decrypt_secret
 from app.deps import get_current_range_state, is_testing_state
 from app.models import AuditLog, RFDevice, Serial, SignalLog, SignalPackageEntry
+from app.rf_config import serial_package_rf_config, recalculate_from_values
 from app.signal_warnings import warning_flags_for
 
 
@@ -105,11 +106,11 @@ def _entry_values_from_snapshot(entry: SignalPackageEntry, snapshot: CBMSnapshot
 def _changed(latest: SignalLog | None, values: dict) -> bool:
     if latest is None:
         return True
-    fields = ("signal_status", "modulation", "symbol_rate", "fec", "power", "eb_no", "tx_if", "rx_if")
+    fields = ("signal_status", "modulation", "symbol_rate", "fec", "power", "eb_no", "tx_if", "tx_rf", "rx_rf", "rx_if")
     return any(getattr(latest, field) != values.get(field) for field in fields)
 
 
-def sync_active_cbms(db: Session, actor_id: int) -> CBMSyncResult:
+def sync_active_cbms(db: Session, actor_id: int | None, audit_when_noop: bool = True) -> CBMSyncResult:
     result = CBMSyncResult(errors=[])
     range_state = get_current_range_state(db)
     testing = is_testing_state(db)
@@ -175,6 +176,18 @@ def sync_active_cbms(db: Session, actor_id: int) -> CBMSyncResult:
             SignalLog.is_deleted == False,
             SignalLog.is_testing == testing,
         ).order_by(SignalLog.timestamp.desc()).first()
+        baseline = {
+            "tx_if": values.get("tx_if") if values.get("tx_if") is not None else (latest.tx_if if latest else entry.tx_if),
+            "tx_rf": latest.tx_rf if latest else entry.tx_rf,
+            "rx_rf": latest.rx_rf if latest else entry.rx_rf,
+            "rx_if": values.get("rx_if") if values.get("rx_if") is not None else (latest.rx_if if latest else entry.rx_if),
+            "freq_unit": "MHz",
+        }
+        values.update(recalculate_from_values(
+            baseline,
+            serial_package_rf_config(db, serial.id, entry.signal_name),
+            preferred=[field for field in ("tx_if", "rx_if") if values.get(field) is not None],
+        ))
         if not _changed(latest, values):
             continue
 
@@ -184,10 +197,10 @@ def sync_active_cbms(db: Session, actor_id: int) -> CBMSyncResult:
             range_state=range_state,
             signal_name=entry.signal_name,
             signal_status=values["signal_status"],
-            tx_if=values.get("tx_if") if values.get("tx_if") is not None else (latest.tx_if if latest else entry.tx_if),
-            tx_rf=latest.tx_rf if latest else entry.tx_rf,
-            rx_rf=latest.rx_rf if latest else entry.rx_rf,
-            rx_if=values.get("rx_if") if values.get("rx_if") is not None else (latest.rx_if if latest else entry.rx_if),
+            tx_if=values.get("tx_if"),
+            tx_rf=values.get("tx_rf"),
+            rx_rf=values.get("rx_rf"),
+            rx_if=values.get("rx_if"),
             freq_unit="MHz",
             band=latest.band if latest else (entry.package.band or entry.band),
             modulation=values.get("modulation"),
@@ -208,14 +221,18 @@ def sync_active_cbms(db: Session, actor_id: int) -> CBMSyncResult:
                 entry.signal_name,
                 power,
                 "dBm",
-                tx_rf=latest.tx_rf if latest else entry.tx_rf,
-                rx_rf=latest.rx_rf if latest else entry.rx_rf,
+                tx_rf=values.get("tx_rf"),
+                rx_rf=values.get("rx_rf"),
                 freq_unit="MHz",
                 band=latest.band if latest else (entry.package.band or entry.band),
             ),
         )
         db.add(new_entry)
         result.updated += 1
+
+    if not audit_when_noop and result.updated == 0 and result.skipped == 0 and not result.errors:
+        db.commit()
+        return result
 
     summary = f"updated={result.updated}, skipped={result.skipped}, issues={len(result.errors or [])}"
     issue_text = "\n".join(result.errors or [])

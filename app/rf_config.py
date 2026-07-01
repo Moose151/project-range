@@ -3,6 +3,75 @@ from sqlalchemy.orm import Session
 from app.models import SerialPackage
 
 
+def round_freq(value: float | None) -> float | None:
+    return round(value, 6) if value is not None else None
+
+
+def recalculate_frequencies(
+    *,
+    known: str,
+    value: float | None,
+    tx_lo: float | None,
+    rx_lo: float | None,
+    ttf: float | None,
+    ttf_direction: str = "+",
+) -> dict[str, float | None]:
+    """Calculate TxIF/TxRF/RxRF/RxIF from one known value, all in package units."""
+    if value is None or tx_lo is None or rx_lo is None or ttf is None:
+        return {}
+    sign = -1 if ttf_direction == "-" else 1
+    if known == "tx_if":
+        tx_if = value
+        tx_rf = tx_if + tx_lo
+        rx_rf = tx_rf + sign * ttf
+        rx_if = rx_rf - rx_lo
+    elif known == "tx_rf":
+        tx_rf = value
+        tx_if = tx_rf - tx_lo
+        rx_rf = tx_rf + sign * ttf
+        rx_if = rx_rf - rx_lo
+    elif known == "rx_rf":
+        rx_rf = value
+        tx_rf = rx_rf - sign * ttf
+        tx_if = tx_rf - tx_lo
+        rx_if = rx_rf - rx_lo
+    elif known == "rx_if":
+        rx_if = value
+        rx_rf = rx_if + rx_lo
+        tx_rf = rx_rf - sign * ttf
+        tx_if = tx_rf - tx_lo
+    else:
+        return {}
+    return {
+        "tx_if": round_freq(tx_if),
+        "tx_rf": round_freq(tx_rf),
+        "rx_rf": round_freq(rx_rf),
+        "rx_if": round_freq(rx_if),
+    }
+
+
+def recalculate_from_values(values: dict, rf: dict | None, preferred: list[str] | None = None) -> dict:
+    """Return values with all frequencies recalculated when a usable RF plan exists."""
+    if not rf:
+        return values
+    fields = preferred or ["tx_if", "tx_rf", "rx_rf", "rx_if"]
+    known = next((field for field in fields if values.get(field) is not None), None)
+    if not known:
+        return values
+    calculated = recalculate_frequencies(
+        known=known,
+        value=values.get(known),
+        tx_lo=rf.get("tx_lo"),
+        rx_lo=rf.get("rx_lo"),
+        ttf=rf.get("ttf"),
+        ttf_direction=rf.get("ttf_direction") or "+",
+    )
+    if calculated:
+        values.update(calculated)
+        values["freq_unit"] = rf.get("freq_unit") or values.get("freq_unit") or "MHz"
+    return values
+
+
 def package_has_rf_config(package) -> bool:
     """Return whether a package contains any package-level RF setting."""
     return any(value is not None for value in (package.tx_lo, package.rx_lo, package.ttf)) or bool(

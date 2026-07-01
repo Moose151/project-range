@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.17.14` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.18.0` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -183,6 +183,13 @@
   - Package signal Source and dashboard quick-edit Source now show **No modem assigned** as the blank/default state, so operators no longer need to create a fake `nil` Source.
   - Selecting **No modem assigned** clears the package signal Source and internal `cbm_device_id`. CBM sync intentionally ignores these entries, so only the signal currently mapped to a real CBM is updated from that modem.
   - Operators can assign a CBM Source from the dashboard when a signal is ready to go Up; that Source change persists back to the package mapping from 0.17.13.
+- **0.18.0 — Session, dashboard bulk edit, package delete, chat presence, and automatic EBEM sync:**
+  - User accounts are now **single-session**. On successful login, `users.active_session_token` is replaced with a fresh token stored in that browser session; older sessions for the same user are redirected to `/login?timeout=1` on their next authenticated request. Logout only clears the token when it belongs to the current session, so an old tab cannot log out a newer login.
+  - Dashboard quick-edit rows now stage **all signal parameter changes** into the serial widget's existing bulk submit bar: status, Source/CBM mapping, modulation, symbol rate, FEC, antenna, power/unit, Eb/No, notes, and TxIF/TxRF/RxRF/RxIF. The per-row `Update & Log` submit is gone; operators use one **Submit Widget** / **Submit All Changes** action for the whole widget.
+  - Dashboard frequency edits now recalculate the other three frequency fields immediately in the browser from the assigned package TxLO/RxLO/TTF, and the server recalculates again on bulk submit. EBEM/CBM sync also recalculates TxRF/RxRF when modem TxIF/RxIF reads change.
+  - Package deletion now blocks only active/pending serial assignments. If all package references are from closed serials in history, the old `serial_packages` links are removed and the package can be deleted; signal log history remains intact.
+  - Chat presence now uses a shorter 25-second online window plus a `/chat/offline` `sendBeacon` on browser/page close. This cannot make browser-close detection perfect, but stale users disappear much faster and normal logout still removes them immediately.
+  - EBEM/CBM read-only sync now runs automatically every **5 seconds** in a FastAPI background task using the existing `sync_active_cbms` path. Configure with `CBM_AUTO_SYNC_SECONDS` (`0` disables). The task skips overlapping runs and executes polling in a worker thread so SSH reads do not block web requests.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.
@@ -196,11 +203,10 @@
    - map real firmware statuses to Project Range states (`Up`, `Down`, `Configured`, `Standby`) and confirm whether `TX_OP=OFF` should always mean Down;
    - test `Sync Active CBMs` on a non-operational serial/package first;
    - only after proving the above, decide whether to add background polling and at what interval.
-5. **Future: full CBM integration complete** — desired end state is live automatic modem-driven updates with a dashboard **Force CBM Update** action.
-   - Build on the existing manual `POST /devices/cbm/sync-active` foundation and package signal modem mapping (`cbm_device_id`, `cbm_path`; Source is the operator-facing modem selector).
-   - Add a controlled background poller (interval to be decided after hardware tests) that polls enabled CBMs, compares parsed modem values to the latest active serial/package signal state, and writes automatic `SignalLog` rows only when values change.
-   - Add a dashboard button for **Force CBM Update** that triggers the same sync immediately and reports per-modem success/errors without leaving the dashboard.
-   - Required before enabling: validate real CBM SSH/ICC output, status mapping, timeout/retry behavior, credential handling, ambiguous mapping safeguards, audit behavior, and how Testing-state CBM polling should behave.
+5. **CBM sync hardware validation** — the dashboard force button and 5-second automatic background poller are now implemented, but real range-hardware validation is still required before operators fully trust it.
+   - Use Devices → Test CBM poll on each modem and compare parsed values against the EBEM/LCT GUI.
+   - Confirm status mapping (`TX_OP`, receive lock/link states), timeout/retry behavior, ambiguous mapping safeguards, audit behavior, and Testing-state behavior.
+   - If auto-sync is too chatty or too slow during hardware testing, tune `CBM_AUTO_SYNC_SECONDS` in the deployment environment (`0` disables the background task).
 6. **Future: voice chat between single and multiple people** — requested as a possible extension to the existing instant chat.
    - Difficulty: **moderate to high** compared with text chat. One-to-one voice can be done with browser WebRTC, but reliable group voice usually needs a Selective Forwarding Unit/media server (for example Janus, mediasoup, LiveKit, or Jitsi components) rather than only FastAPI.
    - Project Range would need signaling endpoints/WebSockets, call UI, microphone permission handling, presence/call state, mute/deafen controls, group room membership, and network/firewall testing on the range LAN.
@@ -220,11 +226,11 @@
 - **`Role` enum has THREE stored values:** `administrator`, `user`, `observer` (read-only). Old aliases `SUPERVISOR`, `OPERATOR`, and `SAFETY_SUPERVISOR` still map to the new values for compatibility with existing internal checks. Read-only is enforced in `main.py` `security_middleware` (blocks non-safe methods; allow-list `SAFETY_SUPERVISOR_ALLOWED_WRITES`). `SessionMiddleware` must stay **added last** (outermost) or `request.session` is empty in that check.
 - **New models since 0.11.0:** `CDATable`, `CDAWindow`, `SerialCDATable` (CDA); `CeaseEvent` (CEASE); `DutyRole` + `User.duty_role`/`User.duty_role_color` (duty tags). All tables auto-create via `create_all`; the two `users` columns are additive migrations in `init_db.py`.
 - **New routers:** `cda.py`, `cease.py` (both registered in `main.py`). Duty-role CRUD lives in `config.py`; duty-role self-set in `preferences.py`.
-- **Static cache-busting is mandatory:** `base.html` references `app.css?v=N` and `app.js?v=N` (both currently **18**). **Bump N on every CSS/JS change** — without it, browsers serve a stale file and new JS handlers silently break (this exact bug hit the 0.13.0 sidebar/span buttons).
+- **Static cache-busting is mandatory:** `base.html` references `app.css?v=N` and `app.js?v=N` (both currently **20**). **Bump N on every CSS/JS change** — without it, browsers serve a stale file and new JS handlers silently break (this exact bug hit the 0.13.0 sidebar/span buttons).
 - **`partials/dashboard_summary.html` is now dead code** (the hardcoded summary row was removed in 0.13.0). Safe to delete; left in place for now.
 - **Settings area** — now reached via the sidebar (user footer → Preferences/Password; administrator → Admin → App Config). The old Settings dropdown is gone.
 - **`DeviceLink` and `RFDevice` new columns are fully implemented** — `device_model`, `has_web_gui`, and the `device_links` table are all in place. Device type list now includes `antenna`. No further migration needed for those.
-- **CBM sync columns:** `signal_package_entries.cbm_device_id` / `cbm_path` / legacy `cbm_carrier`; `rf_devices.cbm_sync_enabled` / `cbm_username` / `cbm_password_encrypted` / `cbm_last_sync_*`. `cbm_carrier` remains in the DB for backward compatibility but is no longer shown in package signal parameters. Additive migrations are in `init_db.py`.
+- **CBM sync columns:** `signal_package_entries.cbm_device_id` / `cbm_path` / legacy `cbm_carrier`; `rf_devices.cbm_sync_enabled` / `cbm_username` / `cbm_password_encrypted` / `cbm_last_sync_*`; `users.active_session_token` for single-session enforcement. `cbm_carrier` remains in the DB for backward compatibility but is no longer shown in package signal parameters. Additive migrations are in `init_db.py`.
 - **Dashboard Engaged column:** `SignalLog.engaged` is a per-signal visual flag used by operators to mark whether mission systems are affecting that signal. It is intentionally not part of the status enum and should not drive buzzer/range-state behavior.
 
 ### Caveats / verification gaps

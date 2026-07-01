@@ -920,10 +920,14 @@ async def package_delete(
             .filter(SerialPackage.package_id == pkg_id)
             .all()
         )
-        if links:
-            titles = [link.serial.display_title for link in links[:3] if link.serial and link.serial.is_testing == testing]
-            suffix = f" ({', '.join(titles)}" + (", ..." if len(links) > 3 else "") + ")" if titles else ""
-            message = f"Cannot delete '{pkg.name}' because it is assigned to {len(links)} serial(s){suffix}. Remove it from those serials or keep the package for history."
+        blocking_links = [
+            link for link in links
+            if link.serial and link.serial.is_testing == testing and link.serial.closed_at is None
+        ]
+        if blocking_links:
+            titles = [link.serial.display_title for link in blocking_links[:3]]
+            suffix = f" ({', '.join(titles)}" + (", ..." if len(blocking_links) > 3 else "") + ")" if titles else ""
+            message = f"Cannot delete '{pkg.name}' because it is assigned to {len(blocking_links)} active or pending serial(s){suffix}. End/delete those serials first."
             db.add(AuditLog(
                 user_id=current_user.id,
                 action_type="PACKAGE_DELETE_BLOCKED",
@@ -934,9 +938,13 @@ async def package_delete(
             ))
             db.commit()
             return RedirectResponse(f"/packages?error={quote_plus(message)}", status_code=302)
+        closed_links = [link for link in links if link.serial and link.serial.is_testing == testing]
+        for link in closed_links:
+            db.delete(link)
         db.delete(pkg)
         db.add(AuditLog(user_id=current_user.id, action_type="PACKAGE_DELETE",
-                        entity_type="SignalPackage", entity_id=pkg_id, new_value=pkg.name))
+                        entity_type="SignalPackage", entity_id=pkg_id, new_value=pkg.name,
+                        comment=f"Removed {len(closed_links)} closed-serial package reference(s)."))
         db.commit()
     return RedirectResponse("/packages?toast=Package+deleted", status_code=302)
 

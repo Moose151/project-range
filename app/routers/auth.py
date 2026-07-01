@@ -1,9 +1,10 @@
 from datetime import datetime
+import secrets
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import AuditLog
+from app.models import AuditLog, User
 from app.auth import (
     authenticate_user, login_lock_remaining, register_failed_login, reset_login_attempts,
 )
@@ -61,8 +62,10 @@ async def login_submit(
         }, status_code=401)
 
     reset_login_attempts(key)
+    session_token = secrets.token_hex(16)
+    user.active_session_token = session_token
     db.add(AuditLog(user_id=user.id, action_type="LOGIN_SUCCESS",
-                    comment=f"{user.username} from {ip}"))
+                    comment=f"{user.username} from {ip}; previous sessions invalidated"))
     db.commit()
     request.session["user_id"] = user.id
     request.session["username"] = user.username
@@ -70,13 +73,24 @@ async def login_submit(
     request.session["role"] = user.role.value if hasattr(user.role, "value") else str(user.role)
     request.session["logged_in_at"] = datetime.utcnow().isoformat()
     request.session["remember"] = bool(remember)
+    request.session["session_token"] = session_token
     return RedirectResponse("/", status_code=302)
 
 
 @router.get("/logout")
 async def logout(request: Request):
     user_id = request.session.get("user_id")
+    token = request.session.get("session_token")
     if user_id:
         chat_state.forget_user(user_id)
+        from app.database import SessionLocal
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if user and user.active_session_token == token:
+                user.active_session_token = None
+                db.commit()
+        finally:
+            db.close()
     request.session.clear()
     return RedirectResponse("/login", status_code=302)

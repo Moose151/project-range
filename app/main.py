@@ -1,3 +1,4 @@
+import asyncio
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request
@@ -6,10 +7,11 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from app.config import (
     SECRET_KEY, APP_VERSION, SESSION_MAX_AGE_DAYS,
-    SESSION_SAME_SITE, SESSION_HTTPS_ONLY,
+    SESSION_SAME_SITE, SESSION_HTTPS_ONLY, CBM_AUTO_SYNC_SECONDS,
 )
 from app.database import SessionLocal
 from app.models import User, Role
+from app.cbm_sync import sync_active_cbms
 from app.templating import templates
 from app import chat_state
 from app.routers import (
@@ -19,6 +21,8 @@ from app.routers import (
 )
 
 app = FastAPI(title="SEW Range", version=APP_VERSION, docs_url=None, redoc_url=None)
+_cbm_sync_running = False
+_cbm_sync_task = None
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 
@@ -113,6 +117,57 @@ app.include_router(incidents.router)
 app.include_router(cda.router)
 app.include_router(cease.router)
 app.include_router(chat.router)
+
+
+def _cbm_sync_actor_id(db) -> int | None:
+    admin = (
+        db.query(User)
+        .filter(User.is_active == True, User.is_archived == False, User.role == Role.ADMINISTRATOR)
+        .order_by(User.id)
+        .first()
+    )
+    if admin:
+        return admin.id
+    user = (
+        db.query(User)
+        .filter(User.is_active == True, User.is_archived == False)
+        .order_by(User.id)
+        .first()
+    )
+    return user.id if user else None
+
+
+def _run_auto_cbm_sync_once() -> None:
+    db = SessionLocal()
+    try:
+        actor_id = _cbm_sync_actor_id(db)
+        if actor_id is not None:
+            sync_active_cbms(db, actor_id, audit_when_noop=False)
+    finally:
+        db.close()
+
+
+async def _auto_cbm_sync_loop() -> None:
+    global _cbm_sync_running
+    interval = max(1, CBM_AUTO_SYNC_SECONDS)
+    while True:
+        await asyncio.sleep(interval)
+        if _cbm_sync_running:
+            continue
+        _cbm_sync_running = True
+        try:
+            await asyncio.to_thread(_run_auto_cbm_sync_once)
+        except Exception:
+            pass
+        finally:
+            _cbm_sync_running = False
+
+
+@app.on_event("startup")
+async def start_auto_cbm_sync() -> None:
+    global _cbm_sync_task
+    if _cbm_sync_task is None and CBM_AUTO_SYNC_SECONDS > 0:
+        _cbm_sync_task = asyncio.create_task(_auto_cbm_sync_loop())
 
 
 @app.exception_handler(302)

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User, Role, LogSession, Serial, RangeState
 from app.auth import session_is_expired
+from app import chat_state
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
@@ -20,6 +21,10 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     if not user:
         request.session.clear()
         raise HTTPException(status_code=302, headers={"Location": "/login"})
+    if user.active_session_token and request.session.get("session_token") != user.active_session_token:
+        chat_state.forget_user(user.id)
+        request.session.clear()
+        raise HTTPException(status_code=302, headers={"Location": "/login?timeout=1"})
     # Force a password change before anything else (seeded/reset accounts).
     if user.must_change_password and request.url.path not in ("/account/password", "/logout"):
         raise HTTPException(status_code=302, headers={"Location": "/account/password"})

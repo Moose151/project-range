@@ -1206,10 +1206,25 @@ function statusBadgeHtml(status) {
 }
 
 function quickRowState(row) {
-  return {
-    status: row.dataset.stageStatus ?? row.dataset.origStatus,
-    power: row.dataset.stagePower ?? row.dataset.origPower,
+  const fields = ['status', 'power', 'source', 'modulation', 'symbolRate', 'fec', 'antenna', 'ebNo', 'txIf', 'txRf', 'rxRf', 'rxIf', 'notes', 'powerUnit'];
+  const state = {};
+  fields.forEach(field => {
+    const origKey = 'orig' + field.charAt(0).toUpperCase() + field.slice(1);
+    state[field] = row.dataset['stage' + field.charAt(0).toUpperCase() + field.slice(1)] ?? row.dataset[origKey] ?? '';
+  });
+  state.powerUnit = row.dataset.stagePowerUnit ?? row.dataset.powerUnit ?? 'dBm';
+  return state;
+}
+
+function stagedFieldNames(row) {
+  const map = {
+    stageStatus: 'signal_status', stagePower: 'power', stageSource: 'source',
+    stageModulation: 'modulation', stageSymbolRate: 'symbol_rate', stageFec: 'fec',
+    stageAntenna: 'antenna', stageEbNo: 'eb_no', stageTxIf: 'tx_if',
+    stageTxRf: 'tx_rf', stageRxRf: 'rx_rf', stageRxIf: 'rx_if',
+    stageNotes: 'notes', stagePowerUnit: 'power_unit',
   };
+  return Object.keys(map).filter(key => Object.prototype.hasOwnProperty.call(row.dataset, key)).map(key => map[key]);
 }
 
 function refreshBulkBar(container) {
@@ -1225,7 +1240,15 @@ function refreshQuickDirty(rowId) {
   const row = quickRow(rowId);
   if (!row) return;
   const s = quickRowState(row);
-  const dirty = (s.status !== row.dataset.origStatus) || ((s.power || '') !== (row.dataset.origPower || ''));
+  const dirty = stagedFieldNames(row).some(name => {
+    if (name === 'signal_status') return s.status !== row.dataset.origStatus;
+    if (name === 'power') return (s.power || '') !== (row.dataset.origPower || '');
+    if (name === 'power_unit') return (s.powerUnit || '') !== (row.dataset.powerUnit || 'dBm');
+    const camel = name.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    const origKey = 'orig' + camel.charAt(0).toUpperCase() + camel.slice(1);
+    const stateKey = camel === 'signalStatus' ? 'status' : camel;
+    return (s[stateKey] || '') !== (row.dataset[origKey] || '');
+  });
   row.classList.toggle('signal-row-dirty', dirty);
   const container = row.closest('[id^="signalTableContainer-"]');
   if (container) refreshBulkBar(container);
@@ -1245,9 +1268,26 @@ async function submitAllDirty(btn) {
   const serialId = dirtyRows[0].dataset.serialId || null;
   const updates = dirtyRows.map(row => {
     const s = quickRowState(row);
-    const upd = { signal_name: row.dataset.signalName, signal_status: s.status, power_unit: row.dataset.powerUnit || 'dBm' };
-    const pval = parseFloat(s.power);
-    if (!isNaN(pval)) upd.power = pval;
+    const upd = {
+      signal_name: row.dataset.signalName,
+      signal_status: s.status,
+      power_unit: s.powerUnit || row.dataset.powerUnit || 'dBm',
+      modulation: s.modulation || '',
+      fec: s.fec || '',
+      symbol_rate: s.symbolRate || '',
+      source: s.source || '',
+      antenna: s.antenna || '',
+      notes: s.notes || '',
+      changed_fields: stagedFieldNames(row),
+    };
+    [['power', s.power], ['eb_no', s.ebNo], ['tx_if', s.txIf], ['tx_rf', s.txRf], ['rx_rf', s.rxRf], ['rx_if', s.rxIf]].forEach(([key, value]) => {
+      if (value === '') {
+        if (upd.changed_fields.includes(key)) upd[key] = null;
+        return;
+      }
+      const parsed = parseFloat(value);
+      if (!isNaN(parsed)) upd[key] = parsed;
+    });
     return upd;
   });
   const payload = { updates };
@@ -1296,6 +1336,8 @@ function onQuickToggle(rowId) {
   if (!row) return;
   const checked = document.getElementById('tog-' + rowId)?.checked;
   row.dataset.stageStatus = checked ? 'Up' : 'Down';
+  const formStatus = document.querySelector(`[data-dashboard-edit-form="${CSS.escape(rowId)}"] [name="signal_status"]`);
+  if (formStatus) formStatus.value = row.dataset.stageStatus;
   applyRowStatusVisual(row, row.dataset.stageStatus);
   refreshQuickDirty(rowId);
 }
@@ -1308,6 +1350,8 @@ function stepQuickPower(rowId, delta) {
   const next = Math.round(((isNaN(cur) ? 0 : cur) + delta) * 100) / 100;
   input.value = next;
   row.dataset.stagePower = String(next);
+  const formPower = document.querySelector(`[data-dashboard-edit-form="${CSS.escape(rowId)}"] [name="power"]`);
+  if (formPower) formPower.value = input.value;
   refreshQuickDirty(rowId);
 }
 
@@ -1316,19 +1360,107 @@ function onQuickPowerInput(rowId) {
   const input = document.getElementById('power-val-' + rowId);
   if (!row || !input) return;
   row.dataset.stagePower = input.value;
+  const formPower = document.querySelector(`[data-dashboard-edit-form="${CSS.escape(rowId)}"] [name="power"]`);
+  if (formPower) formPower.value = input.value;
   refreshQuickDirty(rowId);
+}
+
+function stageQuickEditField(rowId, input) {
+  const row = quickRow(rowId);
+  if (!row || !input?.dataset.stageField) return;
+  const field = input.dataset.stageField;
+  const key = 'stage' + field.charAt(0).toUpperCase() + field.slice(1);
+  row.dataset[key] = input.value;
+  if (field === 'status') {
+    const warn = input.dataset.exclWarn ? document.getElementById(input.dataset.exclWarn) : null;
+    if (warn) warn.style.display = input.value === 'Up' ? 'block' : 'none';
+    const tog = document.getElementById('tog-' + rowId);
+    if (tog) tog.checked = input.value === 'Up';
+    applyRowStatusVisual(row, input.value);
+  }
+  if (field === 'power') {
+    const tablePower = document.getElementById('power-val-' + rowId);
+    if (tablePower) tablePower.value = input.value;
+  }
+  if (['txIf', 'txRf', 'rxRf', 'rxIf'].includes(field)) {
+    recalcDashboardFreqs(row, field, input.value);
+  }
+  refreshQuickDirty(rowId);
+}
+
+function setQuickFormValue(rowId, name, value) {
+  const field = document.querySelector(`[data-dashboard-edit-form="${CSS.escape(rowId)}"] [name="${name}"]`);
+  if (field) field.value = value ?? '';
+}
+
+function recalcDashboardFreqs(row, changedField, rawValue) {
+  const txLo = parseFloat(row.dataset.rfTxLo);
+  const rxLo = parseFloat(row.dataset.rfRxLo);
+  const ttf = parseFloat(row.dataset.rfTtf);
+  const value = parseFloat(rawValue);
+  if ([txLo, rxLo, ttf, value].some(v => isNaN(v))) return;
+  const sign = row.dataset.rfTtfDirection === '-' ? -1 : 1;
+  let txIf, txRf, rxRf, rxIf;
+  if (changedField === 'txIf') {
+    txIf = value; txRf = txIf + txLo; rxRf = txRf + sign * ttf; rxIf = rxRf - rxLo;
+  } else if (changedField === 'txRf') {
+    txRf = value; txIf = txRf - txLo; rxRf = txRf + sign * ttf; rxIf = rxRf - rxLo;
+  } else if (changedField === 'rxRf') {
+    rxRf = value; txRf = rxRf - sign * ttf; txIf = txRf - txLo; rxIf = rxRf - rxLo;
+  } else {
+    rxIf = value; rxRf = rxIf + rxLo; txRf = rxRf - sign * ttf; txIf = txRf - txLo;
+  }
+  const rowId = row.dataset.row;
+  const values = {
+    txIf: txIf.toFixed(6).replace(/\.?0+$/, ''),
+    txRf: txRf.toFixed(6).replace(/\.?0+$/, ''),
+    rxRf: rxRf.toFixed(6).replace(/\.?0+$/, ''),
+    rxIf: rxIf.toFixed(6).replace(/\.?0+$/, ''),
+  };
+  Object.entries(values).forEach(([field, value]) => {
+    const key = 'stage' + field.charAt(0).toUpperCase() + field.slice(1);
+    row.dataset[key] = value;
+  });
+  setQuickFormValue(rowId, 'tx_if', values.txIf);
+  setQuickFormValue(rowId, 'tx_rf', values.txRf);
+  setQuickFormValue(rowId, 'rx_rf', values.rxRf);
+  setQuickFormValue(rowId, 'rx_if', values.rxIf);
 }
 
 function cancelQuickRow(rowId) {
   const row = quickRow(rowId);
   if (!row) return;
-  delete row.dataset.stageStatus;
-  delete row.dataset.stagePower;
+  Object.keys(row.dataset).forEach(key => {
+    if (key.startsWith('stage')) delete row.dataset[key];
+  });
   const tog = document.getElementById('tog-' + rowId);
   if (tog) tog.checked = row.dataset.origStatus === 'Up';
   applyRowStatusVisual(row, row.dataset.origStatus);
   const pv = document.getElementById('power-val-' + rowId);
   if (pv) pv.value = row.dataset.origPower;
+  const form = document.querySelector(`[data-dashboard-edit-form="${CSS.escape(rowId)}"]`);
+  if (form) {
+    const values = {
+      signal_status: row.dataset.origStatus || '',
+      source: row.dataset.origSource || '',
+      modulation: row.dataset.origModulation || '',
+      symbol_rate: row.dataset.origSymbolRate || '',
+      fec: row.dataset.origFec || '',
+      antenna: row.dataset.origAntenna || '',
+      power: row.dataset.origPower || '',
+      power_unit: row.dataset.powerUnit || 'dBm',
+      eb_no: row.dataset.origEbNo || '',
+      tx_if: row.dataset.origTxIf || '',
+      tx_rf: row.dataset.origTxRf || '',
+      rx_rf: row.dataset.origRxRf || '',
+      rx_if: row.dataset.origRxIf || '',
+      notes: '',
+    };
+    Object.entries(values).forEach(([name, value]) => {
+      const field = form.elements[name];
+      if (field) field.value = value;
+    });
+  }
   refreshQuickDirty(rowId);
 }
 

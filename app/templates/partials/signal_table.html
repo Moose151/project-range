@@ -45,13 +45,28 @@
   <tbody>
     {% for log in signals %}
     {% set row_id = "sig-" ~ (serial_id if serial_id is not none else 'legacy') ~ "-" ~ loop.index %}
+    {% set signal_pkg_rf = pkg_rf_by_signal.get(log.signal_name) if pkg_rf_by_signal is defined else none %}
     <tr id="{{ row_id }}-row"
         data-row="{{ row_id }}"
         data-signal-name="{{ log.signal_name }}"
         data-serial-id="{{ serial_id if serial_id is not none else '' }}"
         data-orig-status="{{ log.signal_status }}"
         data-orig-power="{{ log.power if log.power is not none else '' }}"
+        data-orig-source="{{ log.source or '' }}"
+        data-orig-modulation="{{ log.modulation or '' }}"
+        data-orig-symbol-rate="{{ log.symbol_rate or '' }}"
+        data-orig-fec="{{ log.fec or '' }}"
+        data-orig-antenna="{{ log.antenna or '' }}"
+        data-orig-eb-no="{{ log.eb_no if log.eb_no is not none else '' }}"
+        data-orig-tx-if="{{ log.tx_if if log.tx_if is not none else '' }}"
+        data-orig-tx-rf="{{ log.tx_rf if log.tx_rf is not none else '' }}"
+        data-orig-rx-rf="{{ log.rx_rf if log.rx_rf is not none else '' }}"
+        data-orig-rx-if="{{ log.rx_if if log.rx_if is not none else '' }}"
         data-power-unit="{{ log.power_unit }}"
+        data-rf-tx-lo="{{ signal_pkg_rf.tx_lo if signal_pkg_rf and signal_pkg_rf.tx_lo is not none else '' }}"
+        data-rf-rx-lo="{{ signal_pkg_rf.rx_lo if signal_pkg_rf and signal_pkg_rf.rx_lo is not none else '' }}"
+        data-rf-ttf="{{ signal_pkg_rf.ttf if signal_pkg_rf and signal_pkg_rf.ttf is not none else '' }}"
+        data-rf-ttf-direction="{{ signal_pkg_rf.ttf_direction if signal_pkg_rf else '+' }}"
         class="signal-row{% if log.signal_status == 'Faulted' %} status-faulted{% elif log.signal_status == 'Standby' %} status-standby{% elif log.signal_status == 'Up' %} status-up{% elif log.signal_status == 'Down' %} status-down{% endif %}">
       <td class="ps-2 pe-1" style="width:30px">
         <button type="button"
@@ -121,10 +136,7 @@
     <tr class="collapse" id="{{ row_id }}-edit">
       <td colspan="19" class="p-0">
         <div class="p-2 bg-body-tertiary border-top border-secondary">
-          <form hx-post="/dashboard/quick-update"
-                hx-target="#signalTableContainer-{{ serial_id if serial_id is not none else 'legacy' }}"
-                hx-swap="innerHTML"
-                hx-on::after-request="if(event.detail.successful) showToast('{{ log.signal_name }} updated', 'success')">
+          <form data-dashboard-edit-form="{{ row_id }}" onsubmit="event.preventDefault(); submitAllDirty(this);">
             <input type="hidden" name="signal_name" value="{{ log.signal_name }}">
             {% if serial_id is not none %}<input type="hidden" name="serial_id" value="{{ serial_id }}">{% endif %}
             <div class="d-flex gap-2 flex-wrap align-items-end">
@@ -132,8 +144,9 @@
               <div>
                 <label class="form-label small mb-1">Status</label>
                 <select class="form-select form-select-sm" name="signal_status" style="width:110px"
+                  data-stage-field="status" onchange="stageQuickEditField('{{ row_id }}', this)"
                   {% if exclusivity_map is defined and log.signal_name in exclusivity_map %}
-                  onchange="document.getElementById('excl-warn-{{ row_id }}').style.display=(this.value==='Up')?'block':'none'"
+                  data-excl-warn="excl-warn-{{ row_id }}"
                   {% endif %}>
                   {% for s in ['Up','Down','Standby','Configured','Planned','Faulted'] %}
                   <option value="{{ s }}" {% if log.signal_status == s %}selected{% endif %}>{{ s }}</option>
@@ -151,7 +164,8 @@
 
               <div>
                 <label class="form-label small mb-1">Source</label>
-                <select class="form-select form-select-sm" name="source" style="width:120px">
+                <select class="form-select form-select-sm" name="source" style="width:120px"
+                        data-stage-field="source" onchange="stageQuickEditField('{{ row_id }}', this)">
                   <option value="">No modem assigned</option>
                   {% if signal_sources is defined %}
                   {% if log.source and log.source not in signal_sources %}
@@ -166,7 +180,8 @@
 
               <div>
                 <label class="form-label small mb-1">Modulation</label>
-                <select class="form-select form-select-sm" name="modulation" style="width:110px">
+                <select class="form-select form-select-sm" name="modulation" style="width:110px"
+                        data-stage-field="modulation" onchange="stageQuickEditField('{{ row_id }}', this)">
                   <option value="">—</option>
                   {% if mod_types is defined %}
                   {% for m in mod_types %}
@@ -183,12 +198,14 @@
               <div>
                 <label class="form-label small mb-1">Sym Rate</label>
                 <input type="text" class="form-control form-control-sm" name="symbol_rate"
-                       value="{{ log.symbol_rate or '' }}" placeholder="ksps" style="width:90px">
+                       value="{{ log.symbol_rate or '' }}" placeholder="ksps" style="width:90px"
+                       data-stage-field="symbolRate" oninput="stageQuickEditField('{{ row_id }}', this)">
               </div>
 
               <div>
                 <label class="form-label small mb-1">FEC</label>
-                <select class="form-select form-select-sm" name="fec" style="width:90px">
+                <select class="form-select form-select-sm" name="fec" style="width:90px"
+                        data-stage-field="fec" onchange="stageQuickEditField('{{ row_id }}', this)">
                   <option value="">—</option>
                   {% if fec_types is defined %}
                   {% for f in fec_types %}
@@ -204,10 +221,10 @@
 
               <div>
                 <label class="form-label small mb-1">Antenna</label>
-                <select class="form-select form-select-sm" name="antenna" style="width:110px">
+                <select class="form-select form-select-sm" name="antenna" style="width:110px"
+                        data-stage-field="antenna" onchange="stageQuickEditField('{{ row_id }}', this)">
                   <option value="">—</option>
                   {% if antenna_types is defined %}
-                  {% set signal_pkg_rf = pkg_rf_by_signal.get(log.signal_name) if pkg_rf_by_signal is defined else none %}
                   {% set default_ant = log.antenna or (signal_pkg_rf.antenna if signal_pkg_rf else (pkg_rf.antenna if pkg_rf is defined and pkg_rf else none)) %}
                   {% for a in antenna_types %}
                   <option value="{{ a }}" {% if default_ant == a %}selected{% endif %}>{{ a }}</option>
@@ -220,8 +237,10 @@
                 <label class="form-label small mb-1">Power</label>
                 <div class="input-group input-group-sm" style="width:145px">
                   <input type="number" class="form-control form-control-sm" name="power" step="any"
-                         value="{{ log.power if log.power is not none else '' }}">
-                  <select class="form-select form-select-sm" name="power_unit" style="width:60px">
+                         value="{{ log.power if log.power is not none else '' }}"
+                         data-stage-field="power" oninput="stageQuickEditField('{{ row_id }}', this)">
+                  <select class="form-select form-select-sm" name="power_unit" style="width:60px"
+                          data-stage-field="powerUnit" onchange="stageQuickEditField('{{ row_id }}', this)">
                     {% for u in ['dBm','dBW','W'] %}
                     <option value="{{ u }}" {% if log.power_unit == u %}selected{% endif %}>{{ u }}</option>
                     {% endfor %}
@@ -232,20 +251,51 @@
               <div>
                 <label class="form-label small mb-1">Eb/No (dB)</label>
                 <input type="number" class="form-control form-control-sm" name="eb_no" step="any"
-                       value="{{ log.eb_no if log.eb_no is not none else '' }}" style="width:75px">
+                       value="{{ log.eb_no if log.eb_no is not none else '' }}" style="width:75px"
+                       data-stage-field="ebNo" oninput="stageQuickEditField('{{ row_id }}', this)">
+              </div>
+
+              <div>
+                <label class="form-label small mb-1">TxIF</label>
+                <input type="number" class="form-control form-control-sm" name="tx_if" step="any"
+                       value="{{ log.tx_if if log.tx_if is not none else '' }}" style="width:90px"
+                       data-stage-field="txIf" oninput="stageQuickEditField('{{ row_id }}', this)">
+              </div>
+
+              <div>
+                <label class="form-label small mb-1">TxRF</label>
+                <input type="number" class="form-control form-control-sm" name="tx_rf" step="any"
+                       value="{{ log.tx_rf if log.tx_rf is not none else '' }}" style="width:90px"
+                       data-stage-field="txRf" oninput="stageQuickEditField('{{ row_id }}', this)">
+              </div>
+
+              <div>
+                <label class="form-label small mb-1">RxRF</label>
+                <input type="number" class="form-control form-control-sm" name="rx_rf" step="any"
+                       value="{{ log.rx_rf if log.rx_rf is not none else '' }}" style="width:90px"
+                       data-stage-field="rxRf" oninput="stageQuickEditField('{{ row_id }}', this)">
+              </div>
+
+              <div>
+                <label class="form-label small mb-1">RxIF</label>
+                <input type="number" class="form-control form-control-sm" name="rx_if" step="any"
+                       value="{{ log.rx_if if log.rx_if is not none else '' }}" style="width:90px"
+                       data-stage-field="rxIf" oninput="stageQuickEditField('{{ row_id }}', this)">
               </div>
 
               <div class="flex-grow-1" style="min-width:140px">
                 <label class="form-label small mb-1">Note (optional)</label>
                 <input type="text" class="form-control form-control-sm" name="notes"
-                       placeholder="Reason or annotation…">
+                       placeholder="Reason or annotation..."
+                       data-stage-field="notes" oninput="stageQuickEditField('{{ row_id }}', this)">
               </div>
 
               <div class="ms-auto d-flex gap-1">
-                <button type="submit" class="btn btn-sm btn-primary">
-                  <i class="bi bi-check2 me-1"></i>Update &amp; Log
+                <button type="submit" class="btn btn-sm btn-success">
+                  <i class="bi bi-check2-all me-1"></i>Submit Widget
                 </button>
                 <button type="button" class="btn btn-sm btn-outline-secondary"
+                        onclick="cancelQuickRow('{{ row_id }}')"
                         data-bs-toggle="collapse" data-bs-target="#{{ row_id }}-edit">
                   Cancel
                 </button>
