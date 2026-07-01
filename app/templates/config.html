@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-registry" type="button"><i class="bi bi-reception-4 me-1"></i>Signal Registry</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-roles" type="button"><i class="bi bi-person-badge me-1"></i>Duty Roles</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-system" type="button"><i class="bi bi-globe2 me-1"></i>System</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-desktop" type="button"><i class="bi bi-window-desktop me-1"></i>Desktop App</button></li>
 </ul>
 
 <div class="tab-content">
@@ -691,6 +692,67 @@ document.addEventListener('DOMContentLoaded', () => {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Desktop App -->
+  <div class="tab-pane fade" id="cfg-desktop" role="tabpanel">
+    <div class="card border-secondary">
+      <div class="card-header"><i class="bi bi-window-desktop me-1"></i>Add Range Dashboard to your desktop</div>
+      <div class="card-body">
+        <p class="text-secondary mb-4">
+          Give users one-click access to this dashboard from their desktop. The download
+          creates a launcher named <strong>Range Dashboard</strong> that opens this site at its
+          current address. For the SEW Range logo to appear as the app icon, use
+          <em>Install app</em> below.
+        </p>
+
+        <div class="row g-3">
+          <!-- Windows -->
+          <div class="col-md-6">
+            <div class="border border-secondary rounded p-3 h-100">
+              <h6 class="mb-2"><i class="bi bi-windows me-2"></i>Windows</h6>
+              <p class="small text-secondary">
+                Downloads <code>Range&nbsp;Dashboard.url</code>. Save it to your Desktop and
+                double-click to open the dashboard.
+              </p>
+              <a href="/config/shortcut/windows" class="btn btn-sm btn-primary">
+                <i class="bi bi-download me-1"></i>Download Windows shortcut
+              </a>
+            </div>
+          </div>
+
+          <!-- Ubuntu / Linux -->
+          <div class="col-md-6">
+            <div class="border border-secondary rounded p-3 h-100">
+              <h6 class="mb-2"><i class="bi bi-ubuntu me-2"></i>Ubuntu / Linux</h6>
+              <p class="small text-secondary">
+                Downloads <code>Range&nbsp;Dashboard.desktop</code>. Move it to your Desktop,
+                then right-click &rarr; <em>Allow Launching</em> (or
+                <code>chmod +x</code>) to enable double-click.
+              </p>
+              <a href="/config/shortcut/linux" class="btn btn-sm btn-primary">
+                <i class="bi bi-download me-1"></i>Download Linux launcher
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <hr class="my-4">
+
+        <h6 class="mb-2"><i class="bi bi-box-arrow-down me-2"></i>Install app (recommended — shows the logo icon)</h6>
+        <p class="small text-secondary mb-1">
+          In <strong>Chrome</strong> or <strong>Edge</strong>, open the browser menu and choose
+          <em>Install Range Dashboard</em> (or the install <i class="bi bi-box-arrow-in-down"></i>
+          icon in the address bar). This adds a real app window to the desktop / Start menu / dock
+          with the SEW Range logo as its icon.
+        </p>
+        <p class="small text-secondary mb-0">
+          Note: the <em>Install app</em> option only appears when the site is served over HTTPS
+          or opened on the host machine itself (localhost). On a plain-HTTP LAN address, use the
+          downloadable shortcuts above.
+        </p>
       </div>
     </div>
   </div>

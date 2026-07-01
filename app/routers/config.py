@@ -1,6 +1,6 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -56,6 +56,56 @@ async def config_page(
         "page": "config",
         "toast": request.query_params.get("toast", ""),
     })
+
+
+# ── Desktop shortcuts ─────────────────────────────────────────────────────────
+# Generate a double-clickable launcher that opens this dashboard, built against
+# the host/port the admin is currently using so it works on the local network.
+# The logo icon on the launcher itself is best delivered by "Install app" (PWA);
+# these files guarantee easy one-click access on any Windows or Ubuntu desktop.
+
+@router.get("/shortcut/windows")
+async def shortcut_windows(
+    request: Request,
+    current_user: User = Depends(require_supervisor),
+):
+    base = str(request.base_url)  # e.g. http://10.0.0.5:8000/
+    content = (
+        "[InternetShortcut]\r\n"
+        f"URL={base}\r\n"
+        "IconIndex=0\r\n"
+        f"IconFile={base}static/img/range-icon.ico\r\n"
+    )
+    return Response(
+        content=content,
+        media_type="application/x-mswinurl",
+        headers={"Content-Disposition": 'attachment; filename="Range Dashboard.url"'},
+    )
+
+
+@router.get("/shortcut/linux")
+async def shortcut_linux(
+    request: Request,
+    current_user: User = Depends(require_supervisor),
+):
+    base = str(request.base_url)
+    content = (
+        "[Desktop Entry]\n"
+        "Version=1.0\n"
+        "Type=Application\n"
+        "Name=Range Dashboard\n"
+        "Comment=SEW Range Dashboard\n"
+        f"Exec=xdg-open {base}\n"
+        "Icon=web-browser\n"
+        "Terminal=false\n"
+        "Categories=Network;\n"
+        "StartupNotify=true\n"
+    )
+    return Response(
+        content=content,
+        media_type="application/x-desktop",
+        headers={"Content-Disposition": 'attachment; filename="Range Dashboard.desktop"'},
+    )
 
 
 # ── System settings ──────────────────────────────────────────────────────────
