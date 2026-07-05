@@ -45,4 +45,7 @@ backups/
 
 # Local vendor/device manuals (do not publish restricted PDFs)
 CBM-400*.pdf
+cdm600*.pdf
+CDM-600*.pdf
+Comtech-cdm600*.pdf
 modem_configs/

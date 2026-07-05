@@ -303,6 +303,67 @@ Future target: **full CBM integration complete**.
 - [ ] Validate the automatic poller against real hardware: CBM SSH/ICC output,
   status mapping, credentials, timeouts, retry behaviour, and audit volume.
 
+### Modem live status (Comtech CDM-600L) — serial/RS-485 integration (research spike)
+
+Goal: monitor the CDM-600L L-Band modems from the dashboard the same way we
+monitor the CBM-400s (read-only signal/config/health, no operator double-entry).
+
+**Feasibility: confirmed possible, but a different transport from the CBM-400.**
+The CDM-600L Installation & Operation Manual (Rev 2, reviewed locally — held
+out of git, see `.gitignore`) documents the full remote-control protocol in
+Chapter 16. Key findings:
+
+- **Management is serial-only** — a rear 9-pin M&C port, user-selectable
+  **RS-232 or RS-485 (2/4-wire)**, async, 1200–38400 baud, 7O2/7E2/8N1. There is
+  **no Ethernet/IP port, no SSH, and no SNMP** (2005-era modem). This is the core
+  difference from the CBM-400/EBEM, which we reach over IP via SSH/ICC.
+- **The protocol is a clean ASCII request/response packet**, simpler than the
+  CBM-400 interactive shell — no menu navigation, no `paramiko`:
+  - Controller → modem: `<` + 4-digit address + `/` + 3-letter code + `?` + `[CR]`
+    (e.g. `<0135/TFQ?[CR]` = "report Tx frequency").
+  - Modem → controller: `>0135/TFQ=0950.0000[CR][LF]`.
+  - RS-232 uses fixed address `0000`; RS-485 allows addresses 1–9999, so several
+    modems can share one bus, each individually addressed.
+  - Remote **monitoring works even in LOCAL mode** (LOCAL only disables remote
+    *control*) — ideal for a read-only integration.
+- **Every value we read off the CBM-400 has a direct query equivalent:**
+  `TXO?` (Tx carrier on/off → Up/Down), **`BSQ?`** (bulk status: Eb/No, BER,
+  buffer fill, Rx freq offset, Rx signal level in one reply — the `all_stat ?`
+  analogue), `FLT?` (unit/Tx/Rx faults), `EBN?` (Eb/No), `RSL?` (Rx level),
+  `BER?`, `TFQ?`/`RFQ?` (frequencies), `TSR?`/`RSR?` (symbol rates),
+  `PLI?`/`TPL?` (Tx power), plus `RNE?`/`RNS?` (stored event + link-statistics
+  logs) and `EID?`/`SNO?`/`SWR?` (equipment ID / serial / firmware).
+
+**How it would be achieved (proposed, when scheduled):**
+
+1. **Serial transport onto the LAN.** Recommended: a **serial-to-Ethernet device
+   server** (e.g. Moxa NPort, Lantronix) presenting each modem's M&C port as a raw
+   TCP socket. This keeps the existing `RFDevice` `host:port` model and works under
+   Docker. Direct `pyserial` cabling is possible but pins the app server physically
+   next to the modems and is awkward to pass through to a container.
+2. **New client module `app/cdm600.py`** — analogous to `app/cbm.py`, but it builds
+   `<addr/CODE?>` strings and parses `>addr/CODE=value` replies over a socket
+   (or serial). No SSH/interactive shell state. Reuse the same read-only,
+   change-only-write-back sync path as the CBM-400.
+3. **Two small `RFDevice` additions:** a **connection/protocol type** field (route
+   EBEM-SSH modems vs. CDM-600L-serial modems to the correct client + sync mapping)
+   and, for RS-485 multidrop, a **modem address** field (1–9999). Additive
+   migrations in `init_db.py`, following the existing CBM column pattern.
+4. **Status mapping decision (needs sign-off):** `TXO` on/off → Up/Down;
+   `FLT?` → fault surface/incident; `EBN?`/`RSL?`/`BER?` → existing Eb/No and
+   signal-quality display fields. Reuse the CBM audit + Testing-scope behaviour.
+
+**Remaining unknowns are physical, not protocol:** whether the modems' M&C ports
+are (or can be) wired to a device server reachable on the range LAN, and each
+modem's baud rate, character format, and RS-485 address. Confirm those before
+committing to a milestone.
+
+- [ ] Confirm M&C wiring / device-server availability on the range LAN.
+- [ ] Prototype `cdm600.py` against the documented packet format (offline, no HW).
+- [ ] Add `RFDevice` protocol-type + address fields and route sync to the right client.
+- [ ] Agree the CDM-600L status → Project Range state mapping.
+- [ ] Validate against real hardware (parsed values vs. front panel / SatMac).
+
 ### Other future enhancements (Scope §12)
 
 - **Hardware integration:** spectrum analyser screenshot capture, RF switch matrix state, power meters, SNMP/serial/REST devices, auto power/Eb/No readings.
