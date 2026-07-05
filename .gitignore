@@ -44,8 +44,12 @@ logs/
 backups/
 
 # Local vendor/device manuals (do not publish restricted PDFs)
+# All equipment manuals now live under "System Manuals/" — ignore the whole tree.
+System Manuals/
 CBM-400*.pdf
 cdm600*.pdf
 CDM-600*.pdf
 Comtech-cdm600*.pdf
+*.pdf
+*.PDF
 modem_configs/

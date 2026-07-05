@@ -261,6 +261,69 @@ fully trusted.
 
 ## Post-1.0 / under investigation
 
+### ★ Range hardware monitoring expansion (PRIORITY) — user-requested
+
+Goal: extend live monitoring beyond the modems so operators can see the health
+and state of the wider signal path from the dashboard. All relevant equipment
+manuals + vendor **SNMP MIBs** are held locally under `System Manuals/` (kept out
+of git). Sequencing is led by **splitter/combiner state** (user priority), then
+EBEM status lights, then infrastructure; Ranger BUC is deferred (see below).
+
+**The key enabler — a shared SNMP polling foundation.** Most of this estate is
+SNMP-managed (the `.mib` files confirm it): ETL Systems **Genus** matrices/switches,
+the **VTR/VTRC-1xx** matrices, the **Dextra 10 MHz** reference, and the
+**SyncServer S600/S650** (also web/HTTPS/REST). Building one generic SNMP client
+(e.g. `pysnmp`, loading the supplied MIBs) covers items 1, 3-infra below in a
+single reusable module, alongside the existing SSH/ICC (CBM-400) and future
+serial (CDM-600L) clients.
+
+- [ ] **SNMP access gate (do first).** Devices are reachable on the server LAN and
+  can be logged into, but whether **SNMP is enabled** and what community/v3
+  credentials apply is **unconfirmed**. Confirm SNMP is turned on per device, obtain
+  v2c community strings or SNMPv3 creds, and verify reachability (UDP 161) from the
+  Project Range server before committing build effort.
+- [ ] **New `app/snmp.py` client + `RFDevice` SNMP fields** (community/v3 creds,
+  encrypted like the CBM password using `app/crypto.py`). Reuse the existing
+  read-only, change-only-write-back, Testing-scoped sync pattern and audit path.
+
+**1. Splitter / combiner monitoring (LEAD ITEM).** Hardware = ETL Systems Genus
+modular system + VTR/VTRC-1xx matrices (Hawk matrix, Swift switch modules).
+SNMP-readable: matrix input→output routing (*how it is terminated*), switch
+positions, module presence, input/output levels, and PSU/fan/temperature alarms.
+
+- [ ] Read and display current termination/routing + switch state per matrix from SNMP.
+- [ ] Show module/PSU/fan/level alarm status.
+- [ ] **Guided state changes:** define the valid states and transitions with the user,
+  then present plain-language guidance on the dashboard for what must happen to move
+  between states (this is a logic/UX layer on top of the SNMP read, not a hardware
+  control action — read-only stays the rule unless control is explicitly agreed).
+
+**2. EBEM status lights (CBM-400) — extends existing SSH/ICC poller.** Surface the
+extra EBEM status fields as red/green dashboard indicators: unit fault, Tx/Rx
+traffic, modem/demod lock & sync, EDMAC **embedded channel**, and link status.
+
+- [ ] Extend `app/cbm.py` parsing to capture the additional status fields.
+- [ ] Confirm exact EBEM status field names/values against the EBEM manual.
+- [ ] Render red/green status lights on the dashboard signal/device view.
+
+**3-infra. Sync Server, 10 MHz reference, DC injector.**
+
+- [ ] **SyncServer S600/S650** — SNMP + web/HTTPS + REST API. Monitor GPS lock,
+  holdover state, NTP service status, oscillator/reference health, and alarms.
+- [ ] **Dextra 10 MHz reference** — SNMP (MIB present). Monitor reference/PLL lock,
+  output presence/level, and alarms.
+- [ ] **DC injector** — no manual and typically **passive** (DC-onto-coax for
+  BUC/LNB); confirm the actual device — likely little or nothing to monitor
+  directly (useful signal, if any, is BUC current draw seen via the modem/ODU).
+
+**Deferred within this item:**
+
+- [~] **BUC power output — Ranger (via RICS).** RICS (`http://rics`) already shows
+  real-time TX/output power, EIRP, temperature and Eb/No and logs them, but appears
+  **web-only with no documented SNMP/REST API**. **Deferred pending confirmation of a
+  vendor API** (per user); if none exists, revisit web-scrape or exported-log ingest.
+- [~] **BUC power output — STLT-M.** Manual not yet supplied; parked until provided.
+
 ### Modem live status (Intelsat CBM-400) — research spike (start early, parallel)
 
 Goal you described: pull signal/config state from the CBM-400 modems so operators
