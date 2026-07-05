@@ -9,7 +9,7 @@
   <!-- Vendored locally so styling works on LAN devices with no internet access -->
   <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="/static/vendor/bootstrap-icons/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=25">
+  <link rel="stylesheet" href="/static/css/app.css?v=26">
   <link rel="icon" type="image/png" href="/static/img/sew-range-logo.png">
   <!-- Installable-app (PWA) metadata: lets browsers add "Range Dashboard" to the
        desktop with the logo as its icon. See the Desktop App tab in System Config. -->
@@ -271,8 +271,9 @@
   </button>
   <div id="chatRoster" class="chat-roster shadow-lg d-none">
     <div class="chat-roster-header">
-      <span><i class="bi bi-chat-dots me-1"></i>Chat</span>
-      <button type="button" class="btn btn-sm btn-link link-secondary p-0" title="Close" onclick="toggleChatRoster(false)">
+      <span class="chat-roster-title"><i class="bi bi-chat-dots-fill me-1"></i>Chat</span>
+      <span id="chatOnlineCount" class="chat-online-count"></span>
+      <button type="button" class="chat-header-btn ms-auto" title="Close" onclick="toggleChatRoster(false)">
         <i class="bi bi-x-lg"></i>
       </button>
     </div>
@@ -282,24 +283,32 @@
         <div id="chatUnreadRooms" class="small"></div>
       </div>
       <div class="chat-section">
-        <div class="chat-section-title"><i class="bi bi-chat-left-text me-1"></i>Chats</div>
+        <div class="chat-section-title"><i class="bi bi-chat-left-text me-1"></i>Conversations</div>
         <div id="chatRoomList" class="small"></div>
       </div>
-      <div class="d-flex align-items-center justify-content-between mb-1">
-        <span class="text-muted small">Online</span>
-        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="toggleChatGroupCreator()" title="Create group chat">
-          <i class="bi bi-people"></i>
-        </button>
-      </div>
-      <div id="chatOnlineUsers" class="chat-online-users small"></div>
-      <div id="chatGroupCreator" class="chat-group-creator d-none">
-        <input type="text" id="chatGroupTitle" class="form-control form-control-sm my-2" placeholder="Group name">
-        <div id="chatGroupUsers" class="chat-group-users small"></div>
-        <button type="button" class="btn btn-sm btn-primary w-100 mt-2" onclick="createChatGroup()">
-          <i class="bi bi-plus-lg me-1"></i>Create Group
-        </button>
+      <div class="chat-section chat-section-last">
+        <div class="chat-section-head">
+          <div class="chat-section-title mb-0"><i class="bi bi-people-fill me-1"></i>People online</div>
+          <button type="button" class="chat-newgroup-btn" onclick="toggleChatGroupCreator()" title="Create a group chat">
+            <i class="bi bi-plus-lg"></i> New group
+          </button>
+        </div>
+        <div id="chatOnlineUsers" class="chat-online-users small"></div>
+        <div id="chatGroupCreator" class="chat-group-creator d-none">
+          <div class="chat-group-creator-head">
+            <span><i class="bi bi-people me-1"></i>New group chat</span>
+            <button type="button" class="btn btn-sm btn-link link-secondary p-0" onclick="toggleChatGroupCreator()">Cancel</button>
+          </div>
+          <input type="text" id="chatGroupTitle" class="form-control form-control-sm mb-2" placeholder="Group name (optional)">
+          <div class="chat-section-title mb-1">Add people</div>
+          <div id="chatGroupUsers" class="chat-group-users small"></div>
+          <button type="button" class="btn btn-sm btn-primary w-100 mt-2" onclick="createChatGroup()">
+            <i class="bi bi-check-lg me-1"></i>Create group
+          </button>
+        </div>
       </div>
     </div>
+    <div class="chat-roster-foot"><i class="bi bi-info-circle me-1"></i>Messages clear when the app restarts.</div>
   </div>
   <div id="chatWindows" class="chat-windows"></div>
 </div>
@@ -310,7 +319,7 @@
 
 <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="/static/vendor/htmx/htmx.min.js"></script>
-<script src="/static/js/app.js?v=25"></script>
+<script src="/static/js/app.js?v=26"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

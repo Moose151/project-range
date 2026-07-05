@@ -322,7 +322,12 @@ function toggleChatRoster(force) {
 }
 
 function toggleChatGroupCreator() {
-  document.getElementById('chatGroupCreator')?.classList.toggle('d-none');
+  const creator = document.getElementById('chatGroupCreator');
+  if (!creator) return;
+  creator.classList.toggle('d-none');
+  if (!creator.classList.contains('d-none')) {
+    document.getElementById('chatGroupTitle')?.focus();
+  }
 }
 
 function chatRoomIcon(room) {
@@ -410,8 +415,12 @@ function renderChatRoster() {
   const roomListEl = document.getElementById('chatRoomList');
   const unreadSection = document.getElementById('chatUnreadSection');
   const unreadRoomsEl = document.getElementById('chatUnreadRooms');
+  const onlineCountEl = document.getElementById('chatOnlineCount');
   if (!online || !groupUsers || !roomListEl || !unreadSection || !unreadRoomsEl) return;
   const onlineOthers = chatState.users.filter(u => !chatState.me || u.id !== chatState.me.id);
+  if (onlineCountEl) {
+    onlineCountEl.textContent = onlineOthers.length ? `${onlineOthers.length} online` : 'You’re the only one here';
+  }
   const availableOthers = (chatState.availableUsers || chatState.users || []).filter(u => !chatState.me || u.id !== chatState.me.id);
   const rooms = Object.values(chatState.rooms).sort((a, b) => (chatState.unread[b.id] || 0) - (chatState.unread[a.id] || 0) || a.title.localeCompare(b.title));
   const unreadRooms = rooms.filter(room => (chatState.unread[room.id] || 0) > 0);
@@ -419,14 +428,15 @@ function renderChatRoster() {
   unreadRoomsEl.innerHTML = unreadRooms.map(room => chatRoomButton(room, { unreadOnly: true })).join('');
   roomListEl.innerHTML = rooms.length
     ? rooms.map(room => chatRoomButton(room)).join('')
-    : '<div class="text-muted py-2">No chats yet. Select an online user or create a group.</div>';
+    : '<div class="chat-empty">No conversations yet.<br>Pick someone below to start chatting.</div>';
   online.innerHTML = onlineOthers.length ? onlineOthers.map(u => `
-    <button type="button" class="chat-user-row" onclick="openPrivateChat(${u.id})" title="Open private chat">
+    <button type="button" class="chat-user-row" onclick="openPrivateChat(${u.id})" title="Start a private chat with ${escapeHtml(u.display_name)}">
       <span class="chat-presence-dot"></span>
-      <span class="text-truncate">${escapeHtml(u.display_name)}</span>
+      <span class="text-truncate flex-grow-1">${escapeHtml(u.display_name)}</span>
       ${chatRoleBadge(u)}
+      <i class="bi bi-chat-dots chat-user-go"></i>
     </button>
-  `).join('') : '<div class="text-muted py-2">No other users online.</div>';
+  `).join('') : '<div class="chat-empty">No other users are online right now.</div>';
   groupUsers.innerHTML = availableOthers.length
     ? chatUserPickerHtml(availableOthers, 'data-chat-group-user', 'No online users available.')
     : '<div class="text-muted py-2">No users available to add.</div>';
@@ -552,8 +562,8 @@ function openChatWindow(roomId) {
     ${room.is_group ? `<div class="chat-group-members d-none" data-chat-group-members>${groupMembersPanel(room)}</div>` : ''}
     <div class="chat-window-body" data-chat-messages></div>
     <form class="chat-window-form" onsubmit="sendChatMessage(event, '${escapeHtml(roomId)}')">
-      <input type="text" class="form-control form-control-sm" name="body" autocomplete="off" maxlength="2000" placeholder="Message">
-      <button type="submit" class="btn btn-sm btn-primary" title="Send"><i class="bi bi-send"></i></button>
+      <input type="text" class="form-control form-control-sm" name="body" autocomplete="off" maxlength="2000" placeholder="Type a message…">
+      <button type="submit" class="btn btn-sm btn-primary" title="Send"><i class="bi bi-send-fill"></i></button>
     </form>`;
   windows.appendChild(node);
   pollChatRoom(roomId, { full: true, alert: false });
@@ -686,6 +696,10 @@ function appendChatMessages(roomId, messages, opts = {}) {
     }
   });
   if (appendedMessages.length && body) body.scrollTop = body.scrollHeight;
+  // Friendly placeholder while a conversation has no messages yet.
+  if (body && !body.querySelector('.chat-message') && !body.querySelector('[data-chat-empty]')) {
+    body.innerHTML = '<div class="chat-empty" data-chat-empty>No messages yet — say hello 👋</div>';
+  }
   const unreadNew = appendedMessages.filter(m => !chatState.me || m.sender_id !== chatState.me.id).length;
   const shouldAlert = receivedNewFromOther && (!roomOpen || win.classList.contains('minimised'));
   if (alert && shouldAlert) {

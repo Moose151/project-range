@@ -4,9 +4,18 @@ This document records the major user-facing changes shipped in each beta version
 For planned work, see [ROADMAP.md](ROADMAP.md). For deep implementation notes and
 handover details, see [HANDOVER.md](HANDOVER.md).
 
-Current version: **0.18.6**
+Current version: **0.18.7**
 
 ---
+
+## 0.18.7 — Chat UI Tidy-Up
+
+- Reorganised the chat panel with clearer sections: **Unread**, **Conversations**, and **People online**.
+- The panel header now shows how many people are online, and a footer reminds you that messages clear when the app restarts.
+- Replaced the icon-only group button with a labelled **New group** button, and gave the group creator its own tidy panel with a Cancel option and clearer "Add people" wording.
+- Online users now show a chat affordance on hover and clearer tooltips so it's obvious clicking starts a private chat.
+- Friendlier empty states for "no conversations yet" and brand-new chats, plus a clearer message composer.
+- Static cache keys bumped to `app.css?v=26` and `app.js?v=26`.
 
 ## 0.18.6 — Calculator Keyboard, Account Permissions View, Chat Badge and Doc Conflict Fixes
 
