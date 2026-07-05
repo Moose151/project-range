@@ -4,9 +4,17 @@ This document records the major user-facing changes shipped in each beta version
 For planned work, see [ROADMAP.md](ROADMAP.md). For deep implementation notes and
 handover details, see [HANDOVER.md](HANDOVER.md).
 
-Current version: **0.18.5**
+Current version: **0.18.6**
 
 ---
+
+## 0.18.6 — Calculator Keyboard, Account Permissions View, Chat Badge and Doc Conflict Fixes
+
+- Basic Calculator (dashboard widget and standalone page) now accepts keyboard and numpad input: digits, `+ - * /`, `Enter`/`=`, `Backspace`, and `Esc`/`Delete` to clear.
+- Preferences now shows your account type (Administrator / User / Observer) and a clear permissions table describing what each account type can and cannot do.
+- Fixed the chat launcher unread bubble getting stuck on a number for a room that no longer exists (for example after a server restart clears ephemeral chat rooms). Stale unread counts are now reconciled against the live room list.
+- Fixed lost document edits when two people propose changes to the same page: the approval queue now flags a **Conflict** when the live page changed since an edit was drafted, shows the proposed vs current content side by side, and requires the administrator to explicitly confirm before overwriting newer changes.
+- Static cache keys bumped to `app.css?v=25` and `app.js?v=25`.
 
 ## 0.18.5 — Observer Utilities, CDA Assignment, and Calculator Usability
 

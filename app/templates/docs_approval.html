@@ -13,9 +13,10 @@
 
 {% if proposals %}
 {% for v in proposals %}
-<div class="card border-warning mb-4">
-  <div class="card-header d-flex align-items-center gap-2">
+<div class="card {% if v.conflict %}border-danger{% else %}border-warning{% endif %} mb-4">
+  <div class="card-header d-flex align-items-center gap-2 flex-wrap">
     <span class="badge bg-warning text-dark">Pending</span>
+    {% if v.conflict %}<span class="badge bg-danger"><i class="bi bi-exclamation-triangle me-1"></i>Conflict</span>{% endif %}
     <strong>{{ v.page.title }}</strong>
     <span class="text-muted small ms-2">
       Proposed by {{ v.created_by.display_name }} on {{ v.created_at.strftime('%d %b %Y %H:%M') }}
@@ -30,15 +31,42 @@
     </div>
   </div>
   <div class="card-body">
+    {% if v.conflict %}
+    <div class="alert alert-danger py-2 small mb-3">
+      <i class="bi bi-exclamation-triangle me-1"></i>
+      <strong>The live page has changed since this edit was proposed</strong> — most likely another
+      edit was approved in the meantime. Publishing this version will <strong>overwrite those newer
+      changes</strong> with the proposed content below. Compare the two panels, and only confirm if
+      that is what you intend. Otherwise reject this edit and ask the author to re-edit the current page.
+    </div>
+    {% endif %}
     <div class="row g-3">
-      <div class="col-lg-8">
+      <div class="{% if v.conflict %}col-lg-6{% else %}col-lg-8{% endif %}">
+        <div class="small text-muted mb-1">Proposed content{% if v.conflict %} (would be published){% endif %}</div>
         <div class="border border-secondary rounded p-3 bg-body-secondary" style="max-height:400px;overflow-y:auto;">
           <pre class="mb-0 small" style="white-space:pre-wrap;font-family:monospace">{{ v.content }}</pre>
         </div>
       </div>
-      <div class="col-lg-4">
+      {% if v.conflict %}
+      <div class="col-lg-6">
+        <div class="small text-muted mb-1">Current live page (would be lost)</div>
+        <div class="border border-danger rounded p-3 bg-body-secondary" style="max-height:400px;overflow-y:auto;">
+          <pre class="mb-0 small" style="white-space:pre-wrap;font-family:monospace">{{ v.current_content }}</pre>
+        </div>
+      </div>
+      {% endif %}
+      <div class="col-lg-{% if v.conflict %}12{% else %}4{% endif %}">
         <form method="post" action="/docs/versions/{{ v.id }}/approve" class="mb-2">
-          <button type="submit" class="btn btn-success w-100">
+          {% if v.conflict %}
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="confirm_conflict" value="1"
+                   id="confirm-{{ v.id }}" required>
+            <label class="form-check-label small text-danger" for="confirm-{{ v.id }}">
+              I understand this will overwrite the newer changes shown above.
+            </label>
+          </div>
+          {% endif %}
+          <button type="submit" class="btn {% if v.conflict %}btn-danger{% else %}btn-success{% endif %} w-100">
             <i class="bi bi-check-lg me-1"></i>Approve &amp; Publish
           </button>
         </form>

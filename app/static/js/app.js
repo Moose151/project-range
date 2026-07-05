@@ -455,6 +455,23 @@ function mergeChatRooms(rooms) {
   saveChatSessionState();
 }
 
+// Drop unread/room state for rooms the server no longer knows about. Chat is
+// ephemeral (in-memory on the server), so a restart wipes rooms while stale
+// unread counts survive in sessionStorage — that left the launcher badge stuck
+// on a number for a room the user could never open to clear. This reconciles
+// the local state against the authoritative room list on each refresh.
+function reconcileChatState(serverRooms) {
+  const validIds = new Set((serverRooms || []).map(r => r.id));
+  let changed = false;
+  Object.keys(chatState.rooms).forEach(id => { if (!validIds.has(id)) delete chatState.rooms[id]; });
+  Object.keys(chatState.unread).forEach(id => {
+    if (!validIds.has(id)) { delete chatState.unread[id]; changed = true; }
+  });
+  Object.keys(chatState.unreadSenders).forEach(id => { if (!validIds.has(id)) delete chatState.unreadSenders[id]; });
+  Object.keys(chatState.lastMessageIds).forEach(id => { if (!validIds.has(id)) delete chatState.lastMessageIds[id]; });
+  if (changed) { updateChatUnreadBadge(); saveChatSessionState(); }
+}
+
 async function refreshChatState() {
   if (!document.getElementById('chatDock')) return;
   try {
@@ -462,6 +479,7 @@ async function refreshChatState() {
     chatState.me = data.me;
     chatState.users = data.online_users || [];
     chatState.availableUsers = data.available_users || chatState.users || [];
+    reconcileChatState(data.rooms);
     mergeChatRooms(data.rooms);
     pollKnownChatRooms();
     renderChatRoster();
@@ -832,6 +850,7 @@ function calcKey(id) {
 
 function calcPress(id, val) {
   const s = calcKey(id);
+  window._lastCalcId = id;
   const disp = document.getElementById('mathCalcInput-' + id);
   const expr = document.getElementById('mathCalcExpr-' + id);
   if (!disp) return;
@@ -921,13 +940,49 @@ function mathCalcBody(id) {
   const grid = btns.map(([v, cls]) =>
     `<button type="button" class="calc-btn ${cls}" onclick="calcPress('${id}','${v}')">${v}</button>`
   ).join('');
-  return `<div class="p-2">
+  return `<div class="p-2 math-calc" data-calc-id="${id}" tabindex="0">
     <div class="math-calc-expr mb-1" id="mathCalcExpr-${id}"></div>
     <input id="mathCalcInput-${id}" class="form-control form-control-sm text-end font-monospace mb-2"
            value="0" readonly style="font-size:1.4rem;height:auto;padding:.3rem .6rem">
     <div class="calc-btn-grid">${grid}</div>
+    <div class="text-muted small mt-2 text-center">Tip: use your keyboard / numpad (0-9 · + − × ÷ · Enter = · Backspace · Esc clears)</div>
   </div>`;
 }
+
+// Keyboard / numpad support for the basic calculator. Routes key presses to the
+// active calculator: the one the user last interacted with, the one focus is
+// inside, or the only calculator on the page.
+function activeCalcId() {
+  const calcs = document.querySelectorAll('.math-calc[data-calc-id]');
+  if (!calcs.length) return null;
+  const focused = document.activeElement?.closest?.('.math-calc[data-calc-id]');
+  if (focused) return focused.getAttribute('data-calc-id');
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return null;
+  if (calcs.length === 1) return calcs[0].getAttribute('data-calc-id');
+  if (window._lastCalcId && document.querySelector(`.math-calc[data-calc-id="${CSS.escape(window._lastCalcId)}"]`)) {
+    return window._lastCalcId;
+  }
+  return null;
+}
+
+const CALC_KEY_MAP = {
+  '+': '+', '-': '−', '*': '×', '/': '÷',
+  '=': '=', 'Enter': '=', 'Backspace': '⌫', 'Delete': 'C',
+  'Escape': 'C', '.': '.', ',': '.', '%': '%',
+};
+
+document.addEventListener('keydown', (evt) => {
+  if (evt.ctrlKey || evt.metaKey || evt.altKey) return;
+  let val;
+  if (/^[0-9]$/.test(evt.key)) val = evt.key;
+  else if (evt.key in CALC_KEY_MAP) val = CALC_KEY_MAP[evt.key];
+  else return;
+  const id = activeCalcId();
+  if (!id) return;
+  evt.preventDefault();
+  calcPress(id, val);
+});
 
 // ── RF Frequency calculator (client-side, compact widget) ─────────────────────
 function rfCalcBody(id) {

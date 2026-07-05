@@ -173,6 +173,11 @@ async def docs_proposals(
         .order_by(DocVersion.created_at)
         .all()
     )
+    # Annotate each proposal so the template can warn about concurrent-edit
+    # conflicts (page changed since the edit was drafted).
+    for v in proposals:
+        v.conflict = _version_has_conflict(v)
+        v.current_content = v.page.content
     return templates.TemplateResponse(request, "docs_approval.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
@@ -198,14 +203,31 @@ async def docs_version_history(
     })
 
 
+def _version_has_conflict(version: DocVersion) -> bool:
+    """A pending edit conflicts if the live page has changed since the edit was
+    drafted — approving it would overwrite those newer changes."""
+    if version.base_content is None:
+        return False
+    return version.base_content != version.page.content
+
+
 @router.post("/versions/{vid}/approve")
 async def docs_approve(
     vid: int,
+    confirm_conflict: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
     version = db.query(DocVersion).filter(DocVersion.id == vid).first()
     if version and version.approval_status == "pending":
+        # Guard against silently overwriting newer changes. If the page moved on
+        # since this edit was proposed, require the admin to explicitly confirm.
+        if _version_has_conflict(version) and confirm_conflict != "1":
+            return RedirectResponse(
+                "/docs/proposals?toast=Conflict:+the+page+changed+since+this+edit+was+proposed."
+                "+Review+the+differences+and+confirm+before+publishing.",
+                status_code=302,
+            )
         now = datetime.utcnow()
         version.approval_status = "approved"
         version.approved_by_id = current_user.id
@@ -373,6 +395,7 @@ async def docs_submit_edit(
 
     now = datetime.utcnow()
     next_ver = _next_version(db, doc.id)
+    base_content = doc.content  # content this edit was drafted against
 
     if current_user.role == "administrator":
         # Direct publish
@@ -385,6 +408,7 @@ async def docs_submit_edit(
             page_id=doc.id,
             version_number=next_ver,
             content=content,
+            base_content=base_content,
             change_summary=change_summary.strip() or "Direct edit",
             approval_status="approved",
             created_by_id=current_user.id,
@@ -406,6 +430,7 @@ async def docs_submit_edit(
             page_id=doc.id,
             version_number=next_ver,
             content=content,
+            base_content=base_content,
             change_summary=change_summary.strip() or "Proposed edit",
             approval_status="pending",
             created_by_id=current_user.id,

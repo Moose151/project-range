@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.18.5` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.18.6` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -216,6 +216,12 @@
   - CDA table detail now lists unassigned active serials and can assign/remove that CDA table directly from `/cda/{table_id}`.
   - Basic Calculator now tracks the "awaiting second operand" state after an operator, so users can type `12 + 7 =` normally.
   - Static cache keys bumped to `app.css?v=24` / `app.js?v=24`.
+- **0.18.6 — Calculator keyboard, account permissions view, chat badge + doc conflict fixes:**
+  - **Basic Calculator keyboard/numpad input:** a global `keydown` handler in `app.js` routes keys to the active calculator (`activeCalcId()` picks the focus-containing calc, the last-used one via `window._lastCalcId`, or the only calc on the page). `mathCalcBody` now wraps the widget in `.math-calc[data-calc-id]` (focusable) and shows a keyboard hint. Keys: `0-9`, `+ - * /`, `Enter`/`=`, `Backspace`, `Esc`/`Delete` (clear), `.`/`,`, `%`. The handler ignores keys when a real input/textarea/select is focused elsewhere.
+  - **Account type + permissions on Preferences:** the Account card (`preferences.html`) is now "Account & Permissions" — shows the signed-in user, their account type badge (Administrator/User/Observer), and a per-role capability table plus a plain-language summary. Read-only from `user.role`; no new route needed.
+  - **Chat unread bubble stuck on "1" fix:** chat is ephemeral (in-memory server rooms), but `unread`/`unreadSenders`/`lastMessageIds` persist in `sessionStorage`. After a server restart the rooms vanish but the stale unread survived, and since the roster only renders rooms in `chatState.rooms`, the user could never open the room to clear it → badge stuck. `reconcileChatState(serverRooms)` (called in `refreshChatState` before `mergeChatRooms`) drops local room/unread state for any room the authoritative `/chat/state` no longer returns, then updates the badge.
+  - **Document concurrent-edit conflict guard:** two users proposing edits to the same page previously caused a lost update — approving proposal A then B overwrote A (B's snapshot was based on the pre-A content). `DocVersion.base_content` (new nullable TEXT column, additive migration in `init_db.py`) records the page content each edit was drafted against. `_version_has_conflict()` flags a pending edit when `base_content != page.content`. The approval queue (`docs_approval.html`) shows a red **Conflict** badge, proposed-vs-current side-by-side panels, and a required confirmation checkbox; `POST /docs/versions/{vid}/approve` now takes `confirm_conflict` and refuses to publish a conflicting edit without it. Sibling pending edits automatically re-flag as conflicts once one is approved (their base no longer matches the live page). Not a full 3-way merge — it prevents *silent* overwrites and forces informed review.
+  - Static cache keys bumped to `app.css?v=25` / `app.js?v=25`.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.

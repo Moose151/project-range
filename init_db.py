@@ -123,6 +123,7 @@ def _migrate(conn):
         "ALTER TABLE incidents ADD COLUMN approved_at DATETIME",
         "ALTER TABLE incidents ADD COLUMN rejection_reason TEXT",
         "ALTER TABLE cease_events ADD COLUMN is_testing BOOLEAN DEFAULT 0",
+        "ALTER TABLE doc_versions ADD COLUMN base_content TEXT",
     ]
     for sql in migrations:
         try:

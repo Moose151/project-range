@@ -93,8 +93,71 @@
     </div>
 
     <div class="card border-secondary mt-3">
-      <div class="card-header"><i class="bi bi-shield-lock me-1"></i>Account</div>
+      <div class="card-header"><i class="bi bi-shield-lock me-1"></i>Account &amp; Permissions</div>
       <div class="card-body">
+        {% set acct = user.role %}
+        <p class="mb-2">
+          Signed in as <strong>{{ user.display_name }}</strong>
+          {% if user.username %}<span class="text-muted">({{ user.username }})</span>{% endif %}
+        </p>
+        <p class="mb-3">
+          Your account type is
+          {% if acct == 'administrator' %}
+          <span class="badge bg-primary">Administrator</span>
+          {% elif acct == 'observer' %}
+          <span class="badge bg-danger">Observer (read-only)</span>
+          {% else %}
+          <span class="badge bg-success">User</span>
+          {% endif %}
+          <span class="text-muted small">— your account type is set by an administrator.</span>
+        </p>
+
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-2">
+            <thead>
+              <tr>
+                <th style="width:52%">What you can do</th>
+                <th class="text-center">Admin</th>
+                <th class="text-center">User</th>
+                <th class="text-center">Observer</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% macro tick(admin, usr, obs) %}
+              <td class="text-center">{% if admin %}<i class="bi bi-check-lg text-success"></i>{% else %}<i class="bi bi-dash text-muted"></i>{% endif %}</td>
+              <td class="text-center">{% if usr %}<i class="bi bi-check-lg text-success"></i>{% else %}<i class="bi bi-dash text-muted"></i>{% endif %}</td>
+              <td class="text-center">{% if obs %}<i class="bi bi-check-lg text-success"></i>{% else %}<i class="bi bi-dash text-muted"></i>{% endif %}</td>
+              {% endmacro %}
+              <tr><td>Use calculators, view dashboard, docs &amp; history</td>{{ tick(true, true, true) }}</tr>
+              <tr><td>Use instant chat &amp; set your own duty-role tag</td>{{ tick(true, true, true) }}</tr>
+              <tr><td>Raise a CEASE / dismiss alerts</td>{{ tick(true, true, true) }}</tr>
+              <tr><td>Log signals &amp; edit the live dashboard</td>{{ tick(true, true, false) }}</tr>
+              <tr><td>Create / start / end serials &amp; packages</td>{{ tick(true, true, false) }}</tr>
+              <tr><td>Change range state (Standby / Closed Loop / Live)*</td>{{ tick(true, true, false) }}</tr>
+              <tr><td>Submit incident/fault reports</td>{{ tick(true, true, true) }}</tr>
+              <tr><td>Edit documentation directly</td>{{ tick(true, false, false) }}</tr>
+              <tr><td>Propose documentation edits (needs approval)</td>{{ tick(true, true, true) }}</tr>
+              <tr><td>Approve edits, manage users, App Config &amp; audit</td>{{ tick(true, false, false) }}</tr>
+              <tr><td>Enter/leave Testing range state</td>{{ tick(true, false, false) }}</tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-muted small mb-2">
+          {% if acct == 'observer' %}
+          As an <strong>Observer</strong> your account is <strong>read-only</strong>: you can view everything,
+          use calculators, chat, raise a CEASE, and submit incidents/doc edits for administrator approval,
+          but you cannot change signals, serials, packages, or range state.
+          {% elif acct == 'administrator' %}
+          As an <strong>Administrator</strong> you have full access, including user management, App Config,
+          the audit log, documentation editing/approval, and the Testing range state.
+          {% else %}
+          As a <strong>User</strong> you can run day-to-day operations — logging signals, editing the dashboard,
+          managing serials/packages, and changing range state — but administrator-only settings
+          (users, App Config, audit, direct doc editing) are not available.
+          {% endif %}
+        </p>
+        <p class="text-muted small mb-3">*Going <strong>Live</strong> also requires a second administrator to authorise (two-person rule).</p>
+
         <a href="/account/password" class="btn btn-outline-secondary btn-sm">
           <i class="bi bi-key me-1"></i>Change password
         </a>

@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.18.5` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.18.6` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -68,6 +68,7 @@ Core of the MVP scope is in place:
 - Observer accounts can use calculators, docs, chat, CEASE, duty-role selection, dashboard Engaged toggles, and incident submission-for-approval while package/serial configuration remains read-only with clear hints
 - CDA tables can be assigned to active serials directly from the CDA table detail page after windows are created
 - Basic Calculator operator entry now moves cleanly to the second operand without requiring backspace
+- Basic Calculator accepts keyboard/numpad input; Preferences shows account type and a per-role permissions table; chat unread bubble no longer sticks on rooms that no longer exist; document approval flags concurrent-edit conflicts before overwriting newer changes
 - **0.6.0:** TxLO/RxLO naming, version badge, fully offline (LAN) styling, Docker deploy on port 7474
 
 ---

@@ -340,6 +340,10 @@ class DocVersion(Base):
     page_id: Mapped[int] = mapped_column(ForeignKey("doc_pages.id"), nullable=False)
     version_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Snapshot of the page content this edit was drafted against. Used to detect
+    # concurrent-edit conflicts when approving pending proposals (a proposal whose
+    # base no longer matches the live page would silently overwrite newer changes).
+    base_content: Mapped[str | None] = mapped_column(Text, nullable=True)
     change_summary: Mapped[str | None] = mapped_column(String(512), nullable=True)
     # approval_status: approved | pending | rejected
     approval_status: Mapped[str] = mapped_column(String(16), nullable=False, default="approved")
