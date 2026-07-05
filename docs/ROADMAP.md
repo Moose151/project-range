@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.18.7` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.19.0` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -282,21 +282,30 @@ serial (CDM-600L) clients.
   credentials apply is **unconfirmed**. Confirm SNMP is turned on per device, obtain
   v2c community strings or SNMPv3 creds, and verify reachability (UDP 161) from the
   Project Range server before committing build effort.
-- [ ] **New `app/snmp.py` client + `RFDevice` SNMP fields** (community/v3 creds,
-  encrypted like the CBM password using `app/crypto.py`). Reuse the existing
-  read-only, change-only-write-back, Testing-scoped sync pattern and audit path.
+- [x] **New `app/snmp.py` client + `RFDevice` SNMP fields** — shipped in **0.19.0**.
+  SNMP v2c/v3 client (pysnmp 7.x async, bridged to a sync worker thread), creds
+  encrypted via `app/crypto.py`, `app/snmp_sync.py` mapper writing observed routing
+  onto `DevicePort` + audit on change, and an opt-in background poller
+  (`SNMP_AUTO_SYNC_SECONDS`, default 0).
 
 **1. Splitter / combiner monitoring (LEAD ITEM).** Hardware = ETL Systems Genus
 modular system + VTR/VTRC-1xx matrices (Hawk matrix, Swift switch modules).
 SNMP-readable: matrix input→output routing (*how it is terminated*), switch
 positions, module presence, input/output levels, and PSU/fan/temperature alarms.
 
-- [ ] Read and display current termination/routing + switch state per matrix from SNMP.
-- [ ] Show module/PSU/fan/level alarm status.
-- [ ] **Guided state changes:** define the valid states and transitions with the user,
-  then present plain-language guidance on the dashboard for what must happen to move
-  between states (this is a logic/UX layer on top of the SNMP read, not a hardware
-  control action — read-only stays the rule unless control is explicitly agreed).
+- [x] Read and display current termination/routing per matrix from SNMP — shipped in
+  **0.19.0**: the routing page shows live observed routing vs the plan with mismatch
+  highlighting (`hawkOutputRoutingSettings` under ETL enterprise OID `20938`).
+- [x] Show system alarm/module health status — shipped in 0.19.0 (`systemSummaryAlarm`
+  + `moduleInfoTable` on the Devices page and routing panel). *(Per-port input/output
+  level detail can be added later if operators want it.)*
+- [ ] **Guided state changes (follow-up):** capture **named presets** of known-good
+  routing (user decision), match live routing to a preset, and present plain-language
+  guidance on what to re-route to reach a target preset. **Read-only guidance only** —
+  the app advises; the operator changes the matrix. Not started.
+- [ ] **Hardware validation:** confirm observed routing/alarm reads against the matrix
+  front panel once SNMP is enabled + credentials obtained (v2c vs v3), and confirm the
+  routing-table row/column → output-index interpretation in `app/snmp.py::parse_routing`.
 
 **2. EBEM status lights (CBM-400) — extends existing SSH/ICC poller.** Surface the
 extra EBEM status fields as red/green dashboard indicators: unit fault, Tx/Rx

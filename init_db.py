@@ -124,6 +124,19 @@ def _migrate(conn):
         "ALTER TABLE incidents ADD COLUMN rejection_reason TEXT",
         "ALTER TABLE cease_events ADD COLUMN is_testing BOOLEAN DEFAULT 0",
         "ALTER TABLE doc_versions ADD COLUMN base_content TEXT",
+        "ALTER TABLE rf_devices ADD COLUMN snmp_enabled BOOLEAN DEFAULT 0",
+        "ALTER TABLE rf_devices ADD COLUMN snmp_version VARCHAR(4) DEFAULT '2c'",
+        "ALTER TABLE rf_devices ADD COLUMN snmp_port INTEGER DEFAULT 161",
+        "ALTER TABLE rf_devices ADD COLUMN snmp_community_encrypted TEXT",
+        "ALTER TABLE rf_devices ADD COLUMN snmp_v3_user VARCHAR(128)",
+        "ALTER TABLE rf_devices ADD COLUMN snmp_v3_auth_encrypted TEXT",
+        "ALTER TABLE rf_devices ADD COLUMN snmp_v3_priv_encrypted TEXT",
+        "ALTER TABLE rf_devices ADD COLUMN snmp_last_poll_at DATETIME",
+        "ALTER TABLE rf_devices ADD COLUMN snmp_last_poll_status VARCHAR(32)",
+        "ALTER TABLE rf_devices ADD COLUMN snmp_last_poll_error TEXT",
+        "ALTER TABLE rf_devices ADD COLUMN snmp_system_alarm VARCHAR(16)",
+        "ALTER TABLE device_ports ADD COLUMN observed_routed_from INTEGER",
+        "ALTER TABLE device_ports ADD COLUMN observed_label VARCHAR(128)",
     ]
     for sql in migrations:
         try:

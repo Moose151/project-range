@@ -463,6 +463,19 @@ class RFDevice(Base):
     cbm_last_sync_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cbm_last_sync_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     cbm_last_sync_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # SNMP read-only monitoring (splitter/combiner/switch matrices, e.g. ETL Genus).
+    # Secrets are encrypted at rest via app.crypto (Fernet from SECRET_KEY).
+    snmp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    snmp_version: Mapped[str] = mapped_column(String(4), default="2c")   # '2c' | '3'
+    snmp_port: Mapped[int] = mapped_column(Integer, default=161)
+    snmp_community_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    snmp_v3_user: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    snmp_v3_auth_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    snmp_v3_priv_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    snmp_last_poll_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    snmp_last_poll_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    snmp_last_poll_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    snmp_system_alarm: Mapped[str | None] = mapped_column(String(16), nullable=True)  # ok|fault|warning
     location: Mapped[str | None] = mapped_column(String(128), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     num_inputs: Mapped[int] = mapped_column(Integer, default=16)
@@ -494,7 +507,11 @@ class DevicePort(Base):
     direction: Mapped[str] = mapped_column(String(3), nullable=False)   # 'in' or 'out'
     idx: Mapped[int] = mapped_column(Integer, nullable=False)           # 1-based port number
     label: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    routed_from: Mapped[int | None] = mapped_column(Integer, nullable=True)  # input idx feeding an output
+    routed_from: Mapped[int | None] = mapped_column(Integer, nullable=True)  # planned input idx feeding an output
+    # SNMP-observed (live) routing, kept separate from the manually-entered plan so the
+    # routing page can show planned-vs-actual and highlight mismatches. 0 = unrouted.
+    observed_routed_from: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    observed_label: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     device: Mapped["RFDevice"] = relationship("RFDevice", back_populates="ports")
 

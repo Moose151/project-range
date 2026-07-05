@@ -13,6 +13,38 @@
 <div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
 {% endif %}
 
+{# ── SNMP live monitoring panel (read-only) ── #}
+{% if device.snmp_enabled %}
+<div class="card border-secondary mb-3">
+  <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
+    <span class="fw-semibold"><i class="bi bi-broadcast-pin me-1"></i>Live SNMP monitor</span>
+    {% if device.snmp_system_alarm %}
+    <span class="badge {% if device.snmp_system_alarm == 'ok' %}bg-success{% elif device.snmp_system_alarm == 'warning' %}bg-warning text-dark{% else %}bg-danger{% endif %} text-capitalize">
+      System: {{ device.snmp_system_alarm }}
+    </span>
+    {% else %}
+    <span class="badge bg-secondary">System: not yet polled</span>
+    {% endif %}
+    {% if device.snmp_last_poll_status %}
+    <span class="text-muted small">
+      Last poll: {{ device.snmp_last_poll_status }}{% if device.snmp_last_poll_at %} · {{ device.snmp_last_poll_at.strftime('%Y-%m-%d %H:%M:%SZ') }}{% endif %}
+    </span>
+    {% endif %}
+    {% if device.snmp_last_poll_error %}
+    <span class="text-danger small" title="{{ device.snmp_last_poll_error }}">{{ device.snmp_last_poll_error[:80] }}{% if device.snmp_last_poll_error|length > 80 %}…{% endif %}</span>
+    {% endif %}
+    {% if user.role == 'administrator' %}
+    <form method="post" action="/devices/{{ device.id }}/snmp/test" class="ms-auto">
+      <button type="submit" class="btn btn-sm btn-outline-success"><i class="bi bi-plug-fill me-1"></i>Poll now</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="card-footer py-1 text-muted small">
+    Observed routing is read live from the matrix and compared against the planned routing below. Read-only — the app never changes the matrix.
+  </div>
+</div>
+{% endif %}
+
 <form method="post" action="/devices/{{ device.id }}/routing">
   <div class="row g-4">
     <!-- Inputs: labels -->
@@ -50,12 +82,14 @@
         <div class="card-body p-2 overflow-auto">
           <table class="table table-dark table-sm align-middle mb-0">
             <thead class="table-secondary">
-              <tr><th style="width:48px">Out</th><th style="width:200px">Routed from input</th><th>Label / what's connected</th></tr>
+              <tr><th style="width:48px">Out</th><th style="width:200px">Planned from input</th>{% if device.snmp_enabled %}<th style="width:150px">Live (SNMP)</th>{% endif %}<th>Label / what's connected</th></tr>
             </thead>
             <tbody>
               {% for p in outputs %}
               {% set hint = output_hints.get(p.idx) if output_hints is defined else none %}
-              <tr>
+              {% set observed = p.observed_routed_from %}
+              {% set mismatch = device.snmp_enabled and device.snmp_last_poll_at and (observed or none) != (p.routed_from or none) %}
+              <tr {% if mismatch %}class="table-warning"{% endif %}>
                 <td class="fw-semibold text-warning">{{ p.idx }}</td>
                 <td>
                   <select class="form-select form-select-sm" name="out_src_{{ p.idx }}">
@@ -67,6 +101,21 @@
                     {% endfor %}
                   </select>
                 </td>
+                {% if device.snmp_enabled %}
+                <td class="small">
+                  {% if not device.snmp_last_poll_at %}
+                    <span class="text-muted">—</span>
+                  {% elif observed %}
+                    <span class="{% if mismatch %}text-dark fw-semibold{% else %}text-success{% endif %}">
+                      In {{ observed }}{% if input_labels.get(observed) %} — {{ input_labels.get(observed) }}{% endif %}
+                    </span>
+                    {% if mismatch %}<i class="bi bi-exclamation-triangle-fill text-danger ms-1" title="Live routing differs from plan"></i>{% endif %}
+                  {% else %}
+                    <span class="{% if mismatch %}text-dark fw-semibold{% else %}text-muted{% endif %}">none</span>
+                    {% if mismatch %}<i class="bi bi-exclamation-triangle-fill text-danger ms-1" title="Live routing differs from plan"></i>{% endif %}
+                  {% endif %}
+                </td>
+                {% endif %}
                 <td>
                   <input type="text" class="form-control form-control-sm" name="out_label_{{ p.idx }}"
                          value="{{ p.label or (hint or '') }}"

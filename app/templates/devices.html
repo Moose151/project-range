@@ -90,6 +90,76 @@
       </div>
     </div>
   </div>
+  {# ── SNMP read-only monitoring (splitter/combiner/switch matrices) ── #}
+  <div class="col-12 border-top pt-2 mt-1">
+    <div class="row g-2 align-items-end">
+      <div class="col-12">
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" name="snmp_enabled" value="1" id="snmp-en-{{ action | replace('/', '_') }}"
+                 {% if d and d.snmp_enabled %}checked{% endif %}>
+          <label class="form-check-label small" for="snmp-en-{{ action | replace('/', '_') }}">
+            Enable SNMP read-only monitoring <span class="text-muted">(routing devices — ETL Genus / VTR matrices)</span>
+          </label>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">SNMP Version</label>
+        <select class="form-select form-select-sm" name="snmp_version">
+          <option value="2c" {% if not d or d.snmp_version != '3' %}selected{% endif %}>v2c</option>
+          <option value="3" {% if d and d.snmp_version == '3' %}selected{% endif %}>v3</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">SNMP Port</label>
+        <input type="number" class="form-control form-control-sm" name="snmp_port"
+               value="{{ d.snmp_port if d and d.snmp_port else 161 }}" min="1" max="65535">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">Community (v2c)</label>
+        <input type="password" class="form-control form-control-sm" name="snmp_community"
+               placeholder="{% if d and d.snmp_community_encrypted %}Stored — leave blank to keep{% else %}e.g. public{% endif %}"
+               autocomplete="new-password">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">v3 User</label>
+        <input type="text" class="form-control form-control-sm" name="snmp_v3_user"
+               value="{{ d.snmp_v3_user or '' if d else '' }}" autocomplete="off">
+      </div>
+      {% if d and d.snmp_community_encrypted %}
+      <div class="col-md-3">
+        <div class="form-check mb-1">
+          <input class="form-check-input" type="checkbox" name="clear_snmp_community" value="1" id="clear-snmp-{{ d.id }}">
+          <label class="form-check-label small" for="clear-snmp-{{ d.id }}">Clear stored community</label>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    <div class="row g-2 align-items-end mt-0">
+      <div class="col-md-3">
+        <label class="form-label small mb-0">v3 Auth key</label>
+        <input type="password" class="form-control form-control-sm" name="snmp_v3_auth"
+               placeholder="{% if d and d.snmp_v3_auth_encrypted %}Stored — blank to keep{% else %}SHA auth key{% endif %}"
+               autocomplete="new-password">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">v3 Priv key</label>
+        <input type="password" class="form-control form-control-sm" name="snmp_v3_priv"
+               placeholder="{% if d and d.snmp_v3_priv_encrypted %}Stored — blank to keep{% else %}AES priv key{% endif %}"
+               autocomplete="new-password">
+      </div>
+      {% if d and (d.snmp_v3_auth_encrypted or d.snmp_v3_priv_encrypted) %}
+      <div class="col-md-3">
+        <div class="form-check mb-1">
+          <input class="form-check-input" type="checkbox" name="clear_snmp_v3" value="1" id="clear-snmpv3-{{ d.id }}">
+          <label class="form-check-label small" for="clear-snmpv3-{{ d.id }}">Clear stored v3 keys</label>
+        </div>
+      </div>
+      {% endif %}
+      <div class="col-md-3">
+        <div class="form-text mb-1">Read-only: the server polls routing/alarms only, never changes the matrix.</div>
+      </div>
+    </div>
+  </div>
   <div class="col-12 d-flex align-items-center gap-3 flex-wrap">
     <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check2 me-1"></i>{{ submit_label }}</button>
     <span class="text-muted small">Host + Check Port enable the reachability badge. Inputs/Outputs for routing matrix.</span>
@@ -106,6 +176,11 @@
   <form method="post" action="/devices/cbm/sync-active" class="ms-auto">
     <button type="submit" class="btn btn-sm btn-outline-success">
       <i class="bi bi-arrow-repeat me-1"></i>Sync Active CBMs
+    </button>
+  </form>
+  <form method="post" action="/devices/snmp/poll-active">
+    <button type="submit" class="btn btn-sm btn-outline-success" title="Read routing/alarms from all SNMP-enabled matrices">
+      <i class="bi bi-broadcast-pin me-1"></i>Poll SNMP
     </button>
   </form>
   {% endif %}
@@ -129,6 +204,7 @@
           <th>Location</th>
           <th>Web GUI</th>
           <th>CBM Sync</th>
+          <th>SNMP Monitor</th>
           <th></th>
         </tr>
       </thead>
@@ -179,6 +255,35 @@
               <span class="text-muted small">—</span>
             {% endif %}
           </td>
+          <td>
+            {% if d.is_routing and d.snmp_enabled %}
+              {% if d.snmp_community_encrypted or d.snmp_v3_user %}
+              <span class="badge bg-success">Ready</span>
+              {% else %}
+              <span class="badge bg-warning text-dark">Needs credentials</span>
+              {% endif %}
+              {% if d.snmp_system_alarm %}
+              <span class="badge {% if d.snmp_system_alarm == 'ok' %}bg-success{% elif d.snmp_system_alarm == 'warning' %}bg-warning text-dark{% else %}bg-danger{% endif %} text-capitalize">
+                {{ d.snmp_system_alarm }}
+              </span>
+              {% endif %}
+              {% if d.snmp_last_poll_status %}
+              <div class="text-muted small">
+                {{ d.snmp_last_poll_status }}
+                {% if d.snmp_last_poll_at %} · {{ d.snmp_last_poll_at.strftime('%H:%M') }}{% endif %}
+              </div>
+              {% endif %}
+              {% if d.snmp_last_poll_error %}
+              <div class="text-danger small" title="{{ d.snmp_last_poll_error }}">
+                {{ d.snmp_last_poll_error[:60] }}{% if d.snmp_last_poll_error|length > 60 %}…{% endif %}
+              </div>
+              {% endif %}
+            {% elif d.is_routing %}
+              <span class="text-muted small">Disabled</span>
+            {% else %}
+              <span class="text-muted small">—</span>
+            {% endif %}
+          </td>
           <td class="text-nowrap">
             {% if d.is_routing %}
             <a href="/devices/{{ d.id }}/routing" class="btn btn-sm btn-outline-info py-0 px-1" title="Routing matrix">
@@ -190,6 +295,13 @@
             <form method="post" action="/devices/{{ d.id }}/cbm/test" class="d-inline">
               <button type="submit" class="btn btn-sm btn-outline-success py-0 px-1" title="Test read-only CBM poll">
                 <i class="bi bi-plug"></i>
+              </button>
+            </form>
+            {% endif %}
+            {% if d.is_routing and d.snmp_enabled %}
+            <form method="post" action="/devices/{{ d.id }}/snmp/test" class="d-inline">
+              <button type="submit" class="btn btn-sm btn-outline-success py-0 px-1" title="Test read-only SNMP poll">
+                <i class="bi bi-plug-fill"></i>
               </button>
             </form>
             {% endif %}
@@ -206,13 +318,13 @@
         </tr>
         {% if user.role == 'administrator' %}
         <tr class="collapse" id="edit-{{ d.id }}">
-          <td colspan="9" class="p-2 bg-body-tertiary">
+          <td colspan="10" class="p-2 bg-body-tertiary">
             {{ device_form(d, device_types, '/devices/' ~ d.id ~ '/update', 'Save') }}
           </td>
         </tr>
         {% endif %}
         {% else %}
-        <tr><td colspan="9" class="text-muted text-center py-3">No devices yet.</td></tr>
+        <tr><td colspan="10" class="text-muted text-center py-3">No devices yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>

@@ -4,9 +4,18 @@ This document records the major user-facing changes shipped in each beta version
 For planned work, see [ROADMAP.md](ROADMAP.md). For deep implementation notes and
 handover details, see [HANDOVER.md](HANDOVER.md).
 
-Current version: **0.18.7**
+Current version: **0.19.0**
 
 ---
+
+## 0.19.0 — Splitter/Combiner Live Monitoring (SNMP)
+
+- Added read-only **SNMP monitoring** for splitter/combiner/switch matrices (ETL Systems Genus / VTR).
+- Routing devices now have SNMP settings (v2c community or v3 user, encrypted at rest) with a **Test SNMP poll** button and a **Poll SNMP** bulk action on the Devices page.
+- The routing page now shows the **live observed routing** read from the matrix beside the planned routing and highlights any mismatch, plus a system alarm/health panel.
+- Optional background polling via `SNMP_AUTO_SYNC_SECONDS` (default `0` = disabled).
+- Read-only by design: the app never changes matrix routing. This is the first item of the range hardware monitoring expansion; **guided state-change presets are a planned follow-up**.
+- **Not yet hardware-validated** — real Genus/VTR SNMP reads must be confirmed on the range once SNMP is enabled and credentials are available.
 
 ## 0.18.7 — Chat UI Tidy-Up
 

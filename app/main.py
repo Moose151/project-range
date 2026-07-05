@@ -7,11 +7,12 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from app.config import (
     SECRET_KEY, APP_VERSION, SESSION_MAX_AGE_DAYS,
-    SESSION_SAME_SITE, SESSION_HTTPS_ONLY, CBM_AUTO_SYNC_SECONDS,
+    SESSION_SAME_SITE, SESSION_HTTPS_ONLY, CBM_AUTO_SYNC_SECONDS, SNMP_AUTO_SYNC_SECONDS,
 )
 from app.database import SessionLocal
 from app.models import User, Role
 from app.cbm_sync import sync_active_cbms
+from app.snmp_sync import poll_active_snmp_devices
 from app.templating import templates
 from app import chat_state
 from app.routers import (
@@ -23,6 +24,8 @@ from app.routers import (
 app = FastAPI(title="SEW Range", version=APP_VERSION, docs_url=None, redoc_url=None)
 _cbm_sync_running = False
 _cbm_sync_task = None
+_snmp_sync_running = False
+_snmp_sync_task = None
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 
@@ -176,11 +179,39 @@ async def _auto_cbm_sync_loop() -> None:
             _cbm_sync_running = False
 
 
+def _run_auto_snmp_poll_once() -> None:
+    db = SessionLocal()
+    try:
+        actor_id = _cbm_sync_actor_id(db)
+        if actor_id is not None:
+            poll_active_snmp_devices(db, actor_id, audit_when_noop=False)
+    finally:
+        db.close()
+
+
+async def _auto_snmp_poll_loop() -> None:
+    global _snmp_sync_running
+    interval = max(1, SNMP_AUTO_SYNC_SECONDS)
+    while True:
+        await asyncio.sleep(interval)
+        if _snmp_sync_running:
+            continue
+        _snmp_sync_running = True
+        try:
+            await asyncio.to_thread(_run_auto_snmp_poll_once)
+        except Exception:
+            pass
+        finally:
+            _snmp_sync_running = False
+
+
 @app.on_event("startup")
 async def start_auto_cbm_sync() -> None:
-    global _cbm_sync_task
+    global _cbm_sync_task, _snmp_sync_task
     if _cbm_sync_task is None and CBM_AUTO_SYNC_SECONDS > 0:
         _cbm_sync_task = asyncio.create_task(_auto_cbm_sync_loop())
+    if _snmp_sync_task is None and SNMP_AUTO_SYNC_SECONDS > 0:
+        _snmp_sync_task = asyncio.create_task(_auto_snmp_poll_loop())
 
 
 @app.exception_handler(302)

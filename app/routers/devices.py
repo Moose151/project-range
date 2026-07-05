@@ -10,6 +10,8 @@ from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, is_testing_state, require_supervisor
 from app.cbm import CBMError, poll_cbm_ssh
 from app.cbm_sync import sync_active_cbms
+from app.snmp import SNMPError, poll_genus_matrix
+from app.snmp_sync import poll_active_snmp_devices, poll_snmp_device
 from app.crypto import decrypt_secret, encrypt_secret
 from app.models import RFDevice, DevicePort, DeviceLink, AuditLog, User
 from app.templating import templates
@@ -106,6 +108,18 @@ async def devices_cbm_sync_active(
     return RedirectResponse(f"/devices?toast={quote_plus(message)}", status_code=302)
 
 
+@router.post("/snmp/poll-active")
+async def devices_snmp_poll_active(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    result = poll_active_snmp_devices(db, current_user.id)
+    message = f"SNMP poll complete: {result.polled} polled, {result.updated} routing changed"
+    if result.errors:
+        message += f", {len(result.errors)} issue(s): {result.errors[0]}"
+    return RedirectResponse(f"/devices?toast={quote_plus(message)}", status_code=302)
+
+
 @router.post("/new")
 async def device_create(
     name: str = Form(...),
@@ -117,6 +131,13 @@ async def device_create(
     cbm_sync_enabled: str = Form(""),
     cbm_username: str = Form(""),
     cbm_password: str = Form(""),
+    snmp_enabled: str = Form(""),
+    snmp_version: str = Form("2c"),
+    snmp_port: str = Form("161"),
+    snmp_community: str = Form(""),
+    snmp_v3_user: str = Form(""),
+    snmp_v3_auth: str = Form(""),
+    snmp_v3_priv: str = Form(""),
     location: str = Form(""),
     num_inputs: int = Form(16),
     num_outputs: int = Form(16),
@@ -126,6 +147,7 @@ async def device_create(
 ):
     name = name.strip()
     if name:
+        is_routing = device_type in ROUTING_TYPES
         dev = RFDevice(
             name=name,
             device_model=device_model.strip() or None,
@@ -136,6 +158,13 @@ async def device_create(
             cbm_sync_enabled=bool(cbm_sync_enabled) if device_type == "modem" else False,
             cbm_username=cbm_username.strip() or None,
             cbm_password_encrypted=encrypt_secret(cbm_password.strip()) if cbm_password.strip() else None,
+            snmp_enabled=bool(snmp_enabled) if is_routing else False,
+            snmp_version="3" if snmp_version == "3" else "2c",
+            snmp_port=int(snmp_port) if snmp_port.strip().isdigit() else 161,
+            snmp_community_encrypted=encrypt_secret(snmp_community.strip()) if snmp_community.strip() else None,
+            snmp_v3_user=snmp_v3_user.strip() or None,
+            snmp_v3_auth_encrypted=encrypt_secret(snmp_v3_auth.strip()) if snmp_v3_auth.strip() else None,
+            snmp_v3_priv_encrypted=encrypt_secret(snmp_v3_priv.strip()) if snmp_v3_priv.strip() else None,
             location=location.strip() or None,
             num_inputs=max(0, min(num_inputs, 128)),
             num_outputs=max(0, min(num_outputs, 128)),
@@ -163,6 +192,15 @@ async def device_update(
     cbm_username: str = Form(""),
     cbm_password: str = Form(""),
     clear_cbm_password: str = Form(""),
+    snmp_enabled: str = Form(""),
+    snmp_version: str = Form("2c"),
+    snmp_port: str = Form("161"),
+    snmp_community: str = Form(""),
+    clear_snmp_community: str = Form(""),
+    snmp_v3_user: str = Form(""),
+    snmp_v3_auth: str = Form(""),
+    snmp_v3_priv: str = Form(""),
+    clear_snmp_v3: str = Form(""),
     location: str = Form(""),
     num_inputs: int = Form(16),
     num_outputs: int = Form(16),
@@ -184,6 +222,23 @@ async def device_update(
             dev.cbm_password_encrypted = None
         elif cbm_password.strip():
             dev.cbm_password_encrypted = encrypt_secret(cbm_password.strip())
+        # SNMP monitoring config (routing devices only)
+        dev.snmp_enabled = bool(snmp_enabled) if dev.device_type in ROUTING_TYPES else False
+        dev.snmp_version = "3" if snmp_version == "3" else "2c"
+        dev.snmp_port = int(snmp_port) if snmp_port.strip().isdigit() else 161
+        dev.snmp_v3_user = snmp_v3_user.strip() or None
+        if clear_snmp_community:
+            dev.snmp_community_encrypted = None
+        elif snmp_community.strip():
+            dev.snmp_community_encrypted = encrypt_secret(snmp_community.strip())
+        if clear_snmp_v3:
+            dev.snmp_v3_auth_encrypted = None
+            dev.snmp_v3_priv_encrypted = None
+        else:
+            if snmp_v3_auth.strip():
+                dev.snmp_v3_auth_encrypted = encrypt_secret(snmp_v3_auth.strip())
+            if snmp_v3_priv.strip():
+                dev.snmp_v3_priv_encrypted = encrypt_secret(snmp_v3_priv.strip())
         dev.location = location.strip() or None
         dev.num_inputs = max(0, min(num_inputs, 128))
         dev.num_outputs = max(0, min(num_outputs, 128))
@@ -249,6 +304,47 @@ async def device_cbm_test(
         return RedirectResponse(
             f"/devices?toast={quote_plus('CBM poll failed: ' + dev.name)}",
             status_code=302,
+        )
+
+
+@router.post("/{dev_id}/snmp/test")
+async def device_snmp_test(
+    dev_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    dev = db.query(RFDevice).filter(RFDevice.id == dev_id, RFDevice.is_testing == is_testing_state(db)).first()
+    if not dev or dev.device_type not in ROUTING_TYPES:
+        return RedirectResponse("/devices?toast=SNMP+device+not+found", status_code=302)
+    _ensure_ports(db, dev)
+    try:
+        snapshot, changed = poll_snmp_device(db, dev)
+        routed = snapshot.summary["outputs_routed"] if snapshot else 0
+        db.add(AuditLog(
+            user_id=current_user.id,
+            action_type="SNMP_TEST",
+            entity_type="RFDevice",
+            entity_id=dev.id,
+            new_value=f"{dev.name}: alarm={dev.snmp_system_alarm or 'n/a'}, {routed} outputs routed",
+        ))
+        db.commit()
+        return RedirectResponse(
+            f"/devices?toast={quote_plus('SNMP poll OK: ' + dev.name)}", status_code=302,
+        )
+    except SNMPError as exc:
+        dev.snmp_last_poll_at = datetime.utcnow()
+        dev.snmp_last_poll_status = "error"
+        dev.snmp_last_poll_error = str(exc)[:1000]
+        db.add(AuditLog(
+            user_id=current_user.id,
+            action_type="SNMP_TEST_FAILED",
+            entity_type="RFDevice",
+            entity_id=dev.id,
+            new_value=f"{dev.name}: {dev.snmp_last_poll_error}",
+        ))
+        db.commit()
+        return RedirectResponse(
+            f"/devices?toast={quote_plus('SNMP poll failed: ' + dev.name)}", status_code=302,
         )
 
 
@@ -323,6 +419,7 @@ async def device_routing_page(
         "outputs": sorted(outputs, key=lambda p: p.idx),
         "input_hints": input_hints,
         "output_hints": output_hints,
+        "input_labels": {p.idx: (p.label or input_hints.get(p.idx) or "") for p in inputs},
         "toast": request.query_params.get("toast", ""),
         "page": "devices",
     })
