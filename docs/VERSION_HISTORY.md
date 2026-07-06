@@ -11,6 +11,7 @@ Current version: **0.19.8**
 - Sessions now carry `session_issued_at`; malformed timestamps expire safely, and the absolute cookie-age ceiling is enforced server-side as well as by the browser cookie.
 - SQLite data, audit/serial archive directories, and generated backup files now get best-effort owner-only filesystem permissions.
 - Admin Config → System Health now reports database and archive permission modes so overly broad file access is visible.
+- Package/CBM imports and CDA CSV imports now enforce upload type and size limits; legacy package JSON imports validate their structure before processing.
 
 ## 0.19.7 — QoL Navigation and Admin Tools
 

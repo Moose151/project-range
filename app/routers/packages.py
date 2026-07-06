@@ -14,6 +14,12 @@ from app.models import (
     User, Signal, SignalPackage, SignalPackageEntry,
     ModulationType, FecType, SignalSource, AntennaType, AuditLog, RFDevice, SerialPackage,
 )
+from app.config import MAX_UPLOAD_BYTES
+from app.upload_validation import (
+    validate_total_upload_size,
+    validate_upload_file,
+    validate_zip_member_count,
+)
 
 router = APIRouter(prefix="/packages")
 from app.templating import templates
@@ -28,6 +34,8 @@ CBM_PATHS = [
     ("tx_rx", "Tx/Rx"),
     ("dvb", "DVB"),
 ]
+PACKAGE_UPLOAD_EXTENSIONS = {"txt", "cfg", "conf", "json", "zip"}
+CBM_TEXT_EXTENSIONS = {"txt", "cfg", "conf"}
 
 CBM_WMASK_DEFAULT = (
     "BPSK:1/2TURBO+BPSK:2/3TURBO+BPSK:3/4TURBO+BPSK:7/8TURBO+BPSK:19/20TURBO+"
@@ -233,6 +241,18 @@ def _dict_to_entries(data: dict) -> list[dict]:
             "display_order": i,
         })
     return entries
+
+
+def _validated_json_package(content: bytes) -> dict:
+    data = json.loads(content.decode("utf-8-sig"))
+    if not isinstance(data, dict) or not isinstance(data.get("signals"), list):
+        raise ValueError("JSON file must be a Project Range package object with a 'signals' list.")
+    if len(data["signals"]) > 500:
+        raise ValueError("JSON package contains too many signals. Maximum is 500.")
+    for i, signal in enumerate(data["signals"], start=1):
+        if not isinstance(signal, dict):
+            raise ValueError(f"JSON signal #{i} must be an object.")
+    return data
 
 
 def _safe_filename(value: str, fallback: str = "signal") -> str:
@@ -474,17 +494,35 @@ async def _uploaded_signal_files(request: Request) -> list[tuple[str, bytes]]:
         raise ValueError("Select at least one CBM .txt, .zip, or legacy Project Range .json file.")
 
     files: list[tuple[str, bytes]] = []
+    total_bytes = 0
     for upload in uploads:
         content = await upload.read()
+        total_bytes += len(content)
+        validate_total_upload_size(total_bytes)
+        filename = validate_upload_file(
+            upload.filename,
+            content,
+            allowed_extensions=PACKAGE_UPLOAD_EXTENSIONS,
+        )
         if zipfile.is_zipfile(io.BytesIO(content)):
             with zipfile.ZipFile(io.BytesIO(content)) as zf:
-                for name in zf.namelist():
-                    if name.endswith("/") or name.rsplit("/", 1)[-1].startswith("."):
+                infos = [info for info in zf.infolist() if not info.is_dir()]
+                validate_zip_member_count(len(infos))
+                for info in infos:
+                    name = info.filename
+                    basename = name.rsplit("/", 1)[-1]
+                    if basename.startswith("."):
                         continue
-                    if name.lower().endswith((".txt", ".cfg", ".conf")):
-                        files.append((name, zf.read(name)))
+                    if not name.lower().endswith((".txt", ".cfg", ".conf")):
+                        continue
+                    validate_upload_file(basename, b"", allowed_extensions=CBM_TEXT_EXTENSIONS)
+                    if info.file_size > MAX_UPLOAD_BYTES:
+                        raise ValueError(f"{basename} is too large. Maximum size is {MAX_UPLOAD_BYTES // 1024} KB.")
+                    total_bytes += info.file_size
+                    validate_total_upload_size(total_bytes)
+                    files.append((basename, zf.read(info)))
         else:
-            files.append((upload.filename, content))
+            files.append((filename, content))
     return files
 
 
@@ -492,9 +530,7 @@ def _entries_from_uploaded_files(files: list[tuple[str, bytes]], display_offset:
     entries = []
     for i, (filename, content) in enumerate(files):
         if filename.lower().endswith(".json"):
-            data = json.loads(content.decode("utf-8-sig"))
-            if not isinstance(data, dict) or "signals" not in data:
-                raise ValueError("JSON file must be a Project Range package object with a 'signals' list.")
+            data = _validated_json_package(content)
             for fields in _dict_to_entries(data):
                 fields["display_order"] = display_offset + len(entries)
                 entries.append(fields)
@@ -1026,9 +1062,7 @@ async def package_import_submit(
     try:
         files = await _uploaded_signal_files(request)
         if len(files) == 1 and files[0][0].lower().endswith(".json"):
-            data = json.loads(files[0][1].decode("utf-8-sig"))
-            if not isinstance(data, dict) or "signals" not in data:
-                raise ValueError("JSON file must be a Project Range package object with a 'signals' list.")
+            data = _validated_json_package(files[0][1])
             return _import_json_package(data, files[0][0], db, current_user)
 
         entries = _entries_from_uploaded_files(files)

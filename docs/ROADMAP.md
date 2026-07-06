@@ -277,8 +277,9 @@ fully trusted.
   `no-new-privileges`, drop unneeded Linux capabilities, set resource limits.
 - [ ] **Encrypted, access-controlled backups** with a tested restore procedure.
 - [ ] **Finer-grained RBAC** beyond the two current roles; periodic access review.
-- [ ] **Upload validation:** enforce type/size limits and validate JSON on package
-  import and any doc/file uploads.
+- [x] **Upload validation:** package/CBM imports and CDA CSV imports now enforce
+  type and size limits, zip member limits, and structured validation for legacy
+  package JSON before processing.
 - [ ] **Audit log integrity:** make audit records tamper-evident / append-only and
   ensure they cannot be silently deleted.
 - [ ] **Pre-deployment review:** a focused security review / light pen test before

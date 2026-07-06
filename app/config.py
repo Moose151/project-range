@@ -24,6 +24,9 @@ SESSION_HTTPS_ONLY = os.environ.get("SESSION_HTTPS_ONLY", "0") == "1"  # set 1 b
 MIN_PASSWORD_LENGTH = int(os.environ.get("MIN_PASSWORD_LENGTH", "6"))
 LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
 LOGIN_LOCKOUT_SECONDS = int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "300"))
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(2 * 1024 * 1024)))
+MAX_UPLOAD_TOTAL_BYTES = int(os.environ.get("MAX_UPLOAD_TOTAL_BYTES", str(8 * 1024 * 1024)))
+MAX_UPLOAD_ZIP_MEMBERS = int(os.environ.get("MAX_UPLOAD_ZIP_MEMBERS", "100"))
 
 DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{BASE_DIR}/range.db")
 

@@ -1,15 +1,19 @@
 import csv
 import io
 from typing import Optional
+from urllib.parse import quote_plus
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, require_supervisor, get_current_range_state, is_testing_state
 from app.models import User, CDATable, CDAWindow, SerialCDATable, Serial, AuditLog
+from app.upload_validation import validate_upload_file
 
 router = APIRouter(prefix="/cda")
 from app.templating import templates
+
+CDA_UPLOAD_EXTENSIONS = {"csv", "txt"}
 
 
 def _parse_zulu_time(t: str) -> str:
@@ -222,11 +226,12 @@ async def cda_import_csv(
     if not table:
         return RedirectResponse("/cda", status_code=302)
 
-    raw = await file.read()
     try:
+        raw = await file.read()
+        validate_upload_file(file.filename, raw, allowed_extensions=CDA_UPLOAD_EXTENSIONS)
         text = raw.decode("utf-8-sig")  # strip Excel BOM if present
-    except Exception:
-        return RedirectResponse(f"/cda/{table_id}?toast=Could+not+read+file", status_code=302)
+    except Exception as exc:
+        return RedirectResponse(f"/cda/{table_id}?toast={quote_plus(str(exc))}", status_code=302)
 
     reader = csv.reader(io.StringIO(text))
     added = skipped = 0
