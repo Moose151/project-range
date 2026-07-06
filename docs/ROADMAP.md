@@ -273,8 +273,10 @@ fully trusted.
 - [ ] **Dependency & image patching:** pin versions, run `pip-audit` (or similar)
   on a schedule, and rebuild the image regularly to pick up base-image security
   fixes. Track CVEs for FastAPI/Starlette/uvicorn/bcrypt.
-- [ ] **Container hardening:** read-only root filesystem where possible,
-  `no-new-privileges`, drop unneeded Linux capabilities, set resource limits.
+- [x] **Container hardening:** Docker Compose now runs the app with a read-only
+  root filesystem, `/tmp` tmpfs, `no-new-privileges`, all Linux capabilities
+  dropped, and basic memory/process limits. `/app/data` remains the writable
+  SQLite/archive volume.
 - [ ] **Encrypted, access-controlled backups** with a tested restore procedure.
 - [ ] **Finer-grained RBAC** beyond the two current roles; periodic access review.
 - [x] **Upload validation:** package/CBM imports and CDA CSV imports now enforce

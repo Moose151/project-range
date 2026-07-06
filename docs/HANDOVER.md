@@ -281,6 +281,7 @@
   - `app.auth.start_authenticated_session()` now clears pre-login session state before writing authenticated claims, adds `session_issued_at`, and `session_is_expired()` treats malformed timestamps or sessions older than `SESSION_MAX_AGE_DAYS` as expired. Login still rotates `active_session_token` to invalidate previous browsers.
   - `app/file_security.py` hardens SQLite DB and archive directories to owner-only permissions where possible. `scripts/backup_db.py` chmods backup output to owner-only, and Admin Config → System Health reports DB/archive permission modes.
   - `app/upload_validation.py` centralises upload limits. Package/CBM imports and CDA CSV imports now reject unexpected file types, oversized uploads, excessive zip members, and malformed legacy package JSON before processing.
+  - `docker-compose.yml` hardens the web container with read-only root filesystem, `/tmp` tmpfs, `no-new-privileges`, dropped capabilities, and memory/process limits while keeping `/app/data` writable as the persistent volume.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.

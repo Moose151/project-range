@@ -115,5 +115,8 @@ Set in `.env` (see `.env.example`):
   concurrent writers well, so do not add multiple workers while on SQLite. For
   higher load, point `DATABASE_URL` at Postgres (note: the `init_db.py` migration
   helper uses SQLite `ALTER TABLE` syntax and would need adjusting for Postgres).
-- The image runs as a non-root user (`appuser`).
+- The image runs as a non-root user (`appuser`). Compose also sets a read-only
+  root filesystem, `/tmp` tmpfs, `no-new-privileges`, drops Linux capabilities,
+  and applies basic memory/process limits. Keep persistent writes under
+  `/app/data`, which is the named volume.
 - A `HEALTHCHECK` polls `/login`; check status with `docker compose ps`.

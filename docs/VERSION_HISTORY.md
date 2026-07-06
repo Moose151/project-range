@@ -12,6 +12,7 @@ Current version: **0.19.8**
 - SQLite data, audit/serial archive directories, and generated backup files now get best-effort owner-only filesystem permissions.
 - Admin Config → System Health now reports database and archive permission modes so overly broad file access is visible.
 - Package/CBM imports and CDA CSV imports now enforce upload type and size limits; legacy package JSON imports validate their structure before processing.
+- Docker Compose now hardens the app container with a read-only root filesystem, `/tmp` tmpfs, no-new-privileges, dropped Linux capabilities, and memory/process limits.
 
 ## 0.19.7 — QoL Navigation and Admin Tools
 
