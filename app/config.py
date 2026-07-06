@@ -27,6 +27,7 @@ LOGIN_LOCKOUT_SECONDS = int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "300"))
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(2 * 1024 * 1024)))
 MAX_UPLOAD_TOTAL_BYTES = int(os.environ.get("MAX_UPLOAD_TOTAL_BYTES", str(8 * 1024 * 1024)))
 MAX_UPLOAD_ZIP_MEMBERS = int(os.environ.get("MAX_UPLOAD_ZIP_MEMBERS", "100"))
+AUDIT_HASH_SECRET = os.environ.get("AUDIT_HASH_SECRET") or SECRET_KEY
 
 DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{BASE_DIR}/range.db")
 

@@ -5,7 +5,30 @@
 <div class="d-flex align-items-center mb-3">
   <h4 class="mb-0"><i class="bi bi-journal-text me-2"></i>Audit Log</h4>
   <span class="badge bg-secondary ms-2">{{ total }} record{{ 's' if total != 1 else '' }}</span>
+  {% if integrity %}
+    {% if integrity.ok %}
+      <span class="badge bg-success ms-2" title="{{ integrity.note }}">
+        <i class="bi bi-shield-check me-1"></i>Integrity OK
+      </span>
+    {% else %}
+      <span class="badge bg-danger ms-2" title="{{ integrity.note }}">
+        <i class="bi bi-shield-exclamation me-1"></i>Integrity warning
+      </span>
+    {% endif %}
+  {% endif %}
 </div>
+
+{% if integrity and not integrity.ok %}
+<div class="alert alert-danger py-2 small">
+  {{ integrity.note }}
+  {% if integrity.first_problem_id %}First affected audit record: #{{ integrity.first_problem_id }}.{% endif %}
+  Checked {{ integrity.checked }} record{{ 's' if integrity.checked != 1 else '' }}.
+</div>
+{% elif integrity and integrity.anchored %}
+<div class="alert alert-secondary py-2 small">
+  {{ integrity.note }}
+</div>
+{% endif %}
 
 {% if retention and (retention.archived or retention.deleted) %}
 <div class="alert alert-info py-2 small">
@@ -69,6 +92,7 @@
           <th>Previous</th>
           <th>New Value</th>
           <th>Comment</th>
+          <th>Hash</th>
         </tr>
       </thead>
       <tbody>
@@ -121,6 +145,13 @@
           </td>
           <td class="small text-muted" style="max-width:200px">
             {{ entry.comment or '—' }}
+          </td>
+          <td class="small font-monospace text-muted">
+            {% if entry.record_hash %}
+              <span title="{{ entry.record_hash }}">{{ entry.record_hash[:10] }}…</span>
+            {% else %}
+              <span class="badge bg-warning text-dark">unsigned</span>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}

@@ -6,6 +6,7 @@ Re-running is safe — it skips existing data and only adds missing tables/seed 
 from datetime import datetime
 
 from app.config import AUDIT_ARCHIVE_DIR, DATABASE_URL, SERIAL_ARCHIVE_DIR
+from app.audit_integrity import backfill_audit_hashes
 from app.database import engine, Base
 from app.file_security import harden_sqlite_storage
 from app.models import (
@@ -116,6 +117,9 @@ def _migrate(conn):
         "ALTER TABLE signal_logs ADD COLUMN is_testing BOOLEAN DEFAULT 0",
         "ALTER TABLE signal_logs ADD COLUMN engaged BOOLEAN DEFAULT 0",
         "ALTER TABLE audit_logs ADD COLUMN is_testing BOOLEAN DEFAULT 0",
+        "ALTER TABLE audit_logs ADD COLUMN previous_hash VARCHAR(64)",
+        "ALTER TABLE audit_logs ADD COLUMN record_hash VARCHAR(64)",
+        "ALTER TABLE audit_logs ADD COLUMN hash_version INTEGER DEFAULT 1",
         "ALTER TABLE rf_devices ADD COLUMN is_testing BOOLEAN DEFAULT 0",
         "ALTER TABLE device_links ADD COLUMN is_testing BOOLEAN DEFAULT 0",
         "ALTER TABLE cda_tables ADD COLUMN is_testing BOOLEAN DEFAULT 0",
@@ -692,6 +696,10 @@ def main():
         if admin:
             if _ensure_doc(db, admin.id, *CBM_SYNC_DOC):
                 print("Seeded CBM-400 read-only signal sync documentation page.")
+        backfilled_live = backfill_audit_hashes(db, is_testing=False)
+        backfilled_testing = backfill_audit_hashes(db, is_testing=True)
+        if backfilled_live or backfilled_testing:
+            print(f"Backfilled audit integrity hashes: live={backfilled_live}, testing={backfilled_testing}")
 
     print("Done.")
 

@@ -282,8 +282,10 @@ fully trusted.
 - [x] **Upload validation:** package/CBM imports and CDA CSV imports now enforce
   type and size limits, zip member limits, and structured validation for legacy
   package JSON before processing.
-- [ ] **Audit log integrity:** make audit records tamper-evident / append-only and
-  ensure they cannot be silently deleted.
+- [x] **Audit log integrity:** audit records now carry a tamper-evident
+  HMAC-SHA-256 hash chain per Live/Testing scope. Existing rows are backfilled
+  as a baseline, the Audit page reports chain health, and archive spreadsheets
+  include hash fields for exported records.
 - [ ] **Pre-deployment review:** a focused security review / light pen test before
   operational sign-off, plus a documented incident-response and patching process.
 

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from urllib.parse import urlencode
 from app.audit_archive import apply_audit_retention
+from app.audit_integrity import verify_audit_scope
 from app.database import get_db
 from app.deps import require_supervisor, get_current_range_state, is_testing_state
 from app.models import AuditLog, User
@@ -35,6 +36,7 @@ async def audit_list(
 ):
     testing = is_testing_state(db)
     retention = apply_audit_retention(db, testing)
+    integrity = verify_audit_scope(db, is_testing=testing)
     q = (
         db.query(AuditLog)
         .join(User, AuditLog.user_id == User.id, isouter=True)
@@ -88,6 +90,7 @@ async def audit_list(
         "page": page,
         "total_pages": total_pages,
         "retention": retention,
+        "integrity": integrity,
         "filters": {
             "action": action,
             "username": username,

@@ -105,6 +105,7 @@ Set in `.env` (see `.env.example`):
 | `DATABASE_URL` | no | `sqlite:////app/data/range.db` | DB connection string. |
 | `SESSION_TIMEOUT_MINUTES` | no | `480` | Inactivity timeout for normal sessions. |
 | `SESSION_MAX_AGE_DAYS` | no | `30` | Lifetime of "remember this terminal" sessions. |
+| `AUDIT_HASH_SECRET` | no | `SECRET_KEY` | HMAC secret for audit integrity hashes. Keep stable. |
 | `MAX_UPLOAD_BYTES` | no | `2097152` | Per-file upload limit for operator imports. |
 | `MAX_UPLOAD_TOTAL_BYTES` | no | `8388608` | Combined upload limit for one import request. |
 | `MAX_UPLOAD_ZIP_MEMBERS` | no | `100` | Maximum files accepted inside a package import zip. |

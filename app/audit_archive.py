@@ -60,6 +60,7 @@ def apply_audit_retention(db: Session, is_testing: bool, keep: int | None = None
     ws.append([
         "ID", "Timestamp (Zulu)", "Username", "Display Name", "Action",
         "Entity Type", "Entity ID", "Previous Value", "New Value", "Comment", "Scope",
+        "Previous Hash", "Record Hash", "Hash Version",
     ])
     for audit, username, display_name in reversed(rows):
         ts = audit.timestamp.strftime("%Y-%m-%d %H:%M:%SZ") if audit.timestamp else ""
@@ -75,6 +76,9 @@ def apply_audit_retention(db: Session, is_testing: bool, keep: int | None = None
             audit.new_value or "",
             audit.comment or "",
             scope,
+            audit.previous_hash or "",
+            audit.record_hash or "",
+            audit.hash_version or "",
         ])
 
     ws.freeze_panes = "A2"

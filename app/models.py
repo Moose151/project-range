@@ -373,6 +373,9 @@ class AuditLog(Base):
     new_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_testing: Mapped[bool] = mapped_column(Boolean, default=False)
+    previous_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    record_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    hash_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
     user: Mapped[User | None] = relationship("User", back_populates="audit_entries")
 
@@ -687,3 +690,28 @@ def _mark_testing_scoped_rows(session: SASession, flush_context, instances) -> N
     testing = _session_testing_state(session)
     for obj in new_scoped:
         obj.is_testing = testing
+
+
+@event.listens_for(SASession, "before_flush")
+def _sign_new_audit_rows(session: SASession, flush_context, instances) -> None:
+    new_audits = [obj for obj in session.new if isinstance(obj, AuditLog) and not obj.record_hash]
+    if not new_audits:
+        return
+
+    from app.audit_integrity import sign_audit_row
+
+    latest_hash_by_scope: dict[bool, str | None] = {}
+    for audit in new_audits:
+        if audit.timestamp is None:
+            audit.timestamp = datetime.utcnow()
+        scope = bool(audit.is_testing)
+        if scope not in latest_hash_by_scope:
+            latest = (
+                session.query(AuditLog)
+                .filter(AuditLog.is_testing == scope, AuditLog.record_hash.isnot(None))
+                .order_by(AuditLog.timestamp.desc(), AuditLog.id.desc())
+                .first()
+            )
+            latest_hash_by_scope[scope] = latest.record_hash if latest else None
+        sign_audit_row(audit, latest_hash_by_scope[scope])
+        latest_hash_by_scope[scope] = audit.record_hash
