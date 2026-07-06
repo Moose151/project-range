@@ -59,12 +59,28 @@ def _room_payload(room, current_user: User, db: Session | None = None) -> dict:
         "participants": sorted(room.participant_ids),
         "participant_details": participants,
         "last_message_id": chat_state.last_message_id(room),
+        "typing_users": _typing_payload(room, current_user, db),
         "unread_hint": False,
     }
 
 
-def _message_payload(msg) -> dict:
-    return {
+def _typing_payload(room, current_user: User, db: Session | None = None) -> list[dict]:
+    user_ids = chat_state.typing_user_ids(room.id, current_user.id)
+    if not user_ids:
+        return []
+    if db is None:
+        return [{"id": uid, "display_name": "Someone"} for uid in user_ids]
+    users = (
+        db.query(User)
+        .filter(User.id.in_(user_ids), User.is_active == True, User.is_archived == False)
+        .order_by(User.display_name)
+        .all()
+    )
+    return [{"id": user.id, "display_name": user.display_name} for user in users]
+
+
+def _message_payload(msg, room=None) -> dict:
+    payload = {
         "id": msg.id,
         "room_id": msg.room_id,
         "sender_id": msg.sender_id,
@@ -72,6 +88,18 @@ def _message_payload(msg) -> dict:
         "body": msg.body,
         "sent_at": msg.sent_at.strftime("%H:%M:%S"),
     }
+    if room is not None:
+        payload["receipt"] = chat_state.message_receipt(msg, room.participant_ids)
+    return payload
+
+
+def _receipt_payloads(room) -> list[dict]:
+    if room is None:
+        return []
+    return [
+        {"id": msg.id, "receipt": chat_state.message_receipt(msg, room.participant_ids)}
+        for msg in room.messages
+    ]
 
 
 def _user_payload(user: User) -> dict:
@@ -185,11 +213,12 @@ async def chat_messages(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    messages = chat_state.messages_after(room_id, current_user.id, after)
     room = chat_state.get_room_for_user(room_id, current_user.id)
+    messages = chat_state.messages_after(room_id, current_user.id, after)
     return JSONResponse({
         "room": _room_payload(room, current_user, db) if room else None,
-        "messages": [_message_payload(msg) for msg in messages],
+        "messages": [_message_payload(msg, room) for msg in messages],
+        "receipts": _receipt_payloads(room),
     })
 
 
@@ -202,4 +231,29 @@ async def chat_send_message(
     msg = chat_state.add_message(room_id, current_user.id, current_user.display_name, body)
     if not msg:
         return JSONResponse({"error": "Message not sent"}, status_code=400)
-    return JSONResponse({"message": _message_payload(msg)})
+    room = chat_state.get_room_for_user(room_id, current_user.id)
+    return JSONResponse({"message": _message_payload(msg, room)})
+
+
+@router.post("/rooms/{room_id}/read")
+async def chat_mark_read(
+    room_id: str,
+    up_to: int = Form(0),
+    current_user: User = Depends(get_current_user),
+):
+    ok = chat_state.mark_read(room_id, current_user.id, up_to if up_to > 0 else None)
+    if not ok:
+        return JSONResponse({"error": "Chat room not found"}, status_code=404)
+    return JSONResponse({"ok": True})
+
+
+@router.post("/rooms/{room_id}/typing")
+async def chat_typing(
+    room_id: str,
+    is_typing: int = Form(1),
+    current_user: User = Depends(get_current_user),
+):
+    ok = chat_state.set_typing(room_id, current_user.id, bool(is_typing))
+    if not ok:
+        return JSONResponse({"error": "Chat room not found"}, status_code=404)
+    return JSONResponse({"ok": True})

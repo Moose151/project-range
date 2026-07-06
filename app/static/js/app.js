@@ -299,6 +299,7 @@ const chatState = {
   unreadSenders: savedChatState.unreadSenders || {},
   pollingRooms: {},
   sendingRooms: {},
+  typingTimers: {},
   rosterOpen: false,
 };
 window.chatState = chatState;
@@ -456,11 +457,91 @@ function chatRoomDutyBadge(room) {
   return `<span class="badge chat-role-badge" style="background:${escapeHtml(colour)}">${escapeHtml(label)}</span>`;
 }
 
+function chatReceiptHtml(receipt) {
+  if (!receipt) return '';
+  const state = receipt.state || 'sent';
+  const icon = state === 'read' ? 'bi-check2-all' : (state === 'received' ? 'bi-check2-all' : 'bi-check2');
+  return `<span class="chat-receipt chat-receipt-${escapeHtml(state)}" data-chat-receipt title="${escapeHtml(receipt.label || '')}"><i class="bi ${icon}"></i>${escapeHtml(receipt.label || '')}</span>`;
+}
+
+function updateChatReceipts(roomId, receipts) {
+  if (!receipts || !receipts.length) return;
+  receipts.forEach(item => {
+    document.querySelectorAll(`[data-chat-message-id="${CSS.escape(String(item.id))}"] [data-chat-receipt]`).forEach(node => {
+      node.outerHTML = chatReceiptHtml(item.receipt);
+    });
+  });
+}
+
+function chatTypingText(room) {
+  const users = room?.typing_users || [];
+  if (!users.length) return '';
+  if (users.length === 1) return `${users[0].display_name} is typing`;
+  if (users.length === 2) return `${users[0].display_name} and ${users[1].display_name} are typing`;
+  return `${users[0].display_name} and ${users.length - 1} others are typing`;
+}
+
+function renderChatTypingIndicators(roomId) {
+  const room = chatState.rooms[roomId];
+  const text = chatTypingText(room);
+  document.querySelectorAll(`[data-chat-typing-for="${CSS.escape(roomId)}"]`).forEach(node => {
+    if (!text) {
+      node.classList.add('d-none');
+      node.innerHTML = '';
+      return;
+    }
+    node.classList.remove('d-none');
+    node.innerHTML = `<span>${escapeHtml(text)}</span><span class="chat-typing-dots"><i></i><i></i><i></i></span>`;
+  });
+}
+
+function renderAllChatTypingIndicators() {
+  Object.keys(chatState.rooms).forEach(renderChatTypingIndicators);
+}
+
+async function markChatRoomRead(roomId) {
+  if (!roomId) return;
+  const lastId = chatState.lastMessageIds[roomId] || chatState.rooms[roomId]?.last_message_id || 0;
+  try {
+    await chatApi('/chat/rooms/' + encodeURIComponent(roomId) + '/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ up_to: lastId }),
+    });
+  } catch (e) {}
+}
+
+function stopChatTyping(roomId) {
+  if (!roomId) return;
+  if (chatState.typingTimers[roomId]) {
+    clearTimeout(chatState.typingTimers[roomId]);
+    delete chatState.typingTimers[roomId];
+  }
+  chatApi('/chat/rooms/' + encodeURIComponent(roomId) + '/typing', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ is_typing: 0 }),
+  }).catch(() => {});
+}
+
+function sendChatTyping(roomId, input) {
+  if (!roomId || !input) return;
+  const isTyping = input.value.trim().length > 0;
+  chatApi('/chat/rooms/' + encodeURIComponent(roomId) + '/typing', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ is_typing: isTyping ? 1 : 0 }),
+  }).catch(() => {});
+  if (chatState.typingTimers[roomId]) clearTimeout(chatState.typingTimers[roomId]);
+  if (isTyping) chatState.typingTimers[roomId] = setTimeout(() => stopChatTyping(roomId), 2500);
+}
+
 function mergeChatRooms(rooms) {
   (rooms || []).forEach(room => {
     const known = Boolean(chatState.rooms[room.id]);
     chatState.rooms[room.id] = room;
     if (!known) chatState.roomSeen[room.id] = false;
+    renderChatTypingIndicators(room.id);
   });
   saveChatSessionState();
 }
@@ -492,6 +573,7 @@ async function refreshChatState() {
     reconcileChatState(data.rooms);
     mergeChatRooms(data.rooms);
     pollKnownChatRooms();
+    renderAllChatTypingIndicators();
     renderChatRoster();
     window.renderDashboardChatWidget?.();
   } catch (e) {}
@@ -535,12 +617,14 @@ function openChatWindow(roomId) {
   if (!room) return;
   chatState.openRooms[roomId] = true;
   clearChatUnread(roomId, { redraw: false });
+  markChatRoomRead(roomId);
   const existing = document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"]`);
   if (existing) {
     existing.classList.remove('minimised', 'has-alert');
     renderChatRoster();
     window.renderDashboardChatWidget?.();
     pollChatRoom(roomId, { full: true, alert: false });
+    markChatRoomRead(roomId);
     return;
   }
   const windows = document.getElementById('chatWindows');
@@ -561,11 +645,13 @@ function openChatWindow(roomId) {
     </div>
     ${room.is_group ? `<div class="chat-group-members d-none" data-chat-group-members>${groupMembersPanel(room)}</div>` : ''}
     <div class="chat-window-body" data-chat-messages></div>
+    <div class="chat-typing d-none" data-chat-typing-for="${escapeHtml(roomId)}"></div>
     <form class="chat-window-form" onsubmit="sendChatMessage(event, '${escapeHtml(roomId)}')">
-      <input type="text" class="form-control form-control-sm" name="body" autocomplete="off" maxlength="2000" placeholder="Type a message…">
+      <input type="text" class="form-control form-control-sm" name="body" autocomplete="off" maxlength="2000" placeholder="Type a message…" oninput="sendChatTyping('${escapeHtml(roomId)}', this)" onblur="stopChatTyping('${escapeHtml(roomId)}')">
       <button type="submit" class="btn btn-sm btn-primary" title="Send"><i class="bi bi-send-fill"></i></button>
     </form>`;
   windows.appendChild(node);
+  renderChatTypingIndicators(roomId);
   pollChatRoom(roomId, { full: true, alert: false });
   renderChatRoster();
   window.renderDashboardChatWidget?.();
@@ -577,12 +663,14 @@ function toggleChatWindowMinimised(roomId) {
   win.classList.toggle('minimised');
   if (!win.classList.contains('minimised')) {
     clearChatUnread(roomId);
+    markChatRoomRead(roomId);
   }
 }
 
 function closeChatWindow(roomId) {
   document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"]`)?.remove();
   delete chatState.openRooms[roomId];
+  stopChatTyping(roomId);
   clearChatUnread(roomId);
 }
 
@@ -648,6 +736,7 @@ async function sendChatMessage(evt, roomId) {
   const body = (input?.value || '').trim();
   if (!body) return;
   chatState.sendingRooms[roomId] = true;
+  stopChatTyping(roomId);
   input?.toggleAttribute('disabled', true);
   button?.toggleAttribute('disabled', true);
   input.value = '';
@@ -690,7 +779,7 @@ function appendChatMessages(roomId, messages, opts = {}) {
       if (noMessages) noMessages.remove();
       body.insertAdjacentHTML('beforeend', `
         <div class="chat-message ${mine ? 'mine' : ''}" data-chat-message-id="${escapeHtml(String(msg.id))}">
-          <div class="chat-message-meta">${mine ? 'You' : escapeHtml(msg.sender_name)} · ${escapeHtml(msg.sent_at)}</div>
+          <div class="chat-message-meta">${mine ? 'You' : escapeHtml(msg.sender_name)} · ${escapeHtml(msg.sent_at)} ${mine ? chatReceiptHtml(msg.receipt) : ''}</div>
           <div class="chat-message-bubble">${escapeHtml(msg.body)}</div>
         </div>`);
     }
@@ -715,6 +804,7 @@ function appendChatMessages(roomId, messages, opts = {}) {
   }
   if (!alert && roomOpen && !win.classList.contains('minimised')) {
     clearChatUnread(roomId);
+    markChatRoomRead(roomId);
   }
   saveChatSessionState();
 }
@@ -728,6 +818,9 @@ async function pollChatRoom(roomId, opts = {}) {
     const data = await chatApi('/chat/rooms/' + encodeURIComponent(roomId) + '/messages?after=' + after);
     if (data.room) mergeChatRooms([data.room]);
     appendChatMessages(roomId, data.messages || [], opts);
+    updateChatReceipts(roomId, data.receipts || []);
+    const win = document.querySelector(`[data-chat-window="${CSS.escape(roomId)}"]`);
+    if (win && !win.classList.contains('minimised')) markChatRoomRead(roomId);
   } catch (e) {
   } finally {
     delete chatState.pollingRooms[roomId];
@@ -750,7 +843,10 @@ document.addEventListener('click', (evt) => {
   const win = evt.target.closest?.('.chat-window');
   if (win) {
     const roomId = win.dataset.chatWindow;
-    if (!win.classList.contains('minimised')) clearChatUnread(roomId);
+    if (!win.classList.contains('minimised')) {
+      clearChatUnread(roomId);
+      markChatRoomRead(roomId);
+    }
   }
 });
 

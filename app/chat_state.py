@@ -12,6 +12,7 @@ from threading import Lock
 
 
 ONLINE_WINDOW = timedelta(seconds=25)
+TYPING_WINDOW = timedelta(seconds=4)
 
 
 @dataclass
@@ -22,6 +23,8 @@ class ChatMessage:
     sender_name: str
     body: str
     sent_at: datetime
+    delivered_to: set[int] = field(default_factory=set)
+    read_by: set[int] = field(default_factory=set)
 
 
 @dataclass
@@ -37,6 +40,7 @@ class ChatRoom:
 _lock = Lock()
 _presence: dict[int, dict] = {}
 _rooms: dict[str, ChatRoom] = {}
+_typing: dict[str, dict[int, datetime]] = {}
 _message_seq = 0
 
 
@@ -83,6 +87,20 @@ def online_users() -> list[dict]:
         ]
 
 
+def _prune_typing_locked(room_id: str | None = None) -> None:
+    cutoff = datetime.utcnow() - TYPING_WINDOW
+    room_ids = [room_id] if room_id else list(_typing.keys())
+    for rid in room_ids:
+        users = _typing.get(rid)
+        if not users:
+            continue
+        stale = [uid for uid, last_typed in users.items() if last_typed < cutoff]
+        for uid in stale:
+            users.pop(uid, None)
+        if not users:
+            _typing.pop(rid, None)
+
+
 def _private_room_id(user_a: int, user_b: int) -> str:
     lo, hi = sorted((user_a, user_b))
     return f"private-{lo}-{hi}"
@@ -115,6 +133,31 @@ def add_group_members(room_id: str, requester_id: int, participant_ids: list[int
             return None
         room.participant_ids.update(participant_ids)
         return room
+
+
+def set_typing(room_id: str, user_id: int, is_typing: bool) -> bool:
+    with _lock:
+        room = _rooms.get(room_id)
+        if room is None or user_id not in room.participant_ids:
+            return False
+        if is_typing:
+            _typing.setdefault(room_id, {})[user_id] = datetime.utcnow()
+        else:
+            users = _typing.get(room_id)
+            if users:
+                users.pop(user_id, None)
+                if not users:
+                    _typing.pop(room_id, None)
+        return True
+
+
+def typing_user_ids(room_id: str, viewer_id: int) -> list[int]:
+    with _lock:
+        room = _rooms.get(room_id)
+        if room is None or viewer_id not in room.participant_ids:
+            return []
+        _prune_typing_locked(room_id)
+        return sorted(uid for uid in _typing.get(room_id, {}) if uid != viewer_id)
 
 
 def user_rooms(user_id: int) -> list[ChatRoom]:
@@ -151,15 +194,74 @@ def add_message(room_id: str, sender_id: int, sender_name: str, body: str) -> Ch
             sender_name=sender_name,
             body=text[:2000],
             sent_at=datetime.utcnow(),
+            delivered_to={sender_id},
+            read_by={sender_id},
         )
         room.messages.append(msg)
         room.messages = room.messages[-100:]
+        users = _typing.get(room_id)
+        if users:
+            users.pop(sender_id, None)
+            if not users:
+                _typing.pop(room_id, None)
         return msg
 
 
-def messages_after(room_id: str, user_id: int, after_id: int = 0) -> list[ChatMessage]:
+def messages_after(room_id: str, user_id: int, after_id: int = 0, mark_delivered: bool = True) -> list[ChatMessage]:
     with _lock:
         room = _rooms.get(room_id)
         if room is None or user_id not in room.participant_ids:
             return []
-        return [msg for msg in room.messages if msg.id > after_id]
+        messages = [msg for msg in room.messages if msg.id > after_id]
+        if mark_delivered:
+            for msg in room.messages:
+                if msg.sender_id != user_id:
+                    msg.delivered_to.add(user_id)
+        return messages
+
+
+def mark_read(room_id: str, user_id: int, up_to_id: int | None = None) -> bool:
+    with _lock:
+        room = _rooms.get(room_id)
+        if room is None or user_id not in room.participant_ids:
+            return False
+        for msg in room.messages:
+            if up_to_id is not None and msg.id > up_to_id:
+                continue
+            if msg.sender_id != user_id:
+                msg.delivered_to.add(user_id)
+                msg.read_by.add(user_id)
+        return True
+
+
+def message_receipt(msg: ChatMessage, participant_ids: set[int]) -> dict:
+    recipients = sorted(uid for uid in participant_ids if uid != msg.sender_id)
+    if not recipients:
+        return {
+            "state": "read",
+            "label": "Read",
+            "delivered": 0,
+            "read": 0,
+            "total": 0,
+        }
+    delivered = sum(1 for uid in recipients if uid in msg.delivered_to)
+    read = sum(1 for uid in recipients if uid in msg.read_by)
+    if read == len(recipients):
+        state = "read"
+        label = "Read"
+    elif delivered == len(recipients):
+        state = "received"
+        label = "Received"
+    else:
+        state = "sent"
+        label = "Sent"
+    if len(recipients) > 1 and state != "sent":
+        count = read if state == "read" else delivered
+        label = f"{label} {count}/{len(recipients)}"
+    return {
+        "state": state,
+        "label": label,
+        "delivered": delivered,
+        "read": read,
+        "total": len(recipients),
+    }

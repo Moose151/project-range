@@ -474,8 +474,9 @@ function utilityBody(id, type, config = {}) {
               <div class="dashboard-chat-body border rounded p-2 mb-2" data-dashboard-chat-messages>
                 <div class="text-muted small">Select an online user or existing room.</div>
               </div>
+              <div class="chat-typing d-none" data-dashboard-chat-typing></div>
               <form class="dashboard-chat-form d-flex gap-2" onsubmit="sendDashboardChatMessage(event, '${id}')">
-                <input type="text" class="form-control form-control-sm" name="body" autocomplete="off" maxlength="2000" placeholder="Message" disabled>
+                <input type="text" class="form-control form-control-sm" name="body" autocomplete="off" maxlength="2000" placeholder="Message" oninput="sendDashboardChatTyping('${id}', this)" onblur="stopDashboardChatTyping('${id}')" disabled>
                 <button type="submit" class="btn btn-sm btn-primary" title="Send" disabled><i class="bi bi-send"></i></button>
               </form>
               <div class="small text-muted mt-2 mb-1">Online users</div>
@@ -722,10 +723,29 @@ function selectDashboardChatRoom(widgetId, roomId) {
   setDashboardChatEnabled(widget, Boolean(roomId));
   if (roomId) {
     clearChatUnread?.(roomId, { redraw: false });
+    markChatRoomRead?.(roomId);
     loadDashboardChatMessages(widgetId, roomId, true);
   } else {
     widget.querySelector('[data-dashboard-chat-messages]').innerHTML = '<div class="text-muted small">Select an online user or existing room.</div>';
+    const typing = widget.querySelector('[data-dashboard-chat-typing]');
+    if (typing) {
+      typing.classList.add('d-none');
+      typing.innerHTML = '';
+    }
   }
+}
+
+function renderDashboardChatTyping(widget, roomId) {
+  const typing = widget?.querySelector('[data-dashboard-chat-typing]');
+  if (!typing) return;
+  const text = chatTypingText?.(window.chatState?.rooms?.[roomId]);
+  if (!text) {
+    typing.classList.add('d-none');
+    typing.innerHTML = '';
+    return;
+  }
+  typing.classList.remove('d-none');
+  typing.innerHTML = `<span>${escapeHtml(text)}</span><span class="chat-typing-dots"><i></i><i></i><i></i></span>`;
 }
 
 async function loadDashboardChatMessages(widgetId, roomId, full = false) {
@@ -740,6 +760,7 @@ async function loadDashboardChatMessages(widgetId, roomId, full = false) {
   try {
     const data = await chatApi('/chat/rooms/' + encodeURIComponent(roomId) + '/messages?after=' + after);
     if (data.room) window.chatState.rooms[roomId] = data.room;
+    renderDashboardChatTyping(widget, roomId);
     const messages = data.messages || [];
     if (full) pane.innerHTML = '';
     if (!messages.length && full) pane.innerHTML = '<div class="text-muted small" data-dashboard-chat-empty>No messages yet.</div>';
@@ -750,16 +771,30 @@ async function loadDashboardChatMessages(widgetId, roomId, full = false) {
       pane.querySelector('[data-dashboard-chat-empty]')?.remove();
       pane.insertAdjacentHTML('beforeend', `
         <div class="chat-message ${mine ? 'mine' : ''}" data-chat-message-id="${escapeHtml(String(msg.id))}">
-          <div class="chat-message-meta">${mine ? 'You' : escapeHtml(msg.sender_name)} · ${escapeHtml(msg.sent_at)}</div>
+          <div class="chat-message-meta">${mine ? 'You' : escapeHtml(msg.sender_name)} · ${escapeHtml(msg.sent_at)} ${mine ? chatReceiptHtml(msg.receipt) : ''}</div>
           <div class="chat-message-bubble">${escapeHtml(msg.body)}</div>
         </div>`);
     });
+    updateChatReceipts?.(roomId, data.receipts || []);
     if (messages.length || full) pane.scrollTop = pane.scrollHeight;
     clearChatUnread?.(roomId, { redraw: false });
+    markChatRoomRead?.(roomId);
   } catch (e) {
   } finally {
     delete window.dashboardChatPolling[pollKey];
   }
+}
+
+function stopDashboardChatTyping(widgetId) {
+  const widget = document.querySelector(`[data-dashboard-chat-widget="${CSS.escape(widgetId)}"]`);
+  const roomId = widget?.dataset.selectedRoom || '';
+  if (roomId) stopChatTyping?.(roomId);
+}
+
+function sendDashboardChatTyping(widgetId, input) {
+  const widget = document.querySelector(`[data-dashboard-chat-widget="${CSS.escape(widgetId)}"]`);
+  const roomId = widget?.dataset.selectedRoom || '';
+  if (roomId) sendChatTyping?.(roomId, input);
 }
 
 async function sendDashboardChatMessage(evt, widgetId) {
@@ -772,6 +807,7 @@ async function sendDashboardChatMessage(evt, widgetId) {
   if (!roomId || !body) return;
   if (widget.dataset.sending === '1') return;
   widget.dataset.sending = '1';
+  stopDashboardChatTyping(widgetId);
   input?.toggleAttribute('disabled', true);
   button?.toggleAttribute('disabled', true);
   input.value = '';
@@ -788,7 +824,7 @@ async function sendDashboardChatMessage(evt, widgetId) {
         pane.querySelector('[data-dashboard-chat-empty]')?.remove();
         pane.insertAdjacentHTML('beforeend', `
           <div class="chat-message mine" data-chat-message-id="${escapeHtml(String(data.message.id))}">
-            <div class="chat-message-meta">You · ${escapeHtml(data.message.sent_at)}</div>
+            <div class="chat-message-meta">You · ${escapeHtml(data.message.sent_at)} ${chatReceiptHtml(data.message.receipt)}</div>
             <div class="chat-message-bubble">${escapeHtml(data.message.body)}</div>
           </div>`);
         pane.scrollTop = pane.scrollHeight;

@@ -1,9 +1,15 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.20.0**
+Current version: **0.20.1**
 
 ---
+
+## 0.20.1 — Chat Receipts and Typing Indicator
+
+- Chat messages now show sender-side delivery state: **Sent**, **Received**, and **Read**. Group chats show receipt counts when only some members have received/read the message.
+- Floating chat windows and dashboard chat widgets now show a live typing indicator when another participant is composing a message.
+- Static cache keys bumped to `app.css?v=27` and `app.js?v=27`.
 
 ## 0.20.0 — Closed-Loop (IF-only) Packages + Eb/No Logging Controls
 
