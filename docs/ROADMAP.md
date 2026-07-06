@@ -410,10 +410,37 @@ Future target: **full CBM integration complete**.
 - [ ] Validate the automatic poller against real hardware: CBM SSH/ICC output,
   status mapping, credentials, timeouts, retry behaviour, and audit volume.
 
-### Modem live status (Comtech CDM-600L) — serial/RS-485 integration (research spike)
+### Modem live status (Comtech CDM-600L) — serial integration (⏸ PARKED — hardware-gated)
 
-Goal: monitor the CDM-600L L-Band modems from the dashboard the same way we
-monitor the CBM-400s (read-only signal/config/health, no operator double-entry).
+Goal: monitor **and configure** the **six** CDM-600L L-Band modems from the dashboard,
+similar to how we monitor the CBM-400s. Scope decision (2026-07): **monitor + configure**
+(config-write gated behind explicit confirmation, since it is active control of live modems).
+
+> **⏸ Status: PARKED (2026-07) — blocked on hardware, not software.** The blocker is
+> purely the serial→IP transport: the modems' P4B ports are currently cabled into a
+> **plain UniFi/Ethernet switch, which cannot carry RS-232** (Ethernet ≠ serial), so no
+> data reaches the server. Nothing can be built/tested until a serial-to-Ethernet device
+> server (or a direct serial port on the server) is in the path. User cannot obtain the
+> equipment right now; revisit when available. Software effort is small once transport exists.
+
+**Current physical setup (from the range):** **6× CDM-600L**; serial cables from each modem's
+**P4B Remote Control port (DB9-M)** intended for the network, but landing on a plain UniFi
+Ethernet switch. Only 2 serial cables on hand (2 modems), all 6 when more cables arrive.
+**User is leaning toward the hub route (Option B).**
+
+**Equipment needed — pick one topology (software handles all three identically; each modem
+ends up as a raw-TCP `host:port`, plus an optional RS-485 address):**
+
+| Option | Hardware | Notes |
+|---|---|---|
+| **A. One converter per modem** | 6× single-port RS-232→Ethernet, TCP-Server mode — e.g. **Altronics D4231** (RS-232/422/485, Modbus, 9–54 V; preferred) or **Jaycar XC4134** (cheaper, hobbyist) | Cheap, incremental (2 now/6 later), **failure-isolated** (one dies → one modem down). 6 boxes / 6 PSUs / 6 IPs. |
+| **B. One multi-port "hub"** (⭐ user's preference, tidiest) | 1× **8-port** serial device server (next size up from 6) — **Moxa NPort 5610-8 / 5650-8** (5650 = RS-232/422/485), **USR-N580** (budget 8-port), **Perle IOLAN STS8**, or **Digi PortServer TS 8** | One box, one IP, ports 4001–4008 (6 used, 2 spare). Neatest for a permanent rack; dearer; single point of failure. 16-port units exist if more headroom wanted. |
+| **C. One converter, RS-485 multidrop** (cheapest) | 1× RS-485-capable converter (e.g. Altronics D4231) wired to all 6 modems on one RS-485 bus | Modems addressed 1–6 in the packet (`<0001/…>`). Cheapest, but RS-485 daisy-chain wiring + per-modem address; single point of failure. |
+
+Set the converter to **TCP Server (raw socket)** mode, **RS-232** (address `0000` per modem),
+and match the modem's baud/format (front panel → CONFIG → Remote Control). **Cabling gotcha:**
+converter DB9-M ↔ modem P4B DB9-M needs a **female-female, likely null-modem (crossover)**
+cable — verify TX/RX against the manual's **P4B pinout (Table 5-5)** at install.
 
 **Feasibility: confirmed possible, but a different transport from the CBM-400.**
 The CDM-600L Installation & Operation Manual (Rev 2, reviewed locally — held
@@ -465,10 +492,14 @@ are (or can be) wired to a device server reachable on the range LAN, and each
 modem's baud rate, character format, and RS-485 address. Confirm those before
 committing to a milestone.
 
-- [ ] Confirm M&C wiring / device-server availability on the range LAN.
-- [ ] Prototype `cdm600.py` against the documented packet format (offline, no HW).
-- [ ] Add `RFDevice` protocol-type + address fields and route sync to the right client.
-- [ ] Agree the CDM-600L status → Project Range state mapping.
+- [ ] **(BLOCKER) Obtain + install a serial→IP device server** (Option A/B/C above) so each
+  modem's P4B port is reachable as a raw TCP socket on the LAN. Everything below waits on this.
+- [ ] Confirm each modem's RS-232/485 mode, baud, format, and (if RS-485) address; sort the
+  DB9 M-M null-modem cabling against the P4B pinout.
+- [ ] Prototype `cdm600.py` against the documented packet format (can start offline, no HW).
+- [ ] Add `RFDevice` protocol-type + `host:port` + optional RS-485 address fields; route sync
+  to the right client (EBEM-SSH vs CDM-600L-serial).
+- [ ] Agree the CDM-600L status → Project Range state mapping; add guarded config-write actions.
 - [ ] Validate against real hardware (parsed values vs. front panel / SatMac).
 
 ### Other future enhancements (Scope §12)
