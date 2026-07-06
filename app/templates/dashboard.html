@@ -63,11 +63,11 @@
   </div>
 </div>
 
-<!-- Global buzzer indicator (compact) -->
+<!-- Global transmission indicator (compact) -->
 {% if any_buzzer %}
 <div class="alert alert-danger buzzer-bar d-flex align-items-center gap-2 py-1 px-3 mb-3" id="buzzerAlert">
-  <i class="bi bi-volume-up-fill"></i>
-  <span class="small"><strong>Buzzer on</strong> — signal(s) Up{% if range_state == 'Live' %}, RF transmitting{% endif %}.</span>
+  <i class="bi bi-broadcast-pin"></i>
+  <span class="small"><strong>Transmitting</strong> — signal(s) Up{% if range_state == 'Live' %}, RF output active{% endif %}.</span>
 </div>
 {% else %}
 <div id="buzzerAlert"></div>
@@ -283,7 +283,7 @@
             {% if serial %}
             <span class="text-muted small me-1">Started {{ serial.opened_at.strftime('%H:%M %d/%m') }}</span>
             <span class="htmx-indicator spinner-border spinner-border-sm text-secondary me-1" role="status" style="width:0.7rem;height:0.7rem"></span>
-            <span id="widgetBuzzer-{{ serial.id }}">{% if w_buzzer %}<span class="badge bg-danger">BUZZER</span>{% endif %}</span>
+            <span id="widgetBuzzer-{{ serial.id }}">{% if w_buzzer %}<span class="badge bg-danger">TRANSMITTING</span>{% endif %}</span>
             {% if sd.has_cbm_mapping and user.role != 'observer' %}
             <form method="post" action="/dashboard/cbm-sync" class="d-inline">
               <button type="submit" class="btn btn-sm btn-outline-info py-0 px-2"

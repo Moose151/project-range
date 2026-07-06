@@ -1,11 +1,11 @@
 {% if buzzer_active %}
-  <span class="buzzer-badge ms-2" title="Signals are ACTIVE (Up) — transmitting">
-    <i class="bi bi-volume-up-fill text-danger"></i>
-    <span class="badge bg-danger">BUZZER ON</span>
+  <span class="buzzer-badge ms-2" title="Signal(s) Up — transmitting">
+    <i class="bi bi-broadcast-pin text-danger"></i>
+    <span class="badge bg-danger">TRANSMITTING</span>
   </span>
 {% elif range_state != 'Standby/Off' %}
   <span class="buzzer-badge ms-2 text-muted" title="No signals currently Up">
-    <i class="bi bi-volume-mute-fill"></i>
-    <span class="badge bg-secondary">BUZZER OFF</span>
+    <i class="bi bi-broadcast"></i>
+    <span class="badge bg-secondary">Not transmitting</span>
   </span>
 {% endif %}

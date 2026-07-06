@@ -26,7 +26,7 @@ Core of the MVP scope is in place:
 - RF frequency calculator (TxIF/TxRF/RxRF/RxIF from one known value) + frequency templates
 - Power converter (dBm/dBW/W), gain/loss chain, EIRP
 - Signal logging with per-signal power-warning thresholds + band/frequency validation
-- Live dashboard (status, buzzer, drag-tab merge/split, steppers, column toggles, bulk-submit)
+- Live dashboard (status, transmitting indicator, drag-tab merge/split, steppers, column toggles, bulk-submit)
 - Range state management (Standby/Closed Loop/Live) with reason + two-person administrator auth
 - Package-level RF config (TxLO/RxLO/TTF) with one-frequency auto-calc across signals
 - Documentation/wiki module, structured XLSX export, shift handover

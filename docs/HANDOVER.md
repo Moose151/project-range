@@ -605,7 +605,7 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 - [x] **Frequency template management** on Config page
 - [x] User management (administrator only: create, enable/disable, reset password)
 - [x] Dark mode throughout
-- [x] Buzzer Active indicator — flashing red "BUZZER ON" banner + badge when range is Live/Closed Loop and any signal is Up; polls every 10s via HTMX
+- [x] Transmission indicator — red "TRANSMITTING" banner + badge when range is Live/Closed Loop and any signal is Up; polls every 10s via HTMX
 - [x] Toast notifications on log create, edit, delete, restore, range state change, dashboard quick-edit
 - [x] **Narrative / manual log notes** (`/logs/note`): plain-text notes appear as amber italic rows in the log list
 - [x] **Signal history view**: clicking any signal name on dashboard or log list filters to that signal's full history
@@ -621,12 +621,12 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 - [x] **Dashboard layout restore on page load**: `restoreLayout()` runs on `DOMContentLoaded`, re-applies tab merges and drag order from `localStorage.dashboardLayout_v2`.
 - [x] **Dashboard "Add signal" button**: each serial widget header has a `+` button linking to `/logs/new?serial_id={id}` which pre-selects that serial on the log form.
 - [x] **Log form pre-selects serial via query param**: `GET /logs/new?serial_id=N` pre-selects serial N in the Serial dropdown (without the param, the first active serial is auto-selected).
-- [x] **Drop-merge-target visual**: `drop-merge-target` CSS class added; buzzer alert has a pulsing box-shadow animation.
+- [x] **Drop-merge-target visual**: `drop-merge-target` CSS class added; transmission alert has a pulsing box-shadow animation.
 - [x] **HTMX loading spinner**: per-serial widget header shows a spinner while the 10s poll is in flight.
 - [x] **Documentation / Wiki module** (`/docs`): Markdown pages with version history, administrator direct edit, user edit proposals, approval queue, printable view. 7 seed pages covering core procedures. Nav link visible to all users; pending-proposal badge for administrators.
 - [x] **Package-level RF configuration**: `SignalPackage` now stores band, antenna, BUC, LO, TTF, TTF direction, and freq unit shared by all signals in the package. When a serial's log entry is created, BUC/LO/TTF/band/antenna are auto-populated from the package — operators only enter one known frequency and the rest resolve automatically. Dashboard quick-edit defaults the Antenna select from the package config. Serial start log entries inherit package-level band and antenna.
 - [x] **Package signal form real-time RF calc**: on the package signal add/edit form, entering any one frequency (TxIF/TxRF/RxRF/RxIF) auto-calculates the other three from the package's BUC/LO/TTF (read live from the form, before saving). Package and signal freq units are converted independently.
-- [x] **Shift Handover module** (`/handover`): point-in-time snapshot of range state, signals-up count, buzzer, and per-serial signal status tables, plus recent range-state changes and notes. `/handover/print` renders a printable/PDF sheet with off-going/on-coming sign-off lines (auto-opens print dialog). Nav link visible to all users.
+- [x] **Shift Handover module** (`/handover`): point-in-time snapshot of range state, signals-up count, transmission state, and per-serial signal status tables, plus recent range-state changes and notes. `/handover/print` renders a printable/PDF sheet with off-going/on-coming sign-off lines (auto-opens print dialog). Nav link visible to all users.
 
 ---
 
@@ -654,7 +654,7 @@ Input accepts dBm/dBW/W for Tx power; converts to dBW internally. Output shown i
 - [x] **Dashboard inline on/off + power controls**: per-signal-row switch to set Up/Down, and −/+ stepper buttons (step 1) plus an editable number field to set power directly, with Submit/Cancel; a log entry is only written on Submit. The 10s poll pauses while any row has unsubmitted changes. Replaces needing the pencil→Status-dropdown path for the common on/off + power changes (full edit panel still available for other fields).
 - [x] **Dashboard column show/hide**: a "Columns" dropdown (checkbox per column) toggles visibility of any of the 17 signal-table columns across all widgets at once; choice is saved in `localStorage.dashboardHiddenCols` and re-applied after every 10s poll swap (`data-col` attributes on each th/td; `applyColumnVisibility` on `htmx:afterSwap`).
 - [x] **Dashboard widget minimise/expand**: each widget header has a chevron button (`toggleCollapse`) that collapses the body to just the header; per-widget collapsed state is saved in `localStorage.dashboardLayout_v2` and restored on load.
-- [x] **Buzzer indicator toned down**: the large pulsing "BUZZER ON" banner is replaced by a compact one-line red bar (`.buzzer-bar`); blinking removed from the nav badge, summary card, and per-widget badge (only the Live range-state indicator still blinks). The big "BUZZER OFF" banner was removed (nav badge + summary card already convey it).
+- [x] **Transmission indicator toned down**: the large pulsing alert is replaced by a compact one-line red bar (`.buzzer-bar`); blinking removed from the nav badge, summary card, and per-widget badge (only the Live range-state indicator still blinks). The old inactive banner was removed (nav badge + summary card already convey it).
 - [x] **Dashboard drag tabbing UX**: each serial's body + header actions live together in a `.serial-body-wrap`. **Merge** = drag a serial's tab onto another widget to combine them into one tabbed card. **Split** = a "Pop out" button in the tabbed card header pops the active tab back into its own standalone widget (dragging a tab to empty space also splits, but the button is the reliable path when widgets fill the screen). Grip icon still reorders widgets (SortableJS). Layout persisted in `localStorage.dashboardLayout_v2`.
 
 ---

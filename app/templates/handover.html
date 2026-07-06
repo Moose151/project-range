@@ -37,9 +37,9 @@
   <div class="col-md-4">
     <div class="card h-100 {% if any_buzzer %}border-danger{% else %}border-secondary{% endif %}">
       <div class="card-body py-3">
-        <div class="text-muted small">Buzzer</div>
+        <div class="text-muted small">Transmission</div>
         <div class="fs-5 fw-semibold {% if any_buzzer %}text-danger blink-icon{% endif %}">
-          {{ 'ACTIVE' if any_buzzer else 'Off' }}
+          {{ 'Transmitting' if any_buzzer else 'Not transmitting' }}
         </div>
       </div>
     </div>
@@ -54,7 +54,7 @@
     <i class="bi bi-collection-play"></i>
     <span class="fw-semibold">{{ sd.serial.title }}</span>
     <span class="text-muted small">started {{ sd.serial.opened_at.strftime('%H:%M %d/%m') }}</span>
-    {% if sd.buzzer_active %}<span class="badge bg-danger ms-1">BUZZER</span>{% endif %}
+    {% if sd.buzzer_active %}<span class="badge bg-danger ms-1">TRANSMITTING</span>{% endif %}
     <span class="ms-auto small">
       {% for status, count in sd.status_counts.items() %}
       <span class="me-2">{{ status_badge(status) }} {{ count }}</span>

@@ -34,14 +34,14 @@
     <tr>
       <td><div class="label">Range State</div><div class="value">{{ range_state }}</div></td>
       <td><div class="label">Signals Up</div><div class="value">{{ total_up }}</div></td>
-      <td><div class="label">Buzzer</div><div class="value {% if any_buzzer %}alert{% endif %}">{{ 'ACTIVE' if any_buzzer else 'Off' }}</div></td>
+      <td><div class="label">Transmission</div><div class="value {% if any_buzzer %}alert{% endif %}">{{ 'Transmitting' if any_buzzer else 'Not transmitting' }}</div></td>
       <td><div class="label">Active Serials</div><div class="value">{{ serial_data | length }}</div></td>
     </tr>
   </table>
 
   {% if serial_data %}
   {% for sd in serial_data %}
-  <h2>{{ sd.serial.title }} <span style="font-weight:normal;font-size:9pt;color:#555">— started {{ sd.serial.opened_at.strftime('%H:%M %d/%m/%Y') }}{% if sd.buzzer_active %} · BUZZER ACTIVE{% endif %}</span></h2>
+  <h2>{{ sd.serial.title }} <span style="font-weight:normal;font-size:9pt;color:#555">— started {{ sd.serial.opened_at.strftime('%H:%M %d/%m/%Y') }}{% if sd.buzzer_active %} · TRANSMITTING{% endif %}</span></h2>
   {% if sd.signals %}
   <table>
     <thead>
