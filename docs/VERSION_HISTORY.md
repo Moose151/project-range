@@ -4,9 +4,15 @@ This document records the major user-facing changes shipped in each beta version
 For planned work, see [ROADMAP.md](ROADMAP.md). For deep implementation notes and
 handover details, see [HANDOVER.md](HANDOVER.md).
 
-Current version: **0.19.2**
+Current version: **0.19.3**
 
 ---
+
+## 0.19.3 — VTRC Combiner Routing and Alias Fix
+
+- Fixed VTRC combiner live routing so the app follows the MIB's combiner semantics: **inputs route to outputs**. The routing page now shows many inputs correctly combining into one output instead of transposing that as every output being fed from one input.
+- Combiner SNMP aliases now count as observed-state changes during polling, so real input/output names are persisted and shown instead of falling back to generic labels.
+- Stale splitter-style observed routing is cleared from combiner output ports on the next successful poll.
 
 ## 0.19.2 — Clearer Routing Page + Input Routing + Real Device Names
 

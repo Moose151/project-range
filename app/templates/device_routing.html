@@ -51,25 +51,38 @@
 {# ── LIVE ROUTING: the main, easy-to-read view ── #}
 {% if has_observed_routing %}
 <div class="row g-3 mb-3">
-  <!-- Outputs: each is fed from one input -->
+  <!-- Outputs -->
   <div class="col-lg-6">
     <div class="card border-secondary h-100">
       <div class="card-header d-flex align-items-center">
         <i class="bi bi-box-arrow-right me-2 text-warning"></i>
         <span>Outputs</span>
-        <span class="text-muted small ms-2">— each output is fed from one input</span>
+        <span class="text-muted small ms-2">
+          {% if routing_mode == 'input_to_output' %}— inputs combined into each output{% else %}— each output is fed from one input{% endif %}
+        </span>
       </div>
       <div class="card-body p-0">
         <table class="table table-dark table-sm align-middle mb-0">
           <tbody>
             {% for p in outputs %}
+            {% if routing_mode == 'input_to_output' %}
+            {% set feeds = output_feeds.get(p.idx, []) %}
+            {% else %}
             {% set src = p.observed_routed_from %}
             {% set planned_mismatch = p.routed_from and (p.routed_from or none) != (src or none) %}
+            {% endif %}
             <tr>
               <td style="width:1%" class="text-warning fw-semibold text-nowrap">O{{ p.idx }}</td>
               <td class="fw-semibold">{{ out_name[p.idx] }}</td>
               <td class="text-center text-muted" style="width:1%"><i class="bi bi-arrow-left-short"></i></td>
               <td>
+                {% if routing_mode == 'input_to_output' %}
+                  {% if feeds %}
+                    {% for i in feeds %}<span class="badge bg-secondary border border-info-subtle text-info me-1 mb-1">I{{ i }} · {{ in_name.get(i, 'Input ' ~ i) }}</span>{% endfor %}
+                  {% else %}
+                    <span class="text-muted fst-italic">no inputs routed</span>
+                  {% endif %}
+                {% else %}
                 {% if src %}
                   <span class="text-info">I{{ src }}</span> · {{ in_name.get(src, 'Input ' ~ src) }}
                 {% else %}
@@ -77,6 +90,7 @@
                 {% endif %}
                 {% if planned_mismatch %}
                 <span class="badge bg-warning text-dark ms-1" title="Planned: input {{ p.routed_from }}">≠ plan</span>
+                {% endif %}
                 {% endif %}
               </td>
             </tr>
@@ -87,28 +101,42 @@
     </div>
   </div>
 
-  <!-- Inputs: each feeds these outputs -->
+  <!-- Inputs -->
   <div class="col-lg-6">
     <div class="card border-secondary h-100">
       <div class="card-header d-flex align-items-center">
         <i class="bi bi-box-arrow-in-right me-2 text-info"></i>
         <span>Inputs</span>
-        <span class="text-muted small ms-2">— where each input is routed to</span>
+        <span class="text-muted small ms-2">
+          {% if routing_mode == 'input_to_output' %}— where each input is routed to{% else %}— where each input is routed to{% endif %}
+        </span>
       </div>
       <div class="card-body p-0">
         <table class="table table-dark table-sm align-middle mb-0">
           <tbody>
             {% for p in inputs %}
+            {% if routing_mode == 'input_to_output' %}
+            {% set dst = p.observed_routed_from %}
+            {% else %}
             {% set feeds = input_feeds.get(p.idx, []) %}
+            {% endif %}
             <tr>
               <td style="width:1%" class="text-info fw-semibold text-nowrap">I{{ p.idx }}</td>
               <td class="fw-semibold">{{ in_name[p.idx] }}</td>
               <td class="text-center text-muted" style="width:1%"><i class="bi bi-arrow-right-short"></i></td>
               <td>
+                {% if routing_mode == 'input_to_output' %}
+                  {% if dst %}
+                    <span class="text-warning">O{{ dst }}</span> · {{ out_name.get(dst, 'Output ' ~ dst) }}
+                  {% else %}
+                    <span class="text-muted fst-italic">not routed</span>
+                  {% endif %}
+                {% else %}
                 {% if feeds %}
                   {% for o in feeds %}<span class="badge bg-secondary border border-warning-subtle text-warning me-1 mb-1">O{{ o }} · {{ out_name.get(o, 'Output ' ~ o) }}</span>{% endfor %}
                 {% else %}
                   <span class="text-muted fst-italic">not routed</span>
+                {% endif %}
                 {% endif %}
               </td>
             </tr>

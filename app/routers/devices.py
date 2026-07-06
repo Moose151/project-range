@@ -121,7 +121,7 @@ async def devices_snmp_poll_active(
     current_user: User = Depends(require_supervisor),
 ):
     result = poll_active_snmp_devices(db, current_user.id)
-    message = f"SNMP poll complete: {result.polled} polled, {result.updated} routing changed"
+    message = f"SNMP poll complete: {result.polled} polled, {result.updated} observed state changed"
     if result.errors:
         message += f", {len(result.errors)} issue(s): {result.errors[0]}"
     return RedirectResponse(f"/devices?toast={quote_plus(message)}", status_code=302)
@@ -490,11 +490,27 @@ async def device_routing_page(
     in_name = {p.idx: (p.observed_label or p.label or input_hints.get(p.idx) or f"Input {p.idx}") for p in inputs}
     out_name = {p.idx: (p.observed_label or p.label or output_hints.get(p.idx) or f"Output {p.idx}") for p in outputs}
 
-    # Live fan-out: which outputs each input currently feeds (from observed routing).
+    routing_mode = "input_to_output" if dev.device_type == "combiner" else "output_to_input"
+
+    # Live fan-out/fan-in from observed routing. Splitters store routing on output
+    # ports (output -> input); combiners store routing on input ports (input -> output).
     input_feeds: dict[int, list[int]] = {}
-    for op in outputs:
-        if op.observed_routed_from:
-            input_feeds.setdefault(op.observed_routed_from, []).append(op.idx)
+    output_feeds: dict[int, list[int]] = {}
+    if routing_mode == "input_to_output":
+        for ip in inputs:
+            if ip.observed_routed_from:
+                output_feeds.setdefault(ip.observed_routed_from, []).append(ip.idx)
+                input_feeds.setdefault(ip.idx, []).append(ip.observed_routed_from)
+    else:
+        for op in outputs:
+            if op.observed_routed_from:
+                input_feeds.setdefault(op.observed_routed_from, []).append(op.idx)
+                output_feeds.setdefault(op.idx, []).append(op.observed_routed_from)
+
+    has_observed_routing = any(
+        p.observed_routed_from is not None
+        for p in (inputs if routing_mode == "input_to_output" else outputs)
+    )
 
     return templates.TemplateResponse(request, "device_routing.html", {
         "user": current_user,
@@ -508,9 +524,11 @@ async def device_routing_page(
         "in_name": in_name,
         "out_name": out_name,
         "input_feeds": input_feeds,
+        "output_feeds": output_feeds,
+        "routing_mode": routing_mode,
         "snmp_modules": _load_snmp_modules(dev),
         "ignored_modules": ignored_module_idxs(dev),
-        "has_observed_routing": any(p.observed_routed_from is not None for p in outputs),
+        "has_observed_routing": has_observed_routing,
         "toast": request.query_params.get("toast", ""),
         "page": "devices",
     })

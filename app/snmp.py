@@ -42,14 +42,15 @@ GENUS_MATRIX = f"{GENUS_ROOT}.6"       # genusMatrix branch
 @dataclass(frozen=True)
 class MatrixProfile:
     """A Genus matrix family's tables. Routing/alias tables share the same shape:
-    entry column 1 = row index, columns 2.. = per-port values (routing: input routed to
-    output, 0 = terminated; alias: the port's display name on the device). Only the base
-    OIDs and column count differ per model."""
+    entry column 1 = row index, columns 2.. = per-port values. Splitters expose
+    output -> input routing; combiners expose input -> output routing. Alias tables
+    use the same row/column layout for the port names."""
     name: str
     routing_oid: str                       # ...RoutingSettingsEntry
     route_cols: int                        # number of Route*Set / alias columns
     input_alias_oid: str | None = None     # ...IpAliasSettingsEntry (per-input names)
     output_alias_oid: str | None = None    # ...OpAliasSettingsEntry (per-output names)
+    routing_mode: str = "output_to_input"  # or "input_to_output" for VTRC combiners
 
 
 def _vtr(module: int) -> dict:
@@ -63,7 +64,8 @@ def _vtrc(module: int) -> dict:
     """Combiner family table OIDs: alias tables are mirrored vs the splitter (Ip=.6, Op=.5)."""
     root = f"{GENUS_MATRIX}.{module}"
     return {"routing_oid": f"{root}.2.1", "route_cols": 16,
-            "input_alias_oid": f"{root}.6.1", "output_alias_oid": f"{root}.5.1"}
+            "input_alias_oid": f"{root}.6.1", "output_alias_oid": f"{root}.5.1",
+            "routing_mode": "input_to_output"}
 
 
 # Tried in order during auto-detection; first routing table that returns rows wins.
@@ -103,12 +105,13 @@ class SNMPError(RuntimeError):
 class MatrixSnapshot:
     """Parsed read-only view of a Genus/VTR matrix."""
 
-    routing: dict[int, int] = field(default_factory=dict)          # output idx -> input idx (0 = none)
+    routing: dict[int, int] = field(default_factory=dict)          # see routing_mode
     input_aliases: dict[int, str] = field(default_factory=dict)     # input idx -> device name
     output_aliases: dict[int, str] = field(default_factory=dict)    # output idx -> device name
     system_alarm: str | None = None                                 # ok|fault|warning
     modules: list[dict[str, str]] = field(default_factory=list)     # [{alias, model, status}]
     profile: str | None = None                                      # detected matrix family (vtr101/hawk/...)
+    routing_mode: str = "output_to_input"                           # output_to_input|input_to_output
     raw: dict[str, str] = field(default_factory=dict)               # oid -> value (audit/debug)
 
     @property
@@ -172,13 +175,19 @@ def _oid_tail(oid: str, base: str) -> list[int] | None:
         return None
 
 
-def parse_routing(varbinds: list[tuple[str, str]], base_oid: str, route_cols: int) -> dict[int, int]:
-    """Interpret a Genus RoutingSettings table into {output_idx: input_idx}.
+def parse_routing(
+    varbinds: list[tuple[str, str]],
+    base_oid: str,
+    route_cols: int,
+    routing_mode: str = "output_to_input",
+) -> dict[int, int]:
+    """Interpret a Genus RoutingSettings table.
 
     The entry is INDEX { RouteNumber } (column 1) with `route_cols` Route{n}Set columns
-    (OID columns 2..route_cols+1). Each cell value is the input routed to that output
-    (0 = terminated). Layout: output = (RouteNumber - 1) * route_cols + column_position,
-    so a single-row table maps columns directly onto outputs 1..route_cols.
+    (OID columns 2..route_cols+1). VTR splitters describe "input connected to output",
+    so the returned map is {output_idx: input_idx}. VTRC combiners describe "output
+    connected to input", so the returned map is {input_idx: output_idx}. Zero means
+    terminated/not routed.
     """
     routing: dict[int, int] = {}
     for oid, value in varbinds:
@@ -190,10 +199,10 @@ def parse_routing(varbinds: list[tuple[str, str]], base_oid: str, route_cols: in
             continue  # skip the index column (1) and anything unexpected
         output_idx = (route_number - 1) * route_cols + (column - 1)
         try:
-            input_idx = int(value)
+            connected_idx = int(value)
         except (TypeError, ValueError):
             continue
-        routing[output_idx] = max(input_idx, 0)
+        routing[output_idx] = max(connected_idx, 0)
     return routing
 
 
@@ -247,11 +256,11 @@ def build_snapshot(
     output_alias_vb: list[tuple[str, str]] | None = None,
 ) -> MatrixSnapshot:
     """Pure assembly of a MatrixSnapshot from raw varbind lists — unit-testable."""
-    raw = {oid: val for oid, val in (*routing_vb, *module_vb)}
+    raw = {oid: val for oid, val in (*routing_vb, *module_vb, *(input_alias_vb or []), *(output_alias_vb or []))}
     if system_alarm_value is not None:
         raw[OID_SYSTEM_SUMMARY_ALARM] = system_alarm_value
     alarm = SUMMARY_ALARM_TEXT.get(str(system_alarm_value).strip()) if system_alarm_value is not None else None
-    routing = parse_routing(routing_vb, profile.routing_oid, profile.route_cols) if profile else {}
+    routing = parse_routing(routing_vb, profile.routing_oid, profile.route_cols, profile.routing_mode) if profile else {}
     input_aliases: dict[int, str] = {}
     output_aliases: dict[int, str] = {}
     if profile:
@@ -266,6 +275,7 @@ def build_snapshot(
         system_alarm=alarm,
         modules=parse_modules(module_vb),
         profile=profile.name if profile else None,
+        routing_mode=profile.routing_mode if profile else "output_to_input",
         raw=raw,
     )
 

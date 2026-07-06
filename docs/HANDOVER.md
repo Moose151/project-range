@@ -247,6 +247,11 @@
   - **`device_routing.html` fully redesigned** for clarity: a live status bar; read-only **Outputs** table (output → the input feeding it, with mismatch-vs-plan badge) and a new **Inputs** table (input → the outputs it feeds, computed as `input_feeds` in the router from observed routing = live fan-out); module health + manual planning/labels moved into `<details>` collapsibles. Port display name resolves device alias > manual label > topology hint > "Input N".
   - **Poll redirect fix:** `POST /devices/{id}/snmp/test` now takes an optional `next` form field; the routing page's Refresh button passes `next=/devices/{id}/routing` so it no longer bounces to the Devices list.
   - Still Bootstrap-only (no `app.css`/`app.js` change). Remaining validation: confirm the live output/input numbering matches each matrix front panel.
+- **0.19.3 — VTRC combiner route direction fix (from live testing):**
+  - The VTRC MIB routing descriptions are genuinely different from VTR: VTR says "Input connected to output" (output -> input), while VTRC says "Output connected to input" (input -> output). `MatrixProfile.routing_mode` now records that distinction, with VTRC profiles set to `input_to_output`.
+  - `snmp_sync.poll_snmp_device()` stores splitter routes on **output** ports as before, but stores combiner routes on **input** ports (`DevicePort.observed_routed_from` means "routed to output" for combiners). It also clears stale splitter-style output observations on combiners, so a poll after upgrade removes the old "every output ← I15" display.
+  - The routing page branches on combiner mode: Outputs show the inputs combined into each output, Inputs show each input's destination output. Alias updates now mark the poll as changed so real VTRC names persist and bulk/background poll counts are honest.
+  - No schema change; the existing observed routing field is reused with direction-specific interpretation.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.

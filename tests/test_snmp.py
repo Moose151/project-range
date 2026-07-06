@@ -29,6 +29,8 @@ def test_vtrc_alias_oids_mirrored():
     # Combiner alias tables are swapped vs splitter (Ip=.6, Op=.5).
     assert VTR101.input_alias_oid.endswith(".9.5.1") and VTR101.output_alias_oid.endswith(".9.6.1")
     assert VTRC101.input_alias_oid.endswith(".10.6.1") and VTRC101.output_alias_oid.endswith(".10.5.1")
+    assert VTR101.routing_mode == "output_to_input"
+    assert VTRC101.routing_mode == "input_to_output"
 
 
 def test_parse_aliases():
@@ -66,6 +68,20 @@ def test_parse_routing_vtr101():
     assert routing[16] == 13, routing
 
 
+def test_parse_routing_vtrc101():
+    base = VTRC101.routing_oid  # 16 columns -> column c maps to input (c-1) on row 1
+    vb = [
+        (f"{base}.1.1", "1"),    # index column -> ignored
+        (f"{base}.2.1", "15"),   # Route1Set  -> in 1 -> out 15
+        (f"{base}.3.1", "0"),    # Route2Set  -> in 2 terminated/not routed
+        (f"{base}.17.1", "16"),  # Route16Set -> in 16 -> out 16
+    ]
+    routing = parse_routing(vb, base, VTRC101.route_cols, VTRC101.routing_mode)
+    assert routing[1] == 15, routing
+    assert routing[2] == 0, routing
+    assert routing[16] == 16, routing
+
+
 def test_parse_modules_severity():
     vb = [
         (f"{OID_MODULE_INFO_STATUS}.1", "0"),   # OK
@@ -98,6 +114,7 @@ def test_build_snapshot():
     module_vb = [(f"{OID_MODULE_INFO_STATUS}.1", "3")]
     snap = build_snapshot(routing_vb, module_vb, "1", VTR101)  # 1 -> fault
     assert snap.routing == {1: 3}
+    assert snap.routing_mode == "output_to_input"
     assert snap.system_alarm == "fault"
     assert snap.profile == "vtr101"
     assert snap.raw[OID_SYSTEM_SUMMARY_ALARM] == "1"

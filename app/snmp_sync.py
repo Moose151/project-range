@@ -62,7 +62,9 @@ def poll_snmp_device(db: Session, dev: RFDevice) -> tuple[MatrixSnapshot | None,
     """Poll one device and write observed state. Returns (snapshot, changed).
 
     Raises SNMPError on poll failure (caller records it); on success updates the
-    device's snmp_last_poll_* cache and the observed routing on its output ports.
+    device's snmp_last_poll_* cache and the observed routing. Splitter-style
+    matrices store output -> input on output ports; combiner-style matrices store
+    input -> output on input ports.
     """
     community, v3 = _device_credentials(dev)
     if not dev.host or (not community and not v3):
@@ -76,22 +78,42 @@ def poll_snmp_device(db: Session, dev: RFDevice) -> tuple[MatrixSnapshot | None,
     changed = False
     outputs = {p.idx: p for p in dev.ports if p.direction == "out"}
     inputs = {p.idx: p for p in dev.ports if p.direction == "in"}
-    for output_idx, input_idx in snapshot.routing.items():
-        port = outputs.get(output_idx)
-        if port is None:
-            continue
-        new_val = input_idx or None
-        if port.observed_routed_from != new_val:
-            port.observed_routed_from = new_val
-            changed = True
+    if snapshot.routing_mode == "input_to_output":
+        for port in outputs.values():
+            if port.observed_routed_from is not None:
+                port.observed_routed_from = None
+                changed = True
+        for input_idx, output_idx in snapshot.routing.items():
+            port = inputs.get(input_idx)
+            if port is None:
+                continue
+            new_val = output_idx or None
+            if port.observed_routed_from != new_val:
+                port.observed_routed_from = new_val
+                changed = True
+    else:
+        for port in inputs.values():
+            if port.observed_routed_from is not None:
+                port.observed_routed_from = None
+                changed = True
+        for output_idx, input_idx in snapshot.routing.items():
+            port = outputs.get(output_idx)
+            if port is None:
+                continue
+            new_val = input_idx or None
+            if port.observed_routed_from != new_val:
+                port.observed_routed_from = new_val
+                changed = True
 
     # Store the device's own port names (SNMP aliases) so the UI shows real names.
     for idx, name in snapshot.output_aliases.items():
-        if idx in outputs:
+        if idx in outputs and outputs[idx].observed_label != name:
             outputs[idx].observed_label = name
+            changed = True
     for idx, name in snapshot.input_aliases.items():
-        if idx in inputs:
+        if idx in inputs and inputs[idx].observed_label != name:
             inputs[idx].observed_label = name
+            changed = True
 
     dev.snmp_last_poll_at = datetime.utcnow()
     dev.snmp_last_poll_status = "ok"
