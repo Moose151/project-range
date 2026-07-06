@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -36,8 +37,14 @@ def _mhz_from_khz_text(value: str | None) -> float | None:
 
 
 def _float_text(value: str | None) -> float | None:
+    raw = (value or "").strip()
+    if raw.replace(" ", "") in {"", "NoData", "NoCarrier", "NoLock", "Unavailable", "N/A"}:
+        return None
+    match = re.search(r"[-+]?\d+(?:\.\d+)?", raw)
+    if not match:
+        return None
     try:
-        return float(value) if value not in (None, "", "NoData", "No Data", "NoCarrier", "No Carrier") else None
+        return float(match.group(0))
     except ValueError:
         return None
 
@@ -61,11 +68,45 @@ def _fec_rate_from_cbm_code(value: str | None) -> str | None:
     return base.strip() or None
 
 
-def _status_from_snapshot(snapshot: CBMSnapshot, path: str | None) -> str:
+def _normalise_state(value: str | None) -> str:
+    return (value or "").strip().upper().replace(" ", "").replace("-", "_")
+
+
+def _is_positive_state(value: str | None) -> bool:
+    return _normalise_state(value) in {
+        "ON", "ENABLE", "ENABLED", "ACTIVE", "ENGAGED", "ACQ", "LINK_UP",
+        "READY", "LOCK", "LOCKED", "SYNC", "INSYNC", "IN_SYNC", "OK",
+        "GREEN", "TRUE", "1",
+    }
+
+
+def _is_negative_state(value: str | None) -> bool:
+    return _normalise_state(value) in {
+        "OFF", "DISABLE", "DISABLED", "INACTIVE", "DISENGAGED", "IDLE",
+        "LINK_DOWN", "NOLOCK", "NO_LOCK", "NOSYNC", "NO_SYNC", "DOWN",
+        "RED", "FALSE", "0",
+    }
+
+
+def _status_from_snapshot(snapshot: CBMSnapshot, path: str | None) -> str | None:
     if path in ("rx", "dvb"):
-        lock = snapshot.status.get("ACQ_STATE") or snapshot.status.get("LINK_STAT")
-        return "Up" if lock in {"ACQ", "LINK_UP", "READY"} else "Down"
-    return "Up" if snapshot.tx_config.get("TX_OP") == "ON" else "Down"
+        states = [snapshot.status.get(field) for field in ("ACQ_STATE", "LINK_STAT", "BSYNC_STAT", "ESYNC_STAT")]
+        if any(_is_positive_state(value) for value in states):
+            return "Up"
+        if any(_is_negative_state(value) for value in states):
+            return "Down"
+        return None
+    states = [
+        snapshot.tx_config.get("TX_OP"),
+        snapshot.status.get("TX_OP"),
+        snapshot.summary.get("tx_if_enabled"),
+        snapshot.summary.get("ita_tx_status"),
+    ]
+    if any(_is_positive_state(value) for value in states):
+        return "Up"
+    if any(_is_negative_state(value) for value in states):
+        return "Down"
+    return None
 
 
 def _entry_values_from_snapshot(entry: SignalPackageEntry, snapshot: CBMSnapshot) -> dict:
@@ -108,6 +149,10 @@ def _changed(latest: SignalLog | None, values: dict) -> bool:
         return True
     fields = ("signal_status", "modulation", "symbol_rate", "fec", "power", "eb_no", "tx_if", "tx_rf", "rx_rf", "rx_if")
     return any(getattr(latest, field) != values.get(field) for field in fields)
+
+
+def _latest_or_entry_status(latest: SignalLog | None, entry: SignalPackageEntry) -> str:
+    return latest.signal_status if latest else "Configured"
 
 
 def sync_active_cbms(db: Session, actor_id: int | None, audit_when_noop: bool = True) -> CBMSyncResult:
@@ -176,6 +221,8 @@ def sync_active_cbms(db: Session, actor_id: int | None, audit_when_noop: bool = 
             SignalLog.is_deleted == False,
             SignalLog.is_testing == testing,
         ).order_by(SignalLog.timestamp.desc()).first()
+        if values.get("signal_status") is None:
+            values["signal_status"] = _latest_or_entry_status(latest, entry)
         baseline = {
             "tx_if": values.get("tx_if") if values.get("tx_if") is not None else (latest.tx_if if latest else entry.tx_if),
             "tx_rf": latest.tx_rf if latest else entry.tx_rf,

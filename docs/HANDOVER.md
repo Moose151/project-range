@@ -284,6 +284,10 @@
   - `docker-compose.yml` hardens the web container with read-only root filesystem, `/tmp` tmpfs, `no-new-privileges`, dropped capabilities, and memory/process limits while keeping `/app/data` writable as the persistent volume.
   - `app/audit_integrity.py` adds a per-scope HMAC-SHA-256 audit hash chain using `AUDIT_HASH_SECRET` (defaults to `SECRET_KEY`). New rows are signed automatically from the SQLAlchemy model hook, `init_db.py` backfills existing rows as a baseline, `/audit` shows chain health, and audit archive XLSX files include previous/record hash fields.
   - Work is intentionally paused here for now. The next recommended security item is encrypted backups (`BACKUP_ENCRYPTION_KEY` or similar, encrypted backup output, documented decrypt/restore flow, and a round-trip test), but do not start it until the user asks to resume.
+- **0.19.9 — EBEM sync status fix:**
+  - `app/cbm_sync.py` now accepts active/enabled/engaged modem state variants instead of only exact `TX_OP=ON`.
+  - CBM sync no longer forces a signal Down when the poll has no confident Tx/Rx state; it preserves the latest dashboard status and can still write telemetry changes.
+  - Eb/No parsing accepts numeric strings with units plus EBEM aliases (`RX_EBNO`, `EBNO`, `EBN0`, `EB_N0`, `EB_NO`). Tests live in `tests/test_cbm_sync.py`.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.

@@ -25,6 +25,8 @@ class CBMSnapshot:
         rx_freq = self.rx_config.get("RXIF_FRQ")
         return {
             "tx_operation": tx_on,
+            "tx_if_enabled": self.status.get("TXIF_EN") or self.status.get("TXIF_ENABLED") or self.status.get("TX_ON"),
+            "ita_tx_status": self.status.get("ITT_STAT"),
             "tx_if_power_dbm": tx_power,
             "tx_if_frequency_khz": tx_freq,
             "rx_if_frequency_khz": rx_freq,
@@ -35,7 +37,13 @@ class CBMSnapshot:
             "rx_symbol_rate": self.rx_config.get("RX_SR"),
             "rx_code": self.rx_config.get("RX_CODE"),
             "rx_level_dbm": self.status.get("RXIF_LVL"),
-            "rx_ebno_db": self.status.get("RX_EBNO"),
+            "rx_ebno_db": (
+                self.status.get("RX_EBNO")
+                or self.status.get("EBNO")
+                or self.status.get("EBN0")
+                or self.status.get("EB_N0")
+                or self.status.get("EB_NO")
+            ),
             "rx_esno_db": self.status.get("RX_ESNO"),
             "modem_status": self.status.get("MDM_STAT"),
             "link_status": self.status.get("LINK_STAT"),

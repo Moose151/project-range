@@ -1,9 +1,15 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.19.8**
+Current version: **0.19.9**
 
 ---
+
+## 0.19.9 — EBEM Sync Status Fix
+
+- EBEM/CBM sync now treats active/enabled/engaged modem state variants as signal **Up**, instead of requiring only exact `TX_OP=ON`.
+- EBEM/CBM sync no longer forces a dashboard signal **Down** when the modem poll does not return a confident Tx/Rx state; it preserves the latest dashboard status while still applying telemetry updates.
+- Eb/No parsing now accepts modem values with units and common EBEM field aliases such as `EBNO`, `EBN0`, `EB_N0`, and `EB_NO` as well as `RX_EBNO`.
 
 ## 0.19.8 — Session Hardening
 
