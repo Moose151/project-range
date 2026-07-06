@@ -4,9 +4,16 @@ This document records the major user-facing changes shipped in each beta version
 For planned work, see [ROADMAP.md](ROADMAP.md). For deep implementation notes and
 handover details, see [HANDOVER.md](HANDOVER.md).
 
-Current version: **0.19.1**
+Current version: **0.19.2**
 
 ---
+
+## 0.19.2 — Clearer Routing Page + Input Routing + Real Device Names
+
+- **Redesigned the routing page** to be much easier to read: a live status bar, a read-only **Outputs** view (each output → the input feeding it) and a new **Inputs** view (each input → the outputs it feeds), with module health and the manual planning/labels tucked into collapsible sections.
+- **Real device port names** are now read from the matrix over SNMP (e.g. "CBM-400 1 Rx", "Mission System 3 Tx") and shown automatically, instead of bare port numbers.
+- **See what inputs are routed to** — the Inputs panel shows each input's live fan-out (which outputs are drawing from it).
+- Fixed **Refresh/Poll now** on the routing page bouncing back to the Devices list — it now stays on the routing page.
 
 ## 0.19.1 — SNMP Matrix Support (VTR/VTRC) + Acknowledge Module Faults
 

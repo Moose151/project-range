@@ -41,25 +41,41 @@ GENUS_MATRIX = f"{GENUS_ROOT}.6"       # genusMatrix branch
 
 @dataclass(frozen=True)
 class MatrixProfile:
-    """A Genus matrix family's routing table. All share the same row/column shape:
-    entry column 1 = RouteNumber (row index), columns 2.. = Route{n}Set (input routed
-    to output, 0 = terminated). Only the base OID and column count differ per model."""
+    """A Genus matrix family's tables. Routing/alias tables share the same shape:
+    entry column 1 = row index, columns 2.. = per-port values (routing: input routed to
+    output, 0 = terminated; alias: the port's display name on the device). Only the base
+    OIDs and column count differ per model."""
     name: str
-    routing_oid: str   # ...RoutingSettingsEntry
-    route_cols: int    # number of Route*Set columns
+    routing_oid: str                       # ...RoutingSettingsEntry
+    route_cols: int                        # number of Route*Set / alias columns
+    input_alias_oid: str | None = None     # ...IpAliasSettingsEntry (per-input names)
+    output_alias_oid: str | None = None    # ...OpAliasSettingsEntry (per-output names)
 
 
-# Tried in order during auto-detection; first table that returns rows wins.
-# genusMatrix index per module verified from the ETL MIBs; RoutingSettingsTable = .2,
-# entry = .1, columns 2.. = Route{n}Set. VTR/VTRC families are 16-wide; Hawk is 8-wide.
+def _vtr(module: int) -> dict:
+    """Splitter family table OIDs: routing=.2, IpAlias=.5, OpAlias=.6."""
+    root = f"{GENUS_MATRIX}.{module}"
+    return {"routing_oid": f"{root}.2.1", "route_cols": 16,
+            "input_alias_oid": f"{root}.5.1", "output_alias_oid": f"{root}.6.1"}
+
+
+def _vtrc(module: int) -> dict:
+    """Combiner family table OIDs: alias tables are mirrored vs the splitter (Ip=.6, Op=.5)."""
+    root = f"{GENUS_MATRIX}.{module}"
+    return {"routing_oid": f"{root}.2.1", "route_cols": 16,
+            "input_alias_oid": f"{root}.6.1", "output_alias_oid": f"{root}.5.1"}
+
+
+# Tried in order during auto-detection; first routing table that returns rows wins.
+# genusMatrix index per module verified from the ETL MIBs.
 MATRIX_PROFILES = [
-    MatrixProfile("vtr101", f"{GENUS_MATRIX}.9.2.1", 16),
-    MatrixProfile("vtr100", f"{GENUS_MATRIX}.7.2.1", 16),
-    MatrixProfile("vtr102", f"{GENUS_MATRIX}.11.2.1", 16),
-    MatrixProfile("vtrc100", f"{GENUS_MATRIX}.8.2.1", 16),
-    MatrixProfile("vtrc101", f"{GENUS_MATRIX}.10.2.1", 16),
-    MatrixProfile("vtrc102", f"{GENUS_MATRIX}.12.2.1", 16),
-    MatrixProfile("hawk", f"{GENUS_MATRIX}.2.2.1", 8),
+    MatrixProfile("vtr101", **_vtr(9)),
+    MatrixProfile("vtr100", **_vtr(7)),
+    MatrixProfile("vtr102", **_vtr(11)),
+    MatrixProfile("vtrc101", **_vtrc(10)),
+    MatrixProfile("vtrc100", **_vtrc(8)),
+    MatrixProfile("vtrc102", **_vtrc(12)),
+    MatrixProfile("hawk", f"{GENUS_MATRIX}.2.2.1", 8),  # separate in/out roots; no aliases read
 ]
 
 # systemSummaryAlarm integer meanings.
@@ -88,6 +104,8 @@ class MatrixSnapshot:
     """Parsed read-only view of a Genus/VTR matrix."""
 
     routing: dict[int, int] = field(default_factory=dict)          # output idx -> input idx (0 = none)
+    input_aliases: dict[int, str] = field(default_factory=dict)     # input idx -> device name
+    output_aliases: dict[int, str] = field(default_factory=dict)    # output idx -> device name
     system_alarm: str | None = None                                 # ok|fault|warning
     modules: list[dict[str, str]] = field(default_factory=list)     # [{alias, model, status}]
     profile: str | None = None                                      # detected matrix family (vtr101/hawk/...)
@@ -179,6 +197,23 @@ def parse_routing(varbinds: list[tuple[str, str]], base_oid: str, route_cols: in
     return routing
 
 
+def parse_aliases(varbinds: list[tuple[str, str]], base_oid: str, cols: int) -> dict[int, str]:
+    """Interpret an Ip/OpAlias table into {port_idx: name}. Same layout as routing."""
+    aliases: dict[int, str] = {}
+    for oid, value in varbinds:
+        tail = _oid_tail(oid, base_oid)
+        if not tail or len(tail) < 2:
+            continue
+        column, row = tail[0], tail[1]
+        if column < 2 or column > (1 + cols):
+            continue
+        port_idx = (row - 1) * cols + (column - 1)
+        name = (value or "").strip()
+        if name:
+            aliases[port_idx] = name
+    return aliases
+
+
 def parse_modules(varbinds: list[tuple[str, str]]) -> list[dict[str, str]]:
     """Collect per-module alias/model/status rows from moduleInfoTable varbinds."""
     by_index: dict[int, dict[str, str]] = {}
@@ -208,6 +243,8 @@ def build_snapshot(
     module_vb: list[tuple[str, str]],
     system_alarm_value: str | None,
     profile: MatrixProfile | None = None,
+    input_alias_vb: list[tuple[str, str]] | None = None,
+    output_alias_vb: list[tuple[str, str]] | None = None,
 ) -> MatrixSnapshot:
     """Pure assembly of a MatrixSnapshot from raw varbind lists — unit-testable."""
     raw = {oid: val for oid, val in (*routing_vb, *module_vb)}
@@ -215,8 +252,17 @@ def build_snapshot(
         raw[OID_SYSTEM_SUMMARY_ALARM] = system_alarm_value
     alarm = SUMMARY_ALARM_TEXT.get(str(system_alarm_value).strip()) if system_alarm_value is not None else None
     routing = parse_routing(routing_vb, profile.routing_oid, profile.route_cols) if profile else {}
+    input_aliases: dict[int, str] = {}
+    output_aliases: dict[int, str] = {}
+    if profile:
+        if input_alias_vb and profile.input_alias_oid:
+            input_aliases = parse_aliases(input_alias_vb, profile.input_alias_oid, profile.route_cols)
+        if output_alias_vb and profile.output_alias_oid:
+            output_aliases = parse_aliases(output_alias_vb, profile.output_alias_oid, profile.route_cols)
     return MatrixSnapshot(
         routing=routing,
+        input_aliases=input_aliases,
+        output_aliases=output_aliases,
         system_alarm=alarm,
         modules=parse_modules(module_vb),
         profile=profile.name if profile else None,
@@ -298,9 +344,16 @@ async def _poll_genus_matrix_async(
             routing_vb, matched = rows, prof
             break
 
+    input_alias_vb: list[tuple[str, str]] = []
+    output_alias_vb: list[tuple[str, str]] = []
+    if matched and matched.input_alias_oid:
+        input_alias_vb = await _walk(engine, auth, transport, context, matched.input_alias_oid)
+    if matched and matched.output_alias_oid:
+        output_alias_vb = await _walk(engine, auth, transport, context, matched.output_alias_oid)
+
     module_vb = await _walk(engine, auth, transport, context, OID_MODULE_INFO_TABLE)
     system_alarm = await _get(engine, auth, transport, context, OID_SYSTEM_SUMMARY_ALARM)
-    return build_snapshot(routing_vb, module_vb, system_alarm, matched)
+    return build_snapshot(routing_vb, module_vb, system_alarm, matched, input_alias_vb, output_alias_vb)
 
 
 async def _diag_walk_async(

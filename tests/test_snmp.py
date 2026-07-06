@@ -16,11 +16,33 @@ from app.snmp import (  # noqa: E402
     OID_SYSTEM_SUMMARY_ALARM,
     _oid_tail,
     parse_routing,
+    parse_aliases,
     parse_modules,
     build_snapshot,
 )
 
 VTR101 = next(p for p in MATRIX_PROFILES if p.name == "vtr101")  # 16 route columns
+VTRC101 = next(p for p in MATRIX_PROFILES if p.name == "vtrc101")
+
+
+def test_vtrc_alias_oids_mirrored():
+    # Combiner alias tables are swapped vs splitter (Ip=.6, Op=.5).
+    assert VTR101.input_alias_oid.endswith(".9.5.1") and VTR101.output_alias_oid.endswith(".9.6.1")
+    assert VTRC101.input_alias_oid.endswith(".10.6.1") and VTRC101.output_alias_oid.endswith(".10.5.1")
+
+
+def test_parse_aliases():
+    base = VTR101.input_alias_oid  # 16 cols: column c -> port (c-1) on row 1
+    vb = [
+        (f"{base}.1.1", "0"),               # index col ignored
+        (f"{base}.2.1", "CBM-400 1 Tx"),    # input 1
+        (f"{base}.3.1", "  "),              # blank -> skipped
+        (f"{base}.17.1", "Loopback 1"),     # input 16
+    ]
+    aliases = parse_aliases(vb, base, VTR101.route_cols)
+    assert aliases[1] == "CBM-400 1 Tx"
+    assert 2 not in aliases
+    assert aliases[16] == "Loopback 1"
 
 
 def test_oid_tail():

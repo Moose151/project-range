@@ -75,6 +75,7 @@ def poll_snmp_device(db: Session, dev: RFDevice) -> tuple[MatrixSnapshot | None,
 
     changed = False
     outputs = {p.idx: p for p in dev.ports if p.direction == "out"}
+    inputs = {p.idx: p for p in dev.ports if p.direction == "in"}
     for output_idx, input_idx in snapshot.routing.items():
         port = outputs.get(output_idx)
         if port is None:
@@ -83,6 +84,14 @@ def poll_snmp_device(db: Session, dev: RFDevice) -> tuple[MatrixSnapshot | None,
         if port.observed_routed_from != new_val:
             port.observed_routed_from = new_val
             changed = True
+
+    # Store the device's own port names (SNMP aliases) so the UI shows real names.
+    for idx, name in snapshot.output_aliases.items():
+        if idx in outputs:
+            outputs[idx].observed_label = name
+    for idx, name in snapshot.input_aliases.items():
+        if idx in inputs:
+            inputs[idx].observed_label = name
 
     dev.snmp_last_poll_at = datetime.utcnow()
     dev.snmp_last_poll_status = "ok"

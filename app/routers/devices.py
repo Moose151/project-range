@@ -317,9 +317,13 @@ async def device_cbm_test(
 @router.post("/{dev_id}/snmp/test")
 async def device_snmp_test(
     dev_id: int,
+    next: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
+    # Return to the page the poll was triggered from (routing page or devices list).
+    dest = next if next.startswith("/devices") else "/devices"
+    sep = "&" if "?" in dest else "?"
     dev = db.query(RFDevice).filter(RFDevice.id == dev_id, RFDevice.is_testing == is_testing_state(db)).first()
     if not dev or dev.device_type not in ROUTING_TYPES:
         return RedirectResponse("/devices?toast=SNMP+device+not+found", status_code=302)
@@ -335,9 +339,7 @@ async def device_snmp_test(
             new_value=f"{dev.name}: alarm={dev.snmp_system_alarm or 'n/a'}, {routed} outputs routed",
         ))
         db.commit()
-        return RedirectResponse(
-            f"/devices?toast={quote_plus('SNMP poll OK: ' + dev.name)}", status_code=302,
-        )
+        return RedirectResponse(f"{dest}{sep}toast={quote_plus('SNMP poll OK: ' + dev.name)}", status_code=302)
     except SNMPError as exc:
         dev.snmp_last_poll_at = datetime.utcnow()
         dev.snmp_last_poll_status = "error"
@@ -350,9 +352,7 @@ async def device_snmp_test(
             new_value=f"{dev.name}: {dev.snmp_last_poll_error}",
         ))
         db.commit()
-        return RedirectResponse(
-            f"/devices?toast={quote_plus('SNMP poll failed: ' + dev.name)}", status_code=302,
-        )
+        return RedirectResponse(f"{dest}{sep}toast={quote_plus('SNMP poll failed: ' + dev.name)}", status_code=302)
 
 
 @router.post("/{dev_id}/snmp/ignore-modules")
@@ -483,15 +483,31 @@ async def device_routing_page(
         if lnk.from_device_id == dev.id and lnk.from_port_idx is not None:
             output_hints[lnk.from_port_idx] = lnk.to_device.name
 
+    inputs = sorted(inputs, key=lambda p: p.idx)
+    outputs = sorted(outputs, key=lambda p: p.idx)
+
+    # Resolved display name per port: device SNMP alias > manual label > topology hint > "Input N".
+    in_name = {p.idx: (p.observed_label or p.label or input_hints.get(p.idx) or f"Input {p.idx}") for p in inputs}
+    out_name = {p.idx: (p.observed_label or p.label or output_hints.get(p.idx) or f"Output {p.idx}") for p in outputs}
+
+    # Live fan-out: which outputs each input currently feeds (from observed routing).
+    input_feeds: dict[int, list[int]] = {}
+    for op in outputs:
+        if op.observed_routed_from:
+            input_feeds.setdefault(op.observed_routed_from, []).append(op.idx)
+
     return templates.TemplateResponse(request, "device_routing.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
         "device": dev,
-        "inputs": sorted(inputs, key=lambda p: p.idx),
-        "outputs": sorted(outputs, key=lambda p: p.idx),
+        "inputs": inputs,
+        "outputs": outputs,
         "input_hints": input_hints,
         "output_hints": output_hints,
         "input_labels": {p.idx: (p.label or input_hints.get(p.idx) or "") for p in inputs},
+        "in_name": in_name,
+        "out_name": out_name,
+        "input_feeds": input_feeds,
         "snmp_modules": _load_snmp_modules(dev),
         "ignored_modules": ignored_module_idxs(dev),
         "has_observed_routing": any(p.observed_routed_from is not None for p in outputs),
