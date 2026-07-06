@@ -785,6 +785,12 @@ code {
   --range-gold-deep: #b9822a;   /* shadowed gold */
   --range-silver: #c9ced6;      /* silver arrow */
   --range-ink: #0e0f12;         /* badge near-black */
+  /* Sidebar + topbar keep a dark background in BOTH light and dark mode (the
+     "light" palettes still set a dark --range-nav-bg), so their text must stay
+     light regardless of the light/dark toggle — otherwise light mode renders
+     dark text on the dark nav and it's unreadable. */
+  --range-nav-fg: rgba(230, 234, 238, 0.90);
+  --range-nav-fg-dim: rgba(230, 234, 238, 0.64);
 }
 .brand-sew span { color: var(--range-gold); letter-spacing: .04em; }
 .navbar { border-bottom: 2px solid var(--range-gold) !important; }
@@ -921,6 +927,7 @@ body {
 .app-sidebar {
   width: 220px;
   background: var(--range-nav-bg);
+  color: var(--range-nav-fg);
   border-right: 2px solid var(--range-gold);
   display: flex;
   flex-direction: column;
@@ -966,7 +973,7 @@ body {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--bs-secondary-color);
+  color: var(--range-nav-fg-dim);
   white-space: nowrap;
   overflow: hidden;
   transition: opacity 0.15s, max-height 0.2s;
@@ -986,7 +993,7 @@ body.sidebar-collapsed .sidebar-section-header {
   align-items: center;
   gap: 0.65rem;
   padding: 0.45rem 0.875rem;
-  color: var(--bs-secondary-color);
+  color: var(--range-nav-fg);
   text-decoration: none;
   font-size: 0.875rem;
   white-space: nowrap;
@@ -1027,6 +1034,21 @@ body.sidebar-collapsed .sidebar-label {
   flex-shrink: 0;
 }
 
+/* Nav surfaces keep a dark background in light mode too, so force their muted/
+   secondary/default text light — Bootstrap's .text-muted flips dark otherwise. */
+.app-sidebar,
+.app-topbar {
+  color: var(--range-nav-fg);
+}
+.app-sidebar .text-muted,
+.app-sidebar .text-body-secondary,
+.app-sidebar .text-secondary,
+.app-topbar .text-muted,
+.app-topbar .text-body-secondary,
+.app-topbar .text-secondary {
+  color: var(--range-nav-fg-dim) !important;
+}
+
 /* ── Main area ────────────────────────────────────────────── */
 .app-main {
   flex: 1;
@@ -1049,10 +1071,13 @@ body.sidebar-collapsed .sidebar-label {
   top: 0;
   z-index: 90;
 }
+.app-topbar {
+  color: var(--range-nav-fg);
+}
 .topbar-btn {
   background: none;
   border: 1px solid var(--range-card-border);
-  color: var(--bs-secondary-color);
+  color: var(--range-nav-fg);
   border-radius: 0.375rem;
   padding: 0.25rem 0.55rem;
   font-size: 0.95rem;
