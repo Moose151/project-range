@@ -1,10 +1,8 @@
 from fastapi import APIRouter, Depends, Request, Query
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
 from datetime import datetime
-from typing import Optional
+from urllib.parse import urlencode
 from app.database import get_db
 from app.deps import require_supervisor, get_current_range_state, is_testing_state
 from app.models import AuditLog, User
@@ -69,6 +67,13 @@ async def audit_list(
     users_map = {
         u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()
     } if user_ids else {}
+    query_base = urlencode({
+        "action": action,
+        "username": username,
+        "date_from": date_from,
+        "date_to": date_to,
+    })
+    page_href_prefix = f"/audit?{query_base}&page=" if query_base else "/audit?page="
 
     return templates.TemplateResponse(request, "audit_log.html", {
         "user": current_user,
@@ -85,5 +90,6 @@ async def audit_list(
             "date_from": date_from,
             "date_to": date_to,
         },
+        "page_href_prefix": page_href_prefix,
         "page_name": "audit",
     })

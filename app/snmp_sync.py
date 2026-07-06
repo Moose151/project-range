@@ -19,7 +19,7 @@ from app.deps import is_testing_state
 from app.models import AuditLog, DevicePort, RFDevice
 from app.snmp import MatrixSnapshot, SNMPError, poll_genus_matrix
 
-ROUTING_TYPES = {"splitter", "combiner", "switch"}
+ROUTING_TYPES = {"splitter", "combiner"}
 
 
 @dataclass

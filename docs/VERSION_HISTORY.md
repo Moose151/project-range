@@ -4,9 +4,22 @@ This document records the major user-facing changes shipped in each beta version
 For planned work, see [ROADMAP.md](ROADMAP.md). For deep implementation notes and
 handover details, see [HANDOVER.md](HANDOVER.md).
 
-Current version: **0.19.3**
+Current version: **0.19.5**
 
 ---
+
+## 0.19.5 — Device Form Shows Relevant Fields Only
+
+- The Add/Edit Device form now shows matrix input/output counts only for routing devices, so modem entries such as CBM-400 units no longer show redundant matrix sizing fields.
+- EBEM/CBM read-only sync settings now appear only for CBM/EBEM modem devices and are cleared/ignored server-side for other device types.
+- SNMP monitoring settings now appear only for splitter/combiner matrices, and SNMP polling ignores other device types until support is explicitly added.
+
+## 0.19.4 — Topology Auto Links + Live Matrix Routes
+
+- The Topology page now auto-infers RF links from splitter/combiner/switch port names. If a matrix port alias contains a registered device name, such as `CBM-400 1 Tx`, the diagram can show that device connected to the matrix without requiring a manually-created topology link.
+- The Topology page now derives **live routed paths** through splitter/combiner/switch matrices by combining physical topology links with the latest SNMP observed routing.
+- Added a **Live Routed Paths** table showing source device, matrix, input-to-output route, and downstream device.
+- The topology diagram now overlays dashed live RF paths so operators can see where signals are actually routed through the splitter/combiner, not just what is physically cabled.
 
 ## 0.19.3 — VTRC Combiner Routing and Alias Fix
 

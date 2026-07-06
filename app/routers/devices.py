@@ -1,5 +1,7 @@
 import asyncio
+import re
 from datetime import datetime
+from types import SimpleNamespace
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -41,6 +43,26 @@ DEVICE_TYPES = [
     ("other",              "Other"),
 ]
 ROUTING_TYPES = {"splitter", "combiner", "switch"}
+SNMP_MONITOR_TYPES = {"splitter", "combiner"}
+
+
+def _normalise_name(value: str | None) -> str:
+    return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
+
+
+def _is_ebem_device(device_type: str, name: str | None, device_model: str | None) -> bool:
+    """Only CBM/EBEM modem devices should expose/use EBEM read-only sync."""
+    if device_type != "modem":
+        return False
+    combined = _normalise_name(f"{name or ''} {device_model or ''}")
+    return "cbm" in combined or "ebem" in combined
+
+
+def _device_port_counts(device_type: str, num_inputs: int, num_outputs: int) -> tuple[int, int]:
+    if device_type in ROUTING_TYPES:
+        return max(0, min(num_inputs, 128)), max(0, min(num_outputs, 128))
+    # Non-matrix devices do not use the routing matrix UI; keep a simple shape.
+    return 1, 1
 
 LINK_TYPES = [
     ("rf",    "RF (coax/waveguide)"),
@@ -97,6 +119,8 @@ async def devices_list(
         "devices": devices,
         "device_types": DEVICE_TYPES,
         "routing_types": ROUTING_TYPES,
+        "snmp_monitor_types": SNMP_MONITOR_TYPES,
+        "ebem_device_ids": {d.id for d in devices if _is_ebem_device(d.device_type, d.name, d.device_model)},
         "toast": request.query_params.get("toast", ""),
         "page": "devices",
         "page_name": "devices",
@@ -154,27 +178,31 @@ async def device_create(
 ):
     name = name.strip()
     if name:
-        is_routing = device_type in ROUTING_TYPES
+        clean_type = device_type if device_type in dict(DEVICE_TYPES) else "other"
+        clean_model = device_model.strip() or None
+        is_ebem = _is_ebem_device(clean_type, name, clean_model)
+        snmp_allowed = clean_type in SNMP_MONITOR_TYPES
+        clean_inputs, clean_outputs = _device_port_counts(clean_type, num_inputs, num_outputs)
         dev = RFDevice(
             name=name,
-            device_model=device_model.strip() or None,
-            device_type=device_type if device_type in dict(DEVICE_TYPES) else "other",
+            device_model=clean_model,
+            device_type=clean_type,
             host=host.strip() or None,
             check_port=int(check_port) if check_port.strip().isdigit() else None,
             has_web_gui=bool(has_web_gui),
-            cbm_sync_enabled=bool(cbm_sync_enabled) if device_type == "modem" else False,
-            cbm_username=cbm_username.strip() or None,
-            cbm_password_encrypted=encrypt_secret(cbm_password.strip()) if cbm_password.strip() else None,
-            snmp_enabled=bool(snmp_enabled) if is_routing else False,
+            cbm_sync_enabled=bool(cbm_sync_enabled) if is_ebem else False,
+            cbm_username=(cbm_username.strip() or None) if is_ebem else None,
+            cbm_password_encrypted=encrypt_secret(cbm_password.strip()) if is_ebem and cbm_password.strip() else None,
+            snmp_enabled=bool(snmp_enabled) if snmp_allowed else False,
             snmp_version="3" if snmp_version == "3" else "2c",
             snmp_port=int(snmp_port) if snmp_port.strip().isdigit() else 161,
-            snmp_community_encrypted=encrypt_secret(snmp_community.strip()) if snmp_community.strip() else None,
-            snmp_v3_user=snmp_v3_user.strip() or None,
-            snmp_v3_auth_encrypted=encrypt_secret(snmp_v3_auth.strip()) if snmp_v3_auth.strip() else None,
-            snmp_v3_priv_encrypted=encrypt_secret(snmp_v3_priv.strip()) if snmp_v3_priv.strip() else None,
+            snmp_community_encrypted=encrypt_secret(snmp_community.strip()) if snmp_allowed and snmp_community.strip() else None,
+            snmp_v3_user=(snmp_v3_user.strip() or None) if snmp_allowed else None,
+            snmp_v3_auth_encrypted=encrypt_secret(snmp_v3_auth.strip()) if snmp_allowed and snmp_v3_auth.strip() else None,
+            snmp_v3_priv_encrypted=encrypt_secret(snmp_v3_priv.strip()) if snmp_allowed and snmp_v3_priv.strip() else None,
             location=location.strip() or None,
-            num_inputs=max(0, min(num_inputs, 128)),
-            num_outputs=max(0, min(num_outputs, 128)),
+            num_inputs=clean_inputs,
+            num_outputs=clean_outputs,
             notes=notes.strip() or None,
             is_testing=is_testing_state(db),
         )
@@ -220,25 +248,35 @@ async def device_update(
         dev.name = name.strip() or dev.name
         dev.device_model = device_model.strip() or None
         dev.device_type = device_type if device_type in dict(DEVICE_TYPES) else dev.device_type
+        is_ebem = _is_ebem_device(dev.device_type, dev.name, dev.device_model)
+        snmp_allowed = dev.device_type in SNMP_MONITOR_TYPES
         dev.host = host.strip() or None
         dev.check_port = int(check_port) if check_port.strip().isdigit() else None
         dev.has_web_gui = bool(has_web_gui)
-        dev.cbm_sync_enabled = bool(cbm_sync_enabled) if dev.device_type == "modem" else False
-        dev.cbm_username = cbm_username.strip() or None
-        if clear_cbm_password:
+        dev.cbm_sync_enabled = bool(cbm_sync_enabled) if is_ebem else False
+        dev.cbm_username = (cbm_username.strip() or None) if is_ebem else None
+        if not is_ebem:
+            dev.cbm_password_encrypted = None
+        elif clear_cbm_password:
             dev.cbm_password_encrypted = None
         elif cbm_password.strip():
             dev.cbm_password_encrypted = encrypt_secret(cbm_password.strip())
-        # SNMP monitoring config (routing devices only)
-        dev.snmp_enabled = bool(snmp_enabled) if dev.device_type in ROUTING_TYPES else False
+        # SNMP monitoring config (currently splitter/combiner matrices only).
+        dev.snmp_enabled = bool(snmp_enabled) if snmp_allowed else False
         dev.snmp_version = "3" if snmp_version == "3" else "2c"
         dev.snmp_port = int(snmp_port) if snmp_port.strip().isdigit() else 161
-        dev.snmp_v3_user = snmp_v3_user.strip() or None
-        if clear_snmp_community:
+        dev.snmp_v3_user = (snmp_v3_user.strip() or None) if snmp_allowed else None
+        if not snmp_allowed:
+            dev.snmp_community_encrypted = None
+            dev.snmp_v3_auth_encrypted = None
+            dev.snmp_v3_priv_encrypted = None
+        elif clear_snmp_community:
             dev.snmp_community_encrypted = None
         elif snmp_community.strip():
             dev.snmp_community_encrypted = encrypt_secret(snmp_community.strip())
-        if clear_snmp_v3:
+        if not snmp_allowed:
+            pass
+        elif clear_snmp_v3:
             dev.snmp_v3_auth_encrypted = None
             dev.snmp_v3_priv_encrypted = None
         else:
@@ -247,8 +285,7 @@ async def device_update(
             if snmp_v3_priv.strip():
                 dev.snmp_v3_priv_encrypted = encrypt_secret(snmp_v3_priv.strip())
         dev.location = location.strip() or None
-        dev.num_inputs = max(0, min(num_inputs, 128))
-        dev.num_outputs = max(0, min(num_outputs, 128))
+        dev.num_inputs, dev.num_outputs = _device_port_counts(dev.device_type, num_inputs, num_outputs)
         dev.notes = notes.strip() or None
         db.add(AuditLog(user_id=current_user.id, action_type="DEVICE_UPDATE",
                         entity_type="RFDevice", entity_id=dev.id, new_value=dev.name))
@@ -263,7 +300,7 @@ async def device_cbm_test(
     current_user: User = Depends(require_supervisor),
 ):
     dev = db.query(RFDevice).filter(RFDevice.id == dev_id, RFDevice.is_testing == is_testing_state(db)).first()
-    if not dev or dev.device_type != "modem":
+    if not dev or not _is_ebem_device(dev.device_type, dev.name, dev.device_model):
         return RedirectResponse("/devices?toast=CBM+device+not+found", status_code=302)
     if not dev.host or not dev.cbm_username or not dev.cbm_password_encrypted:
         dev.cbm_last_sync_status = "missing_credentials"
@@ -325,7 +362,7 @@ async def device_snmp_test(
     dest = next if next.startswith("/devices") else "/devices"
     sep = "&" if "?" in dest else "?"
     dev = db.query(RFDevice).filter(RFDevice.id == dev_id, RFDevice.is_testing == is_testing_state(db)).first()
-    if not dev or dev.device_type not in ROUTING_TYPES:
+    if not dev or dev.device_type not in SNMP_MONITOR_TYPES:
         return RedirectResponse("/devices?toast=SNMP+device+not+found", status_code=302)
     _ensure_ports(db, dev)
     try:
@@ -395,7 +432,7 @@ async def device_snmp_diagnostics(
 ):
     """Read-only raw SNMP walk of a subtree — for diagnosing what a device exposes."""
     dev = db.query(RFDevice).filter(RFDevice.id == dev_id, RFDevice.is_testing == is_testing_state(db)).first()
-    if not dev or dev.device_type not in ROUTING_TYPES:
+    if not dev or dev.device_type not in SNMP_MONITOR_TYPES:
         return PlainTextResponse("Device not found or not a routing device.", status_code=404)
     community, v3 = _device_credentials(dev)
     if not dev.host or (not community and not v3):
@@ -565,6 +602,155 @@ async def device_routing_save(
 
 # ── Topology ──────────────────────────────────────────────────────────────────
 
+def _port_display(link_port: str | None, port_idx: int | None, fallback: str) -> str:
+    if port_idx and link_port:
+        return f"Port {port_idx} - {link_port}"
+    if port_idx:
+        return f"Port {port_idx}"
+    return link_port or fallback
+
+
+def _device_port_names(dev: RFDevice) -> dict[tuple[str, int], str]:
+    return {
+        (p.direction, p.idx): (p.observed_label or p.label or f"{'Input' if p.direction == 'in' else 'Output'} {p.idx}")
+        for p in dev.ports
+    }
+
+
+def _matching_device_for_alias(alias: str | None, devices: list[RFDevice], matrix_id: int) -> RFDevice | None:
+    alias_norm = _normalise_name(alias)
+    if not alias_norm:
+        return None
+    candidates = []
+    for dev in devices:
+        if dev.id == matrix_id or dev.device_type in {"splitter", "combiner", "switch"}:
+            continue
+        name_norm = _normalise_name(dev.name)
+        model_norm = _normalise_name(dev.device_model)
+        if name_norm and name_norm in alias_norm:
+            candidates.append((len(name_norm), dev))
+        elif model_norm and model_norm in alias_norm:
+            candidates.append((len(model_norm), dev))
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda item: item[0], reverse=True)[0][1]
+
+
+def _auto_inferred_links(devices: list[RFDevice], links: list[DeviceLink]) -> list[SimpleNamespace]:
+    """Infer display-only RF topology links from matrix port aliases.
+
+    If an SNMP/manual port label mentions a registered device name, topology can
+    draw the physical connection even before an administrator adds a permanent
+    DeviceLink. Existing manual links for that matrix port win.
+    """
+    occupied_inputs = {(lnk.to_device_id, lnk.to_port_idx) for lnk in links if lnk.link_type == "rf" and lnk.to_port_idx}
+    occupied_outputs = {(lnk.from_device_id, lnk.from_port_idx) for lnk in links if lnk.link_type == "rf" and lnk.from_port_idx}
+    inferred: list[SimpleNamespace] = []
+
+    for matrix in devices:
+        if matrix.device_type not in {"splitter", "combiner", "switch"}:
+            continue
+        for port in matrix.ports:
+            alias = port.observed_label or port.label
+            matched = _matching_device_for_alias(alias, devices, matrix.id)
+            if not matched:
+                continue
+            if port.direction == "in":
+                if (matrix.id, port.idx) in occupied_inputs:
+                    continue
+                inferred.append(SimpleNamespace(
+                    id=f"auto-in-{matrix.id}-{port.idx}-{matched.id}",
+                    from_device_id=matched.id,
+                    from_device=matched,
+                    from_port=None,
+                    from_port_idx=None,
+                    to_device_id=matrix.id,
+                    to_device=matrix,
+                    to_port=alias,
+                    to_port_idx=port.idx,
+                    link_type="rf",
+                    label="auto from port name",
+                    inferred=True,
+                ))
+            elif port.direction == "out":
+                if (matrix.id, port.idx) in occupied_outputs:
+                    continue
+                inferred.append(SimpleNamespace(
+                    id=f"auto-out-{matrix.id}-{port.idx}-{matched.id}",
+                    from_device_id=matrix.id,
+                    from_device=matrix,
+                    from_port=alias,
+                    from_port_idx=port.idx,
+                    to_device_id=matched.id,
+                    to_device=matched,
+                    to_port=None,
+                    to_port_idx=None,
+                    link_type="rf",
+                    label="auto from port name",
+                    inferred=True,
+                ))
+    return inferred
+
+
+def _live_routed_paths(devices: list[RFDevice], links: list[DeviceLink | SimpleNamespace]) -> list[dict]:
+    """Derive end-to-end RF paths through splitter/combiner/switch devices.
+
+    DeviceLink rows describe the physical cables to matrix ports. SNMP observed
+    routing describes the internal matrix cross-connect. This joins the two so
+    topology can show which upstream device is currently routed to which downstream
+    device through each routing matrix.
+    """
+    input_links: dict[tuple[int, int], list[DeviceLink]] = {}
+    output_links: dict[tuple[int, int], list[DeviceLink]] = {}
+    for lnk in links:
+        if lnk.link_type != "rf":
+            continue
+        if lnk.to_port_idx:
+            input_links.setdefault((lnk.to_device_id, lnk.to_port_idx), []).append(lnk)
+        if lnk.from_port_idx:
+            output_links.setdefault((lnk.from_device_id, lnk.from_port_idx), []).append(lnk)
+
+    paths: list[dict] = []
+    for dev in devices:
+        if dev.device_type not in {"splitter", "combiner", "switch"}:
+            continue
+        port_names = _device_port_names(dev)
+        inputs = [p for p in dev.ports if p.direction == "in" and p.observed_routed_from]
+        outputs = [p for p in dev.ports if p.direction == "out" and p.observed_routed_from]
+
+        if dev.device_type == "combiner":
+            route_pairs = [(p.idx, p.observed_routed_from) for p in inputs]
+        else:
+            route_pairs = [(p.observed_routed_from, p.idx) for p in outputs]
+
+        for input_idx, output_idx in route_pairs:
+            if not input_idx or not output_idx:
+                continue
+            upstream = input_links.get((dev.id, input_idx), [])
+            downstream = output_links.get((dev.id, output_idx), [])
+            for in_lnk in upstream:
+                for out_lnk in downstream:
+                    if in_lnk.from_device_id == out_lnk.to_device_id:
+                        continue
+                    paths.append({
+                        "from_device_id": in_lnk.from_device_id,
+                        "from_device": in_lnk.from_device.name,
+                        "from_port": _port_display(in_lnk.from_port, in_lnk.from_port_idx, "Output"),
+                        "through_device_id": dev.id,
+                        "through_device": dev.name,
+                        "through_type": dev.device_type,
+                        "input_idx": input_idx,
+                        "input_label": port_names.get(("in", input_idx), f"Input {input_idx}"),
+                        "output_idx": output_idx,
+                        "output_label": port_names.get(("out", output_idx), f"Output {output_idx}"),
+                        "to_device_id": out_lnk.to_device_id,
+                        "to_device": out_lnk.to_device.name,
+                        "to_port": _port_display(out_lnk.to_port, out_lnk.to_port_idx, "Input"),
+                        "link_type": "rf",
+                    })
+    return paths
+
+
 @router.get("/topology", response_class=HTMLResponse)
 async def topology_page(
     request: Request,
@@ -579,11 +765,17 @@ async def topology_page(
         .order_by(DeviceLink.link_type, DeviceLink.id)
         .all()
     )
+    inferred_links = _auto_inferred_links(devices, links)
+    topology_links = [*links, *inferred_links]
+    live_routes = _live_routed_paths(devices, topology_links)
     return templates.TemplateResponse(request, "topology.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
         "devices": devices,
-        "links": links,
+        "links": topology_links,
+        "manual_links": links,
+        "inferred_links": inferred_links,
+        "live_routes": live_routes,
         "device_types": DEVICE_TYPES,
         "link_types": LINK_TYPES,
         "toast": request.query_params.get("toast", ""),

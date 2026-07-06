@@ -252,6 +252,15 @@
   - `snmp_sync.poll_snmp_device()` stores splitter routes on **output** ports as before, but stores combiner routes on **input** ports (`DevicePort.observed_routed_from` means "routed to output" for combiners). It also clears stale splitter-style output observations on combiners, so a poll after upgrade removes the old "every output ← I15" display.
   - The routing page branches on combiner mode: Outputs show the inputs combined into each output, Inputs show each input's destination output. Alias updates now mark the poll as changed so real VTRC names persist and bulk/background poll counts are honest.
   - No schema change; the existing observed routing field is reused with direction-specific interpretation.
+- **0.19.4 — Topology live routed paths:**
+  - `/devices/topology` now creates display-only inferred RF links with `_auto_inferred_links()`: if a splitter/combiner/switch port alias contains a registered non-routing device name (punctuation-insensitive, e.g. `CBM-400 1 Tx` → `CBM-400-1`), the topology diagram treats it as connected to that matrix port. Manual `DeviceLink` rows take precedence for occupied matrix ports; inferred links are not written to the DB.
+  - The page derives end-to-end RF paths through routing devices with `_live_routed_paths()`: physical or inferred topology links provide the cabled matrix input/output ports, and `DevicePort.observed_routed_from` provides the live SNMP internal route.
+  - Splitter/switch paths are derived from output-port observations (`output -> input`); combiner paths are derived from input-port observations (`input -> output`, from the 0.19.3 VTRC fix). The page shows a **Live Routed Paths** table and draws dashed white overlays on the SVG diagram for the RF/All tabs.
+  - No schema change. The route overlay appears when both sides of a routed matrix port are represented by manual or inferred topology links with port indices.
+- **0.19.5 — Device form relevance cleanup:**
+  - The Devices add/edit form now hides irrelevant sections dynamically: matrix Inputs/Outputs only for routing devices, EBEM credentials/sync only for CBM/EBEM modems (name/model contains `cbm` or `ebem`, punctuation-insensitive), and SNMP monitoring only for splitter/combiner matrices.
+  - Server-side create/update mirrors the UI: non-EBEM devices have CBM sync/credentials cleared or ignored; non-SNMP-supported devices have SNMP config cleared or ignored; non-matrix devices keep simple `1 in / 1 out` counts instead of 16x16 defaults.
+  - SNMP poll/test/diagnostics are currently splitter/combiner-only (`SNMP_MONITOR_TYPES`); `switch` remains a routing type for planned/manual matrix UI, but read-only SNMP support is deferred until a supported switch profile is added.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.

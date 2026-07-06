@@ -4,7 +4,7 @@
 {% block content %}
 {# ── Reusable device form macro ── #}
 {% macro device_form(d, device_types, action, submit_label) %}
-<form method="post" action="{{ action }}" class="row g-2 align-items-end">
+<form method="post" action="{{ action }}" class="row g-2 align-items-end device-form">
   <div class="col-md-2">
     <label class="form-label small mb-0">Name <span class="text-muted">(instance)</span></label>
     <input type="text" class="form-control form-control-sm" name="name"
@@ -17,7 +17,7 @@
   </div>
   <div class="col-md-2">
     <label class="form-label small mb-0">Type</label>
-    <select class="form-select form-select-sm" name="device_type">
+    <select class="form-select form-select-sm device-type-select" name="device_type">
       {% for val, lbl in device_types %}
       <option value="{{ val }}" {% if d and d.device_type == val %}selected{% endif %}>{{ lbl }}</option>
       {% endfor %}
@@ -38,12 +38,12 @@
     <input type="text" class="form-control form-control-sm" name="location"
            value="{{ d.location or '' if d else '' }}">
   </div>
-  <div class="col-md-1">
+  <div class="col-md-1 matrix-field">
     <label class="form-label small mb-0">Inputs</label>
     <input type="number" class="form-control form-control-sm" name="num_inputs"
            value="{{ d.num_inputs if d else 16 }}" min="0" max="128">
   </div>
-  <div class="col-md-1">
+  <div class="col-md-1 matrix-field">
     <label class="form-label small mb-0">Outputs</label>
     <input type="number" class="form-control form-control-sm" name="num_outputs"
            value="{{ d.num_outputs if d else 16 }}" min="0" max="128">
@@ -56,7 +56,7 @@
         Has web GUI (link opens <code>http://&lt;host&gt;/</code>)
       </label>
     </div>
-    <div class="form-check mb-0">
+    <div class="form-check mb-0 ebem-field">
       <input class="form-check-input" type="checkbox" name="cbm_sync_enabled" value="1" id="cbm-sync-{{ action | replace('/', '_') }}"
              {% if d and d.cbm_sync_enabled %}checked{% endif %}>
       <label class="form-check-label small" for="cbm-sync-{{ action | replace('/', '_') }}">
@@ -64,7 +64,7 @@
       </label>
     </div>
   </div>
-  <div class="col-12">
+  <div class="col-12 ebem-field">
     <div class="row g-2 align-items-end">
       <div class="col-md-3">
         <label class="form-label small mb-0">EBEM Username</label>
@@ -91,7 +91,7 @@
     </div>
   </div>
   {# ── SNMP read-only monitoring (splitter/combiner/switch matrices) ── #}
-  <div class="col-12 border-top pt-2 mt-1">
+  <div class="col-12 border-top pt-2 mt-1 snmp-field">
     <div class="row g-2 align-items-end">
       <div class="col-12">
         <div class="form-check mb-0">
@@ -162,7 +162,7 @@
   </div>
   <div class="col-12 d-flex align-items-center gap-3 flex-wrap">
     <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check2 me-1"></i>{{ submit_label }}</button>
-    <span class="text-muted small">Host + Check Port enable the reachability badge. Inputs/Outputs for routing matrix.</span>
+    <span class="text-muted small form-help-text">Host + Check Port enable the reachability badge.</span>
   </div>
 </form>
 {% endmacro %}
@@ -232,7 +232,7 @@
             {% endif %}
           </td>
           <td>
-            {% if d.device_type == 'modem' and d.cbm_sync_enabled %}
+            {% if d.id in ebem_device_ids and d.cbm_sync_enabled %}
               {% if d.cbm_username and d.cbm_password_encrypted %}
               <span class="badge bg-success">Ready</span>
               {% else %}
@@ -249,14 +249,14 @@
                 {{ d.cbm_last_sync_error[:60] }}{% if d.cbm_last_sync_error|length > 60 %}…{% endif %}
               </div>
               {% endif %}
-            {% elif d.device_type == 'modem' %}
+            {% elif d.id in ebem_device_ids %}
               <span class="text-muted small">Disabled</span>
             {% else %}
               <span class="text-muted small">—</span>
             {% endif %}
           </td>
           <td>
-            {% if d.is_routing and d.snmp_enabled %}
+            {% if d.device_type in snmp_monitor_types and d.snmp_enabled %}
               {% if d.snmp_community_encrypted or d.snmp_v3_user %}
               <span class="badge bg-success">Ready</span>
               {% else %}
@@ -278,7 +278,7 @@
                 {{ d.snmp_last_poll_error[:60] }}{% if d.snmp_last_poll_error|length > 60 %}…{% endif %}
               </div>
               {% endif %}
-            {% elif d.is_routing %}
+            {% elif d.device_type in snmp_monitor_types %}
               <span class="text-muted small">Disabled</span>
             {% else %}
               <span class="text-muted small">—</span>
@@ -291,14 +291,14 @@
             </a>
             {% endif %}
             {% if user.role == 'administrator' %}
-            {% if d.device_type == 'modem' %}
+            {% if d.id in ebem_device_ids %}
             <form method="post" action="/devices/{{ d.id }}/cbm/test" class="d-inline">
               <button type="submit" class="btn btn-sm btn-outline-success py-0 px-1" title="Test read-only CBM poll">
                 <i class="bi bi-plug"></i>
               </button>
             </form>
             {% endif %}
-            {% if d.is_routing and d.snmp_enabled %}
+            {% if d.device_type in snmp_monitor_types and d.snmp_enabled %}
             <form method="post" action="/devices/{{ d.id }}/snmp/test" class="d-inline">
               <button type="submit" class="btn btn-sm btn-outline-success py-0 px-1" title="Test read-only SNMP poll">
                 <i class="bi bi-plug-fill"></i>
@@ -351,6 +351,51 @@ const STATUS_MAP = {
   down:    {cls: 'bg-danger',    icon: 'bi-x-circle',        text: 'Down'},
   unknown: {cls: 'bg-secondary', icon: 'bi-question-circle', text: 'No check'},
 };
+const MATRIX_TYPES = new Set(['splitter', 'combiner', 'switch']);
+const SNMP_TYPES = new Set(['splitter', 'combiner']);
+
+function normaliseDeviceName(value) {
+  return (value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function isEbEmForm(form) {
+  const type = form.querySelector('[name="device_type"]')?.value || '';
+  if (type !== 'modem') return false;
+  const name = normaliseDeviceName(form.querySelector('[name="name"]')?.value || '');
+  const model = normaliseDeviceName(form.querySelector('[name="device_model"]')?.value || '');
+  const combined = name + model;
+  return combined.includes('cbm') || combined.includes('ebem');
+}
+
+function setSectionVisible(form, selector, visible) {
+  form.querySelectorAll(selector).forEach(el => {
+    el.classList.toggle('d-none', !visible);
+    el.querySelectorAll('input, select, textarea').forEach(field => {
+      if (!visible && (field.type === 'checkbox' || field.type === 'radio')) field.checked = false;
+    });
+  });
+}
+
+function updateDeviceFormSections(form) {
+  const type = form.querySelector('[name="device_type"]')?.value || '';
+  const isMatrix = MATRIX_TYPES.has(type);
+  const canSnmp = SNMP_TYPES.has(type);
+  const canEbEm = isEbEmForm(form);
+  setSectionVisible(form, '.matrix-field', isMatrix);
+  setSectionVisible(form, '.snmp-field', canSnmp);
+  setSectionVisible(form, '.ebem-field', canEbEm);
+  const help = form.querySelector('.form-help-text');
+  if (help) {
+    if (isMatrix) {
+      help.textContent = 'Host + Check Port enable reachability. Inputs/Outputs define the matrix size.';
+    } else if (canEbEm) {
+      help.textContent = 'Host + Check Port enable reachability. EBEM sync is available for CBM/EBEM modems.';
+    } else {
+      help.textContent = 'Host + Check Port enable the reachability badge.';
+    }
+  }
+}
+
 function refreshDeviceStatus() {
   fetch('/devices/status').then(r => r.json()).then(map => {
     document.querySelectorAll('[data-device-status]').forEach(el => {
@@ -364,6 +409,16 @@ function refreshDeviceStatus() {
   }).catch(() => {});
 }
 document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.device-form').forEach(form => {
+    updateDeviceFormSections(form);
+    ['change', 'input'].forEach(evt => {
+      form.addEventListener(evt, event => {
+        if (event.target.matches('[name="device_type"], [name="name"], [name="device_model"]')) {
+          updateDeviceFormSections(form);
+        }
+      });
+    });
+  });
   refreshDeviceStatus();
   setInterval(refreshDeviceStatus, 15000);
 });
