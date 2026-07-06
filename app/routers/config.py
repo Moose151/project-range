@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import require_supervisor, get_current_range_state, is_testing_state
 from app.config import AUDIT_ARCHIVE_DIR, DATABASE_URL, SERIAL_ARCHIVE_DIR
+from app.file_security import permission_status
 from app.models import AuditLog, ModulationType, FecType, SignalSource, AntennaType, Signal, FrequencyTemplate, User, DutyRole, RFDevice
 from app.settings import (
     AUDIT_LIVE_RECORD_LIMIT_KEY,
@@ -83,6 +84,9 @@ async def config_page(
     freq_templates = db.query(FrequencyTemplate).order_by(FrequencyTemplate.name).all()
     duty_roles = db.query(DutyRole).order_by(DutyRole.display_order, DutyRole.name).all()
     db_path = _sqlite_db_path()
+    db_permissions = permission_status(db_path) if db_path else {"mode": "n/a", "secure": None, "note": "Non-SQLite database."}
+    audit_dir_permissions = permission_status(AUDIT_ARCHIVE_DIR, directory=True)
+    serial_dir_permissions = permission_status(SERIAL_ARCHIVE_DIR, directory=True)
     archive_files = _archive_files(AUDIT_ARCHIVE_DIR, "audit") + _archive_files(SERIAL_ARCHIVE_DIR, "serial")
     return templates.TemplateResponse(request, "config.html", {
         "user": current_user,
@@ -111,6 +115,9 @@ async def config_page(
             "serial_archive_dir": str(SERIAL_ARCHIVE_DIR),
             "audit_archive_count": len(_archive_files(AUDIT_ARCHIVE_DIR, "audit")),
             "serial_archive_count": len(_archive_files(SERIAL_ARCHIVE_DIR, "serial")),
+            "database_permissions": db_permissions,
+            "audit_archive_permissions": audit_dir_permissions,
+            "serial_archive_permissions": serial_dir_permissions,
         },
         "archive_files": archive_files,
         "page": "config",

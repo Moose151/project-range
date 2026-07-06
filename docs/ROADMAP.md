@@ -260,9 +260,10 @@ fully trusted.
   cookie-age ceiling server-side, and handles malformed timestamps as expired.
   Re-review the 30-day "remember this terminal" policy operationally — fine for
   a locked ops room, risky on any shared/general PC.
-- [ ] **Least-privilege data store:** on Postgres use a dedicated app role with
-  minimal grants; on SQLite lock down file permissions. Restrict who can read the
-  DB/backups (they contain the full audit trail).
+- [x] **Least-privilege data store:** SQLite DB, archive directories, and generated
+  backup files are hardened to owner-only filesystem permissions where the host
+  allows it; Admin Config reports the current DB/archive modes. If/when Postgres
+  is adopted, use a dedicated app role with minimal grants.
 - [ ] **Network exposure:** bind the service to the range subnet only, firewall to
   known client hosts, and front it with a reverse proxy. Do not expose it beyond
   the range LAN.

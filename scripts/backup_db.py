@@ -30,12 +30,20 @@ def main() -> int:
     args = parse_args()
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        out_dir.chmod(0o700)
+    except OSError as exc:
+        print(f"WARNING: could not set owner-only permissions on {out_dir}: {exc}")
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%SZ")
     dest = out_dir / f"range-{stamp}.db"
     source = f"{args.service}:{args.db_path}"
 
     subprocess.run(["docker", "compose", "cp", source, str(dest)], check=True)
+    try:
+        dest.chmod(0o600)
+    except OSError as exc:
+        print(f"WARNING: could not set owner-only permissions on {dest}: {exc}")
     print(f"Backed up {source} -> {dest}")
 
     if args.keep > 0:

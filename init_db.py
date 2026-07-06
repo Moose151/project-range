@@ -5,7 +5,9 @@ Re-running is safe — it skips existing data and only adds missing tables/seed 
 """
 from datetime import datetime
 
+from app.config import AUDIT_ARCHIVE_DIR, DATABASE_URL, SERIAL_ARCHIVE_DIR
 from app.database import engine, Base
+from app.file_security import harden_sqlite_storage
 from app.models import (
     User, RangeStateLog, Signal, ModulationType, FecType, SignalSource, AntennaType,
     LogSession, SignalPackage, SignalPackageEntry, Serial, SerialPackage,
@@ -581,6 +583,12 @@ def main():
 
     with engine.connect() as conn:
         _migrate(conn)
+
+    permission_errors = harden_sqlite_storage(DATABASE_URL, [AUDIT_ARCHIVE_DIR, SERIAL_ARCHIVE_DIR])
+    if permission_errors:
+        print("WARNING: could not harden one or more data/archive paths:")
+        for error in permission_errors:
+            print(f"  - {error}")
 
     with Session(engine) as db:
         # Default administrator

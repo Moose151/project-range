@@ -63,7 +63,8 @@ python scripts/backup_db.py --keep 14
 
 Schedule that command with cron or Windows Task Scheduler from the repository
 directory. The script uses `docker compose cp`, so the app can keep using the
-named Docker volume.
+named Docker volume. It also makes the local `backups/` directory and copied
+`.db` backup files owner-only where the host filesystem permits it.
 
 Restore procedure:
 
@@ -79,7 +80,9 @@ docker compose start web
 ```
 
 Keep backups access-controlled. They contain the operational log, audit history,
-users, and password hashes.
+users, and password hashes. Admin Config → System Health shows the live SQLite
+database and server archive permission modes; investigate any warning that
+group/other permissions are present.
 
 ## Configuration
 

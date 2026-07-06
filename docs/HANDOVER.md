@@ -279,6 +279,7 @@
   - The New Package screen can duplicate an existing package directly via the "Start from existing" card.
 - **0.19.8 — Session hardening:**
   - `app.auth.start_authenticated_session()` now clears pre-login session state before writing authenticated claims, adds `session_issued_at`, and `session_is_expired()` treats malformed timestamps or sessions older than `SESSION_MAX_AGE_DAYS` as expired. Login still rotates `active_session_token` to invalidate previous browsers.
+  - `app/file_security.py` hardens SQLite DB and archive directories to owner-only permissions where possible. `scripts/backup_db.py` chmods backup output to owner-only, and Admin Config → System Health reports DB/archive permission modes.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.

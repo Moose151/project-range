@@ -711,10 +711,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 <dd class="col-7 text-break">{{ system_health.database }}</dd>
                 <dt class="col-5 text-muted">DB size</dt>
                 <dd class="col-7">{{ system_health.database_size_mb if system_health.database_size_mb is not none else 'n/a' }} MB</dd>
+                <dt class="col-5 text-muted">DB perms</dt>
+                <dd class="col-7">
+                  <span class="badge {% if system_health.database_permissions.secure %}bg-success{% elif system_health.database_permissions.secure is none %}bg-secondary{% else %}bg-warning text-dark{% endif %}">
+                    {{ system_health.database_permissions.mode }}
+                  </span>
+                  <span class="text-muted d-block">{{ system_health.database_permissions.note }}</span>
+                </dd>
                 <dt class="col-5 text-muted">Audit rows</dt>
                 <dd class="col-7">{{ system_health.live_audit_count }} live / {{ system_health.testing_audit_count }} testing</dd>
                 <dt class="col-5 text-muted">Archives</dt>
                 <dd class="col-7">{{ system_health.audit_archive_count }} audit / {{ system_health.serial_archive_count }} serial</dd>
+                <dt class="col-5 text-muted">Archive perms</dt>
+                <dd class="col-7">
+                  <span class="badge {% if system_health.audit_archive_permissions.secure and system_health.serial_archive_permissions.secure %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                    audit {{ system_health.audit_archive_permissions.mode }} / serial {{ system_health.serial_archive_permissions.mode }}
+                  </span>
+                </dd>
               </dl>
             </div>
           </div>
