@@ -37,7 +37,7 @@ CBM_AUTO_SYNC_SECONDS = int(os.environ.get("CBM_AUTO_SYNC_SECONDS", "5"))
 SNMP_AUTO_SYNC_SECONDS = int(os.environ.get("SNMP_AUTO_SYNC_SECONDS", "0"))
 # Single source of truth for the app version (shown in the top-right UI and
 # reported as the FastAPI app version). Bump on each release.
-APP_VERSION = "0.19.0"
+APP_VERSION = "0.19.1"
 
 FREQUENCY_BANDS = {
     "C":  {"tx_min": 5.850, "tx_max": 6.725, "rx_min": 3.625, "rx_max": 4.200},

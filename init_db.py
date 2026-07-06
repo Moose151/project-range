@@ -135,6 +135,8 @@ def _migrate(conn):
         "ALTER TABLE rf_devices ADD COLUMN snmp_last_poll_status VARCHAR(32)",
         "ALTER TABLE rf_devices ADD COLUMN snmp_last_poll_error TEXT",
         "ALTER TABLE rf_devices ADD COLUMN snmp_system_alarm VARCHAR(16)",
+        "ALTER TABLE rf_devices ADD COLUMN snmp_ignored_modules TEXT",
+        "ALTER TABLE rf_devices ADD COLUMN snmp_modules_json TEXT",
         "ALTER TABLE device_ports ADD COLUMN observed_routed_from INTEGER",
         "ALTER TABLE device_ports ADD COLUMN observed_label VARCHAR(128)",
     ]

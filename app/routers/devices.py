@@ -3,15 +3,22 @@ from datetime import datetime
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, PlainTextResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, is_testing_state, require_supervisor
 from app.cbm import CBMError, poll_cbm_ssh
 from app.cbm_sync import sync_active_cbms
-from app.snmp import SNMPError, poll_genus_matrix
-from app.snmp_sync import poll_active_snmp_devices, poll_snmp_device
+import json
+
+from app.snmp import (
+    SNMPError, poll_genus_matrix, snmp_diagnostic_walk, ENTERPRISE_ROOT,
+    effective_alarm_from_modules,
+)
+from app.snmp_sync import (
+    poll_active_snmp_devices, poll_snmp_device, ignored_module_idxs, _device_credentials,
+)
 from app.crypto import decrypt_secret, encrypt_secret
 from app.models import RFDevice, DevicePort, DeviceLink, AuditLog, User
 from app.templating import templates
@@ -348,6 +355,61 @@ async def device_snmp_test(
         )
 
 
+@router.post("/{dev_id}/snmp/ignore-modules")
+async def device_snmp_ignore_modules(
+    dev_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    """Set which module indices have their fault acknowledged/ignored (e.g. empty PSU)."""
+    dev = db.query(RFDevice).filter(RFDevice.id == dev_id, RFDevice.is_testing == is_testing_state(db)).first()
+    if not dev:
+        return RedirectResponse("/devices", status_code=302)
+    form = await request.form()
+    idxs = sorted({
+        int(v) for k, v in form.multi_items()
+        if k == "ignore_module" and str(v).isdigit()
+    })
+    dev.snmp_ignored_modules = ",".join(str(i) for i in idxs) or None
+    # Recompute the effective alarm immediately from the cached module table.
+    if dev.snmp_modules_json:
+        try:
+            modules = json.loads(dev.snmp_modules_json)
+            dev.snmp_system_alarm = effective_alarm_from_modules(modules, set(idxs), fallback=dev.snmp_system_alarm)
+        except (ValueError, TypeError):
+            pass
+    db.add(AuditLog(user_id=current_user.id, action_type="SNMP_MODULE_MUTE",
+                    entity_type="RFDevice", entity_id=dev.id,
+                    new_value=f"{dev.name}: ignored modules [{dev.snmp_ignored_modules or ''}]"))
+    db.commit()
+    return RedirectResponse(f"/devices/{dev_id}/routing?toast=Module+acknowledgements+saved", status_code=302)
+
+
+@router.get("/{dev_id}/snmp/diagnostics", response_class=PlainTextResponse)
+async def device_snmp_diagnostics(
+    dev_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    """Read-only raw SNMP walk of a subtree — for diagnosing what a device exposes."""
+    dev = db.query(RFDevice).filter(RFDevice.id == dev_id, RFDevice.is_testing == is_testing_state(db)).first()
+    if not dev or dev.device_type not in ROUTING_TYPES:
+        return PlainTextResponse("Device not found or not a routing device.", status_code=404)
+    community, v3 = _device_credentials(dev)
+    if not dev.host or (not community and not v3):
+        return PlainTextResponse("SNMP host/credentials are not configured for this device.", status_code=400)
+    base_oid = (request.query_params.get("base") or "").strip() or ENTERPRISE_ROOT
+    header = f"# SNMP walk of {dev.name} ({dev.host}) base={base_oid}\n"
+    try:
+        rows = snmp_diagnostic_walk(dev.host, port=dev.snmp_port or 161, community=community, v3=v3, base_oid=base_oid)
+    except SNMPError as exc:
+        return PlainTextResponse(header + f"# walk failed: {exc}\n", status_code=200)
+    body = "\n".join(f"{oid} = {val}" for oid, val in rows)
+    return PlainTextResponse(header + f"# {len(rows)} rows\n\n" + body + "\n")
+
+
 @router.post("/{dev_id}/delete")
 async def device_delete(
     dev_id: int,
@@ -364,6 +426,16 @@ async def device_delete(
 
 
 # ── Routing matrix ────────────────────────────────────────────────────────────
+
+def _load_snmp_modules(dev: RFDevice) -> list[dict]:
+    """Parse the cached SNMP module table JSON for the health/mute panel."""
+    if not dev.snmp_modules_json:
+        return []
+    try:
+        return json.loads(dev.snmp_modules_json)
+    except (ValueError, TypeError):
+        return []
+
 
 def _ensure_ports(db: Session, dev: RFDevice):
     """Create any missing input/output port rows for the device's current counts."""
@@ -420,6 +492,9 @@ async def device_routing_page(
         "input_hints": input_hints,
         "output_hints": output_hints,
         "input_labels": {p.idx: (p.label or input_hints.get(p.idx) or "") for p in inputs},
+        "snmp_modules": _load_snmp_modules(dev),
+        "ignored_modules": ignored_module_idxs(dev),
+        "has_observed_routing": any(p.observed_routed_from is not None for p in outputs),
         "toast": request.query_params.get("toast", ""),
         "page": "devices",
     })

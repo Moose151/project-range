@@ -9,7 +9,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.snmp import (  # noqa: E402
-    OID_HAWK_OUTPUT_ROUTING,
+    MATRIX_PROFILES,
     OID_MODULE_INFO_STATUS,
     OID_MODULE_INFO_ALIAS,
     OID_MODULE_INFO_MODEL,
@@ -20,6 +20,8 @@ from app.snmp import (  # noqa: E402
     build_snapshot,
 )
 
+VTR101 = next(p for p in MATRIX_PROFILES if p.name == "vtr101")  # 16 route columns
+
 
 def test_oid_tail():
     assert _oid_tail("1.2.3.4", "1.2.3") == [4]
@@ -28,45 +30,58 @@ def test_oid_tail():
     assert _oid_tail("1.2.30", "1.2.3") is None  # not a real child (prefix guard)
 
 
-def test_parse_routing():
-    # column 2 (Route1Set), row 1 -> output 1; column 3 row 1 -> output 2; index col 1 ignored.
+def test_parse_routing_vtr101():
+    base = VTR101.routing_oid  # 16 columns -> column c maps to output (c-1) on row 1
     vb = [
-        (f"{OID_HAWK_OUTPUT_ROUTING}.1.1", "1"),   # index column -> ignored
-        (f"{OID_HAWK_OUTPUT_ROUTING}.2.1", "5"),   # out 1 <- in 5
-        (f"{OID_HAWK_OUTPUT_ROUTING}.3.1", "0"),   # out 2 <- none
-        (f"{OID_HAWK_OUTPUT_ROUTING}.9.1", "12"),  # out 8 <- in 12 (Route8Set)
-        (f"{OID_HAWK_OUTPUT_ROUTING}.2.2", "7"),   # row 2 -> out 9 <- in 7
+        (f"{base}.1.1", "1"),    # index column -> ignored
+        (f"{base}.2.1", "5"),    # Route1Set  -> out 1 <- in 5
+        (f"{base}.3.1", "0"),    # Route2Set  -> out 2 <- terminated
+        (f"{base}.17.1", "13"),  # Route16Set -> out 16 <- in 13
     ]
-    routing = parse_routing(vb)
+    routing = parse_routing(vb, base, VTR101.route_cols)
     assert routing[1] == 5, routing
     assert routing[2] == 0, routing
-    assert routing[8] == 12, routing
-    assert routing[9] == 7, routing
+    assert routing[16] == 13, routing
 
 
-def test_parse_modules():
+def test_parse_modules_severity():
     vb = [
-        (f"{OID_MODULE_INFO_STATUS}.1", "O"),
-        (f"{OID_MODULE_INFO_ALIAS}.1", "Matrix In"),
-        (f"{OID_MODULE_INFO_MODEL}.1", "GNS-HWK"),
-        (f"{OID_MODULE_INFO_STATUS}.2", "F"),
+        (f"{OID_MODULE_INFO_STATUS}.1", "0"),   # OK
+        (f"{OID_MODULE_INFO_ALIAS}.1", "PSU1"),
+        (f"{OID_MODULE_INFO_MODEL}.1", "MPS1170"),
+        (f"{OID_MODULE_INFO_STATUS}.2", "3"),   # General Alarm -> fault
+        (f"{OID_MODULE_INFO_ALIAS}.2", "PSU2"),
     ]
     modules = parse_modules(vb)
-    assert modules[0] == {"status": "O", "alias": "Matrix In", "model": "GNS-HWK"}, modules
-    assert modules[1] == {"status": "F"}, modules
+    assert modules[0]["idx"] == 1 and modules[0]["severity"] == "ok"
+    assert modules[0]["status_text"] == "ok"
+    assert modules[1]["idx"] == 2 and modules[1]["severity"] == "fault"
+    assert modules[1]["alias"] == "PSU2"
+
+
+def test_effective_alarm_mutes_module():
+    # PSU2 (idx 2) faulted; muting it drops the effective alarm to ok.
+    module_vb = [
+        (f"{OID_MODULE_INFO_STATUS}.1", "0"),
+        (f"{OID_MODULE_INFO_STATUS}.2", "3"),
+    ]
+    snap = build_snapshot([], module_vb, "1", VTR101)  # device rollup says fault
+    assert snap.effective_alarm(set()) == "fault"       # nothing muted
+    assert snap.effective_alarm({2}) == "ok"            # PSU2 muted -> ok
 
 
 def test_build_snapshot():
-    routing_vb = [(f"{OID_HAWK_OUTPUT_ROUTING}.2.1", "3")]
-    module_vb = [(f"{OID_MODULE_INFO_STATUS}.1", "F")]
-    snap = build_snapshot(routing_vb, module_vb, "1")  # 1 -> fault
+    base = VTR101.routing_oid
+    routing_vb = [(f"{base}.2.1", "3")]
+    module_vb = [(f"{OID_MODULE_INFO_STATUS}.1", "3")]
+    snap = build_snapshot(routing_vb, module_vb, "1", VTR101)  # 1 -> fault
     assert snap.routing == {1: 3}
     assert snap.system_alarm == "fault"
+    assert snap.profile == "vtr101"
     assert snap.raw[OID_SYSTEM_SUMMARY_ALARM] == "1"
     summ = snap.summary
     assert summ["outputs_routed"] == 1
-    assert summ["system_alarm"] == "fault"
-    assert len(summ["module_faults"]) == 1  # status "F" is a fault
+    assert len(summ["module_faults"]) == 1  # status "3" is a fault
 
 
 def main():

@@ -8,6 +8,7 @@ Read-only: never issues SNMP SET.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -30,6 +31,16 @@ class SNMPSyncResult:
 
     def add_error(self, message: str) -> None:
         self.errors.append(message)
+
+
+def ignored_module_idxs(dev: RFDevice) -> set[int]:
+    """Parse the device's CSV of acknowledged/ignored module indices."""
+    result: set[int] = set()
+    for part in (dev.snmp_ignored_modules or "").split(","):
+        part = part.strip()
+        if part.isdigit():
+            result.add(int(part))
+    return result
 
 
 def _device_credentials(dev: RFDevice) -> tuple[str | None, dict | None]:
@@ -76,7 +87,10 @@ def poll_snmp_device(db: Session, dev: RFDevice) -> tuple[MatrixSnapshot | None,
     dev.snmp_last_poll_at = datetime.utcnow()
     dev.snmp_last_poll_status = "ok"
     dev.snmp_last_poll_error = None
-    dev.snmp_system_alarm = snapshot.system_alarm
+    # Effective alarm is derived from the module table minus acknowledged modules
+    # (e.g. an empty PSU slot), so a benign known fault does not stay red forever.
+    dev.snmp_system_alarm = snapshot.effective_alarm(ignored_module_idxs(dev))
+    dev.snmp_modules_json = json.dumps(snapshot.modules) if snapshot.modules else None
     return snapshot, changed
 
 

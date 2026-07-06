@@ -4,9 +4,16 @@ This document records the major user-facing changes shipped in each beta version
 For planned work, see [ROADMAP.md](ROADMAP.md). For deep implementation notes and
 handover details, see [HANDOVER.md](HANDOVER.md).
 
-Current version: **0.19.0**
+Current version: **0.19.1**
 
 ---
+
+## 0.19.1 — SNMP Matrix Support (VTR/VTRC) + Acknowledge Module Faults
+
+- **Live routing now works on VTR-101 / VTRC-101 matrices** (and VTR-100/102, VTRC-100/102, Hawk). The client auto-detects the matrix family and reads its routing table, fixing the "all outputs show none" issue on those units.
+- **Acknowledge/ignore module faults:** the routing page now shows a per-module health panel (e.g. SLOT/CPU/PSU1/PSU2). You can tick a module — such as an empty or unpowered **PSU2 slot** — to acknowledge its fault so it no longer drives the system status to red. The displayed system status is derived from the non-ignored modules.
+- Added an admin **Diagnostics** button (raw SNMP walk) on the routing page to inspect exactly what a device exposes.
+- The Live (SNMP) routing column now shows a clear note instead of misleading "none" when a device returns no routing data.
 
 ## 0.19.0 — Splitter/Combiner Live Monitoring (SNMP)
 

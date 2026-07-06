@@ -34,13 +34,59 @@
     <span class="text-danger small" title="{{ device.snmp_last_poll_error }}">{{ device.snmp_last_poll_error[:80] }}{% if device.snmp_last_poll_error|length > 80 %}…{% endif %}</span>
     {% endif %}
     {% if user.role == 'administrator' %}
-    <form method="post" action="/devices/{{ device.id }}/snmp/test" class="ms-auto">
-      <button type="submit" class="btn btn-sm btn-outline-success"><i class="bi bi-plug-fill me-1"></i>Poll now</button>
-    </form>
+    <div class="ms-auto d-flex gap-2">
+      <a href="/devices/{{ device.id }}/snmp/diagnostics" target="_blank" rel="noopener"
+         class="btn btn-sm btn-outline-secondary" title="Raw SNMP walk (for diagnosing OIDs)">
+        <i class="bi bi-bug me-1"></i>Diagnostics
+      </a>
+      <form method="post" action="/devices/{{ device.id }}/snmp/test">
+        <button type="submit" class="btn btn-sm btn-outline-success"><i class="bi bi-plug-fill me-1"></i>Poll now</button>
+      </form>
+    </div>
     {% endif %}
   </div>
+
+  {# ── Module health + acknowledge (mute) faults such as an empty PSU slot ── #}
+  {% if snmp_modules %}
+  <div class="card-body py-2 border-top">
+    <form method="post" action="/devices/{{ device.id }}/snmp/ignore-modules">
+      <div class="d-flex align-items-center mb-2 gap-2 flex-wrap">
+        <span class="small fw-semibold">Module health</span>
+        <span class="text-muted small">Tick a module to acknowledge (ignore) its fault so it stops flagging the system status.</span>
+        {% if user.role == 'administrator' %}
+        <button type="submit" class="btn btn-sm btn-outline-primary ms-auto"><i class="bi bi-check2 me-1"></i>Save acknowledgements</button>
+        {% endif %}
+      </div>
+      <div class="row g-2">
+        {% for m in snmp_modules %}
+        <div class="col-md-6 col-lg-4">
+          <div class="d-flex align-items-center gap-2 border rounded px-2 py-1">
+            {% if user.role == 'administrator' %}
+            <input class="form-check-input mt-0" type="checkbox" name="ignore_module" value="{{ m.idx }}"
+                   id="mod-{{ m.idx }}" {% if m.idx in ignored_modules %}checked{% endif %}>
+            {% endif %}
+            <label class="small flex-grow-1 mb-0" for="mod-{{ m.idx }}">
+              <span class="fw-semibold">{{ m.alias or ('Module ' ~ m.idx) }}</span>
+              {% if m.model %}<span class="text-muted">· {{ m.model }}</span>{% endif %}
+            </label>
+            <span class="badge {% if m.severity == 'ok' %}bg-success{% elif m.severity == 'warning' %}bg-warning text-dark{% else %}bg-danger{% endif %} text-capitalize">
+              {{ m.status_text or m.status }}
+            </span>
+            {% if m.idx in ignored_modules %}<span class="badge bg-secondary" title="Fault acknowledged / ignored">muted</span>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
   <div class="card-footer py-1 text-muted small">
+    {% if device.snmp_last_poll_at and not has_observed_routing %}
+    <span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>No live routing data was returned by this device — it may not be a supported crossbar matrix, or uses a different routing table. Use <b>Diagnostics</b> to inspect what it exposes.</span>
+    {% else %}
     Observed routing is read live from the matrix and compared against the planned routing below. Read-only — the app never changes the matrix.
+    {% endif %}
   </div>
 </div>
 {% endif %}
@@ -88,7 +134,7 @@
               {% for p in outputs %}
               {% set hint = output_hints.get(p.idx) if output_hints is defined else none %}
               {% set observed = p.observed_routed_from %}
-              {% set mismatch = device.snmp_enabled and device.snmp_last_poll_at and (observed or none) != (p.routed_from or none) %}
+              {% set mismatch = device.snmp_enabled and device.snmp_last_poll_at and has_observed_routing and (observed or none) != (p.routed_from or none) %}
               <tr {% if mismatch %}class="table-warning"{% endif %}>
                 <td class="fw-semibold text-warning">{{ p.idx }}</td>
                 <td>
@@ -103,7 +149,7 @@
                 </td>
                 {% if device.snmp_enabled %}
                 <td class="small">
-                  {% if not device.snmp_last_poll_at %}
+                  {% if not device.snmp_last_poll_at or not has_observed_routing %}
                     <span class="text-muted">—</span>
                   {% elif observed %}
                     <span class="{% if mismatch %}text-dark fw-semibold{% else %}text-success{% endif %}">

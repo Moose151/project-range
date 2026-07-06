@@ -475,7 +475,11 @@ class RFDevice(Base):
     snmp_last_poll_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     snmp_last_poll_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     snmp_last_poll_error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    snmp_system_alarm: Mapped[str | None] = mapped_column(String(16), nullable=True)  # ok|fault|warning
+    snmp_system_alarm: Mapped[str | None] = mapped_column(String(16), nullable=True)  # effective: ok|warning|fault
+    # Module indices (CSV) whose fault is acknowledged/ignored (e.g. an empty PSU slot),
+    # and a JSON cache of the last-polled module table for the health panel + mute UI.
+    snmp_ignored_modules: Mapped[str | None] = mapped_column(Text, nullable=True)
+    snmp_modules_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     location: Mapped[str | None] = mapped_column(String(128), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     num_inputs: Mapped[int] = mapped_column(Integer, default=16)
