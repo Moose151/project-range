@@ -9,6 +9,10 @@
   </a>
 </div>
 
+{% if toast %}
+<div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
+
 <!-- Search -->
 <form method="get" action="/history" class="card border-secondary mb-3">
   <div class="card-body py-2">
@@ -58,6 +62,14 @@
             <a href="/history/{{ serial.id }}/export/xlsx" class="btn btn-sm btn-outline-secondary py-0 px-2">
               <i class="bi bi-file-earmark-spreadsheet"></i>
             </a>
+            {% if user.role == 'administrator' %}
+            <form method="post" action="/history/{{ serial.id }}/archive" class="d-inline"
+                  onsubmit="return confirm('Archive {{ serial.title }} to a server spreadsheet and remove it from app history?')">
+              <button type="submit" class="btn btn-sm btn-outline-warning py-0 px-2" title="Archive to server and remove from app">
+                <i class="bi bi-archive"></i>
+              </button>
+            </form>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}

@@ -686,6 +686,15 @@ document.addEventListener('DOMContentLoaded', () => {
               Used by the dashboard clock and optional local-time view in logs. Logged timestamps remain Zulu/UTC.
             </div>
           </div>
+          <div class="col-lg-3 col-md-5">
+            <label class="form-label small">Audit records to keep live</label>
+            <input type="number" class="form-control form-control-sm" name="audit_live_record_limit"
+                   value="{{ audit_live_record_limit }}" min="{{ audit_live_record_min }}"
+                   max="{{ audit_live_record_max }}" step="50">
+            <div class="form-text">
+              Older live audit records are archived to XLSX; testing audit records are pruned. Range: {{ audit_live_record_min }}-{{ audit_live_record_max }}.
+            </div>
+          </div>
           <div class="col-auto">
             <button type="submit" class="btn btn-sm btn-primary">
               <i class="bi bi-check2 me-1"></i>Save System Settings

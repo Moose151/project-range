@@ -4,9 +4,17 @@ This document records the major user-facing changes shipped in each beta version
 For planned work, see [ROADMAP.md](ROADMAP.md). For deep implementation notes and
 handover details, see [HANDOVER.md](HANDOVER.md).
 
-Current version: **0.19.5**
+Current version: **0.19.6**
 
 ---
+
+## 0.19.6 — Audit Retention and Serial History Archiving
+
+- Audit Log now automatically applies retention before listing records. Live audit records keep the newest configured amount and archive older rows to server-side `.xlsx` files; Testing/Sandbox audit records keep the newest configured amount and simply prune older rows.
+- Admin Config → System now controls how many audit records stay live in the app. Default is `1000`, minimum `250`, maximum `10000`.
+- Closed serial history can now be archived by administrators. Archiving exports the serial summary and all signal log rows to a server-side `.xlsx`, then removes that closed serial history from the app database.
+- Administrators can now delete documentation pages directly from the documentation page toolbar.
+- The dashboard Widgets dropdown now shows checked widgets that are already visible and can remove widgets by deselecting them.
 
 ## 0.19.5 — Device Form Shows Relevant Fields Only
 

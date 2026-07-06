@@ -617,6 +617,11 @@ def main():
             db.commit()
             print("Seeded default local timezone: UTC")
 
+        if not db.query(AppSetting).filter(AppSetting.key == "audit_live_record_limit").first():
+            db.add(AppSetting(key="audit_live_record_limit", value="1000"))
+            db.commit()
+            print("Seeded default audit live record limit: 1000")
+
         # Seed modulation types if table is empty
         if not db.query(ModulationType).first():
             for name, order in DEFAULT_MOD_TYPES:

@@ -7,6 +7,17 @@
   <span class="badge bg-secondary ms-2">{{ total }} record{{ 's' if total != 1 else '' }}</span>
 </div>
 
+{% if retention and (retention.archived or retention.deleted) %}
+<div class="alert alert-info py-2 small">
+  {% if retention.archived %}
+  Archived {{ retention.archived }} older live audit record{{ 's' if retention.archived != 1 else '' }} to
+  <code>{{ retention.path }}</code>.
+  {% elif retention.deleted %}
+  Removed {{ retention.deleted }} older testing audit record{{ 's' if retention.deleted != 1 else '' }}.
+  {% endif %}
+</div>
+{% endif %}
+
 <!-- Filters -->
 <form method="get" action="/audit" class="card border-secondary mb-3">
   <div class="card-body">

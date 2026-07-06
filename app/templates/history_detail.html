@@ -18,6 +18,14 @@
     <a href="/history/{{ serial.id }}/export/xlsx" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-file-earmark-spreadsheet me-1"></i>XLSX
     </a>
+    {% if user.role == 'administrator' and serial.closed_at %}
+    <form method="post" action="/history/{{ serial.id }}/archive"
+          onsubmit="return confirm('Archive this serial to a server spreadsheet and remove it from app history?')">
+      <button type="submit" class="btn btn-sm btn-outline-warning">
+        <i class="bi bi-archive me-1"></i>Archive
+      </button>
+    </form>
+    {% endif %}
     <a href="/history" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-arrow-left me-1"></i>History
     </a>

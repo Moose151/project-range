@@ -33,6 +33,12 @@
     <a href="/docs/{{ doc_page.slug }}/history" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-clock-history me-1"></i>History
     </a>
+    <form method="post" action="/docs/{{ doc_page.slug }}/delete"
+          onsubmit="return confirm('Delete this documentation page? This cannot be undone.')">
+      <button type="submit" class="btn btn-sm btn-outline-danger">
+        <i class="bi bi-trash me-1"></i>Delete
+      </button>
+    </form>
     {% endif %}
   </div>
 </div>

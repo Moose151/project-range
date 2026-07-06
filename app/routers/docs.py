@@ -88,6 +88,7 @@ async def docs_home(
         "q": q,
         "pending_count": pending_count,
         "page": "docs",
+        "toast": request.query_params.get("toast", ""),
     })
 
 
@@ -312,6 +313,31 @@ async def docs_restore_version(
 
 
 # ── View page ─────────────────────────────────────────────────────────────────
+
+@router.post("/{slug}/delete")
+async def docs_delete_page(
+    slug: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    doc = db.query(DocPage).filter(DocPage.slug == slug, DocPage.is_published == True).first()
+    if not doc:
+        return RedirectResponse("/docs?toast=Documentation+page+not+found", status_code=302)
+
+    doc_id = doc.id
+    title = doc.title
+    db.delete(doc)
+    db.add(AuditLog(
+        user_id=current_user.id,
+        action_type="doc_delete",
+        entity_type="DocPage",
+        entity_id=doc_id,
+        previous_value=title,
+        comment="Documentation page deleted",
+    ))
+    db.commit()
+    return RedirectResponse("/docs?toast=Documentation+page+deleted", status_code=302)
+
 
 @router.get("/{slug}", response_class=HTMLResponse)
 async def docs_view(

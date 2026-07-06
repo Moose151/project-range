@@ -11,27 +11,27 @@
               data-bs-toggle="dropdown" data-bs-auto-close="outside" title="Add dashboard widgets">
         <i class="bi bi-grid-3x3-gap me-1"></i>Widgets
       </button>
-      <ul class="dropdown-menu dropdown-menu-end">
+      <ul class="dropdown-menu dropdown-menu-end p-2" style="min-width:240px">
         <li><h6 class="dropdown-header">Info Widgets</h6></li>
-        <li><button type="button" class="dropdown-item" onclick="showClockWidget()"><i class="bi bi-clock-history me-2"></i>Zulu / Local Clock</button></li>
-        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('range-state')"><i class="bi bi-broadcast-pin me-2"></i>Range State</button></li>
-        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('active-signals')"><i class="bi bi-broadcast me-2"></i>Active Signals</button></li>
-        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('last-state-change')"><i class="bi bi-clock me-2"></i>Last State Change</button></li>
+        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="clock" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-clock-history"></i><span>Zulu / Local Clock</span></label></li>
+        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="range-state" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-broadcast-pin"></i><span>Range State</span></label></li>
+        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="active-signals" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-broadcast"></i><span>Active Signals</span></label></li>
+        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="last-state-change" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-clock"></i><span>Last State Change</span></label></li>
         {% if cda_by_serial %}
-        <li><button type="button" class="dropdown-item" onclick="showCDAWidget()"><i class="bi bi-shield-exclamation me-2"></i>CDA Timer</button></li>
+        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="cda" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-shield-exclamation"></i><span>CDA Timer</span></label></li>
         {% endif %}
         <li><hr class="dropdown-divider"></li>
         <li><h6 class="dropdown-header">Calculators</h6></li>
-        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('calc')"><i class="bi bi-calculator me-2"></i>Basic Calculator</button></li>
-        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('rf-calc')"><i class="bi bi-broadcast me-2"></i>RF Frequency</button></li>
-        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('power-conv')"><i class="bi bi-lightning-charge me-2"></i>Power Converter</button></li>
+        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="calc" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-calculator"></i><span>Basic Calculator</span></label></li>
+        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="rf-calc" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-broadcast"></i><span>RF Frequency</span></label></li>
+        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="power-conv" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-lightning-charge"></i><span>Power Converter</span></label></li>
         <li><hr class="dropdown-divider"></li>
         <li><h6 class="dropdown-header">Utilities</h6></li>
-        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('clock')"><i class="bi bi-clock me-2"></i>Additional Clock</button></li>
-        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('notes')"><i class="bi bi-pencil-square me-2"></i>Quick Notes</button></li>
-        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('doc')"><i class="bi bi-file-earmark-text me-2"></i>Doc Reference</button></li>
-        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('links')"><i class="bi bi-lightning me-2"></i>Quick Links</button></li>
-        <li><button type="button" class="dropdown-item" onclick="addUtilityWidget('chat')"><i class="bi bi-chat-dots me-2"></i>Chat</button></li>
+        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="clock-extra" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-clock"></i><span>Additional Clock</span></label></li>
+        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="notes" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-pencil-square"></i><span>Quick Notes</span></label></li>
+        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="doc" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-file-earmark-text"></i><span>Doc Reference</span></label></li>
+        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="links" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-lightning"></i><span>Quick Links</span></label></li>
+        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="chat" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-chat-dots"></i><span>Chat</span></label></li>
       </ul>
     </div>
     <div class="dropdown">
@@ -391,6 +391,7 @@ function setClockHidden(hidden) {
     btn.classList.toggle('btn-secondary', !hidden);
   }
   try { localStorage.setItem(CLOCK_HIDDEN_KEY, hidden ? '1' : '0'); } catch (e) {}
+  updateDashboardWidgetMenu();
 }
 function hideClockWidget() { setClockHidden(true); saveLayout(); }
 function showClockWidget() { setClockHidden(false); saveLayout(); }
@@ -578,11 +579,52 @@ function addUtilityWidget(type) {
   renderUtilityWidget({ id: 'utility-' + Date.now(), type, config: type === 'doc' && DASHBOARD_DOCS[0] ? { slug: DASHBOARD_DOCS[0].slug } : {} });
   saveUtilityWidgets();
   saveLayout();
+  updateDashboardWidgetMenu();
 }
 function removeUtilityWidget(id) {
   document.querySelector(`.utility-widget-group[data-utility-id="${id}"]`)?.remove();
   saveUtilityWidgets();
   saveLayout();
+  updateDashboardWidgetMenu();
+}
+function removeUtilityWidgetsByType(type) {
+  document.querySelectorAll(`.utility-widget-group[data-widget-type="${CSS.escape(type)}"]`).forEach(group => group.remove());
+  saveUtilityWidgets();
+  saveLayout();
+  updateDashboardWidgetMenu();
+}
+function menuWidgetType(type) {
+  return type === 'clock-extra' ? 'clock' : type;
+}
+function dashboardWidgetVisible(type) {
+  if (type === 'clock') {
+    const group = document.querySelector('.clock-widget-group');
+    return Boolean(group && group.style.display !== 'none');
+  }
+  if (type === 'cda') {
+    const group = document.querySelector('.cda-widget-group');
+    return Boolean(group && group.style.display !== 'none');
+  }
+  return Boolean(document.querySelector(`.utility-widget-group[data-widget-type="${CSS.escape(menuWidgetType(type))}"]`));
+}
+function updateDashboardWidgetMenu() {
+  document.querySelectorAll('.dashboard-widget-toggle').forEach(input => {
+    input.checked = dashboardWidgetVisible(input.dataset.dashboardWidget);
+  });
+}
+function toggleDashboardWidgetFromMenu(input) {
+  const type = input.dataset.dashboardWidget;
+  if (type === 'clock') {
+    setClockHidden(!input.checked);
+  } else if (type === 'cda') {
+    setCDAWidgetHidden(!input.checked);
+  } else if (input.checked) {
+    if (!dashboardWidgetVisible(type)) addUtilityWidget(menuWidgetType(type));
+  } else {
+    removeUtilityWidgetsByType(menuWidgetType(type));
+  }
+  saveLayout();
+  updateDashboardWidgetMenu();
 }
 function downloadNotes(id) {
   const group = document.querySelector(`.utility-widget-group[data-utility-id="${id}"]`);
@@ -1009,6 +1051,7 @@ function setCDAWidgetHidden(hidden) {
   const group = document.querySelector('.cda-widget-group');
   if (group) group.style.display = hidden ? 'none' : '';
   try { localStorage.setItem(CDA_WIDGET_HIDDEN_KEY, hidden ? '1' : '0'); } catch (e) {}
+  updateDashboardWidgetMenu();
 }
 function hideCDAWidget() { setCDAWidgetHidden(true); saveLayout(); }
 function showCDAWidget() { setCDAWidgetHidden(false); saveLayout(); }
@@ -1190,6 +1233,7 @@ document.addEventListener('DOMContentLoaded', () => {
   restoreLayout();
   restoreClockVisibility();
   restoreCDAWidgetVisibility();
+  updateDashboardWidgetMenu();
   refreshAllControls();
   buildColumnMenu();
   applyColumnVisibility();

@@ -7,8 +7,9 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.database import get_db
-from app.deps import get_current_user, get_current_range_state, is_testing_state
+from app.deps import get_current_user, get_current_range_state, is_testing_state, require_supervisor
 from app.models import User, Serial, SignalLog
+from app.serial_archive import archive_closed_serial
 from app.log_changes import annotate_log_changes
 from app.settings import annotate_local_times, get_local_timezone
 
@@ -42,6 +43,7 @@ async def history_list(
         "total": total,
         "page": page,
         "total_pages": total_pages,
+        "toast": request.query_params.get("toast", ""),
         "page_name": "history",
     })
 
@@ -177,3 +179,23 @@ async def history_export_xlsx(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
+
+
+@router.post("/{serial_id}/archive")
+async def history_archive_serial(
+    serial_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    testing = is_testing_state(db)
+    serial = db.query(Serial).filter(
+        Serial.id == serial_id,
+        Serial.closed_at != None,
+        Serial.is_testing == testing,
+    ).first()
+    if not serial:
+        return RedirectResponse("/history?toast=Serial+not+found", status_code=302)
+    result = archive_closed_serial(db, serial, current_user.id)
+    if result.archived:
+        return RedirectResponse("/history?toast=Serial+archived+to+server+spreadsheet", status_code=302)
+    return RedirectResponse("/history?toast=Serial+could+not+be+archived", status_code=302)

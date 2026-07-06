@@ -26,6 +26,16 @@ LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
 LOGIN_LOCKOUT_SECONDS = int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "300"))
 
 DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{BASE_DIR}/range.db")
+
+def _default_data_dir() -> Path:
+    if DATABASE_URL.startswith("sqlite:///"):
+        db_path = Path(DATABASE_URL.removeprefix("sqlite:///"))
+        return db_path.parent if db_path.is_absolute() else (BASE_DIR / db_path).parent
+    return BASE_DIR / "data"
+
+DATA_DIR = Path(os.environ.get("DATA_DIR", str(_default_data_dir())))
+AUDIT_ARCHIVE_DIR = Path(os.environ.get("AUDIT_ARCHIVE_DIR", str(DATA_DIR / "audit_archives")))
+SERIAL_ARCHIVE_DIR = Path(os.environ.get("SERIAL_ARCHIVE_DIR", str(DATA_DIR / "serial_archives")))
 SESSION_TIMEOUT_MINUTES = int(os.environ.get("SESSION_TIMEOUT_MINUTES", "480"))
 # Cookie lifetime. Normal sessions still expire after SESSION_TIMEOUT_MINUTES of
 # inactivity (enforced server-side); "remember this terminal" sessions skip that
@@ -37,7 +47,7 @@ CBM_AUTO_SYNC_SECONDS = int(os.environ.get("CBM_AUTO_SYNC_SECONDS", "5"))
 SNMP_AUTO_SYNC_SECONDS = int(os.environ.get("SNMP_AUTO_SYNC_SECONDS", "0"))
 # Single source of truth for the app version (shown in the top-right UI and
 # reported as the FastAPI app version). Bump on each release.
-APP_VERSION = "0.19.5"
+APP_VERSION = "0.19.6"
 
 FREQUENCY_BANDS = {
     "C":  {"tx_min": 5.850, "tx_max": 6.725, "rx_min": 3.625, "rx_max": 4.200},
