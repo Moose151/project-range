@@ -12,6 +12,10 @@
         <i class="bi bi-grid-3x3-gap me-1"></i>Widgets
       </button>
       <ul class="dropdown-menu dropdown-menu-end p-2" style="min-width:240px">
+        <li class="mb-2">
+          <input type="search" class="form-control form-control-sm" placeholder="Search widgets..."
+                 oninput="filterDashboardWidgetMenu(this.value)">
+        </li>
         <li><h6 class="dropdown-header">Info Widgets</h6></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="clock" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-clock-history"></i><span>Zulu / Local Clock</span></label></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="range-state" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-broadcast-pin"></i><span>Range State</span></label></li>
@@ -34,6 +38,15 @@
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="chat" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-chat-dots"></i><span>Chat</span></label></li>
       </ul>
     </div>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setAllWidgetsCollapsed(true)" title="Collapse all widgets">
+      <i class="bi bi-chevron-double-up"></i>
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setAllWidgetsCollapsed(false)" title="Expand all widgets">
+      <i class="bi bi-chevron-double-down"></i>
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-danger" onclick="resetDashboardLayout()" title="Reset dashboard layout">
+      <i class="bi bi-arrow-counterclockwise"></i>
+    </button>
     <div class="dropdown">
       <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
               data-bs-toggle="dropdown" data-bs-auto-close="outside" title="Show / hide table columns">
@@ -626,6 +639,14 @@ function toggleDashboardWidgetFromMenu(input) {
   saveLayout();
   updateDashboardWidgetMenu();
 }
+function filterDashboardWidgetMenu(value) {
+  const needle = (value || '').toLowerCase().trim();
+  document.querySelectorAll('.dashboard-widget-toggle').forEach(input => {
+    const row = input.closest('li');
+    const label = row?.textContent?.toLowerCase() || '';
+    if (row) row.style.display = !needle || label.includes(needle) ? '' : 'none';
+  });
+}
 function downloadNotes(id) {
   const group = document.querySelector(`.utility-widget-group[data-utility-id="${id}"]`);
   const text = group?.querySelector('textarea')?.value || '';
@@ -1042,6 +1063,21 @@ function toggleCollapse(btn) {
   setCollapsed(group, !group.classList.contains('collapsed'));
   if (group.classList.contains('utility-widget-group')) saveUtilityWidgets();
   saveLayout();
+}
+function setAllWidgetsCollapsed(collapsed) {
+  document.querySelectorAll('#serialWidgetsContainer .serial-widget-group').forEach(group => setCollapsed(group, collapsed));
+  saveUtilityWidgets();
+  saveLayout();
+}
+function resetDashboardLayout() {
+  if (!confirm('Reset dashboard layout and remove local utility widgets on this terminal?')) return;
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(UTILITY_WIDGETS_KEY);
+    localStorage.removeItem(CLOCK_HIDDEN_KEY);
+    localStorage.removeItem(CDA_WIDGET_HIDDEN_KEY);
+  } catch (e) {}
+  location.reload();
 }
 
 // ── CDA Widget show/hide ──────────────────────────────────────────────────

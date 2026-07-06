@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Form, Request, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
@@ -87,7 +87,12 @@ def _apply_filters(query, search, status, band, date_from, date_to, activity, se
             pass
     if date_to:
         try:
-            query = query.filter(SignalLog.timestamp <= datetime.fromisoformat(date_to))
+            end = datetime.fromisoformat(date_to)
+            if "T" not in date_to and len(date_to) == 10:
+                end = end + timedelta(days=1)
+                query = query.filter(SignalLog.timestamp < end)
+            else:
+                query = query.filter(SignalLog.timestamp <= end)
         except ValueError:
             pass
     return query
@@ -147,6 +152,13 @@ async def log_list(
 
     active_serials = get_active_serials(db)
     all_serials = db.query(Serial).filter(Serial.is_testing == testing).order_by(Serial.opened_at.desc()).all()
+    today = datetime.utcnow().date()
+    yesterday = today - timedelta(days=1)
+    quick_dates = {
+        "today": today.isoformat(),
+        "yesterday": yesterday.isoformat(),
+        "last7": (today - timedelta(days=6)).isoformat(),
+    }
 
     return templates.TemplateResponse(request, "logs_list.html", {
         "user": current_user,
@@ -163,6 +175,7 @@ async def log_list(
         "show_local_time": show_local_time,
         "local_timezone": local_timezone,
         "toast": toast,
+        "quick_dates": quick_dates,
         "filters": {
             "search": search, "status": status, "band": band,
             "date_from": date_from, "date_to": date_to,

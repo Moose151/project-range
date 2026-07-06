@@ -4,9 +4,18 @@ This document records the major user-facing changes shipped in each beta version
 For planned work, see [ROADMAP.md](ROADMAP.md). For deep implementation notes and
 handover details, see [HANDOVER.md](HANDOVER.md).
 
-Current version: **0.19.6**
+Current version: **0.19.7**
 
 ---
+
+## 0.19.7 — QoL Navigation and Admin Tools
+
+- Added a global `Ctrl+K` command palette with search/jump results for pages, devices, serials, packages, docs, signals, calculators, and admin destinations.
+- Added terminal-local recently viewed shortcuts inside the command palette.
+- Added dashboard layout controls: searchable widget picker, collapse all, expand all, and reset layout.
+- Added log quick filters for Today, Yesterday, Last 7 days, Faulted, and Current serial, plus terminal-local saved log filter presets.
+- Admin Config → System now shows database/audit/archive health and lets administrators download audit and serial archive spreadsheets from the server.
+- Topology now has search/highlight plus visibility toggles for manual links, auto-inferred links, and live routed paths.
 
 ## 0.19.6 — Audit Retention and Serial History Archiving
 

@@ -1131,3 +1131,93 @@ function runPwrConv(id) {
       <tr><td class="text-muted py-0">mW</td><td class="text-end py-0 fw-semibold">${mW.toPrecision(4)}</td></tr>
     </table>`;
 }
+
+// ── Global command palette + recently viewed pages ──────────────────────────
+const RECENT_PAGES_KEY = 'rangeRecentPages_v1';
+let commandPaletteTimer = null;
+
+function recentPages() {
+  try { return JSON.parse(localStorage.getItem(RECENT_PAGES_KEY) || '[]'); } catch (e) { return []; }
+}
+
+function saveRecentPages(items) {
+  try { localStorage.setItem(RECENT_PAGES_KEY, JSON.stringify(items.slice(0, 8))); } catch (e) {}
+}
+
+function rememberCurrentPage() {
+  if (!document.body || location.pathname === '/login') return;
+  const title = (document.title || 'SEW Range').replace(/\s+[-–]\s+SEW Range$/, '').trim();
+  const url = location.pathname + location.search;
+  const items = recentPages().filter(item => item.url !== url);
+  items.unshift({ title, url, at: Date.now() });
+  saveRecentPages(items);
+}
+
+function renderRecentPages() {
+  const target = document.getElementById('recentPagesList');
+  if (!target) return;
+  const items = recentPages();
+  target.innerHTML = items.length ? items.map(item => `
+    <a href="${escapeHtml(item.url)}" class="list-group-item list-group-item-action py-2">
+      <i class="bi bi-clock-history me-2 text-muted"></i>${escapeHtml(item.title || item.url)}
+      <span class="text-muted small ms-2">${escapeHtml(item.url)}</span>
+    </a>`).join('') : '<div class="text-muted small px-2 py-2">No recent pages yet.</div>';
+}
+
+function renderCommandResults(results) {
+  const target = document.getElementById('commandPaletteResults');
+  if (!target) return;
+  if (!results.length) {
+    target.innerHTML = '<div class="text-muted small px-3 py-3">No matches.</div>';
+    return;
+  }
+  target.innerHTML = results.map(item => `
+    <a href="${escapeHtml(item.url)}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+      <i class="bi ${escapeHtml(item.icon || 'bi-search')} text-primary"></i>
+      <span class="flex-grow-1">
+        <span class="fw-semibold">${escapeHtml(item.label)}</span>
+        ${item.detail ? `<span class="text-muted small d-block">${escapeHtml(item.detail)}</span>` : ''}
+      </span>
+      <span class="badge bg-secondary">${escapeHtml(item.kind || 'Result')}</span>
+    </a>`).join('');
+}
+
+async function searchCommandPalette() {
+  const input = document.getElementById('commandPaletteInput');
+  if (!input) return;
+  const q = input.value || '';
+  const target = document.getElementById('commandPaletteResults');
+  if (target) target.innerHTML = '<div class="text-muted small px-3 py-3">Searching...</div>';
+  try {
+    const resp = await fetch('/quick-search?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' } });
+    const data = await resp.json();
+    renderCommandResults(data.results || []);
+  } catch (e) {
+    if (target) target.innerHTML = '<div class="text-danger small px-3 py-3">Search failed.</div>';
+  }
+}
+
+function openCommandPalette() {
+  const modalEl = document.getElementById('commandPaletteModal');
+  const input = document.getElementById('commandPaletteInput');
+  if (!modalEl || !window.bootstrap) return;
+  renderRecentPages();
+  window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  setTimeout(() => { input?.focus(); input?.select(); searchCommandPalette(); }, 120);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  rememberCurrentPage();
+  const input = document.getElementById('commandPaletteInput');
+  input?.addEventListener('input', () => {
+    clearTimeout(commandPaletteTimer);
+    commandPaletteTimer = setTimeout(searchCommandPalette, 120);
+  });
+});
+
+document.addEventListener('keydown', event => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault();
+    openCommandPalette();
+  }
+});

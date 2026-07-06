@@ -167,6 +167,9 @@
       <button type="button" class="topbar-btn" onclick="history.back()" title="Go back">
         <i class="bi bi-arrow-left"></i>
       </button>
+      <button type="button" class="topbar-btn d-none d-sm-inline-flex align-items-center gap-1 px-2" onclick="openCommandPalette()" title="Search or jump (Ctrl+K)">
+        <i class="bi bi-search"></i><span class="small">Jump</span><span class="text-muted small">Ctrl+K</span>
+      </button>
       <span class="topbar-brand d-none d-lg-inline ms-1">SEW Range</span>
       <div class="ms-auto d-flex align-items-center gap-2">
         <span class="app-version-badge" title="Application version">v{{ app_version }}</span>
@@ -262,6 +265,30 @@
 
 <!-- CEASE splash mount: the full-screen overlay is injected here by app.js when active -->
 <div id="ceaseRoot"></div>
+
+<!-- Global command palette / recently viewed shortcuts -->
+<div class="modal fade" id="commandPaletteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="search" class="form-control" id="commandPaletteInput"
+                 placeholder="Search pages, devices, serials, docs, packages, signals..."
+                 autocomplete="off">
+        </div>
+        <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div id="commandPaletteResults" class="list-group list-group-flush"></div>
+        <div class="border-top p-2">
+          <div class="text-muted small px-2 mb-1">Recently viewed</div>
+          <div id="recentPagesList" class="list-group list-group-flush"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Instant chat: in-memory, terminal-local windows; messages are not persisted. -->
 <div id="chatDock" class="chat-dock" aria-live="polite">

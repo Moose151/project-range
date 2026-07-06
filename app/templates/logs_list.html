@@ -105,6 +105,30 @@
   </div>
 </form>
 
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3 small">
+  <span class="text-muted">Quick filters:</span>
+  <a class="btn btn-sm btn-outline-secondary py-0" href="/logs?date_from={{ quick_dates.today }}&date_to={{ quick_dates.today }}">Today</a>
+  <a class="btn btn-sm btn-outline-secondary py-0" href="/logs?date_from={{ quick_dates.yesterday }}&date_to={{ quick_dates.yesterday }}">Yesterday</a>
+  <a class="btn btn-sm btn-outline-secondary py-0" href="/logs?date_from={{ quick_dates.last7 }}&date_to={{ quick_dates.today }}">Last 7 days</a>
+  <a class="btn btn-sm btn-outline-danger py-0" href="/logs?status=Faulted">Faulted</a>
+  {% if active_serials %}
+  <a class="btn btn-sm btn-outline-success py-0" href="/logs?serial_id={{ active_serials[0].id }}">Current serial</a>
+  {% endif %}
+  <div class="dropdown">
+    <button class="btn btn-sm btn-outline-secondary py-0 dropdown-toggle" type="button"
+            data-bs-toggle="dropdown" data-bs-auto-close="outside">
+      Saved filters
+    </button>
+    <div class="dropdown-menu dropdown-menu-end p-2" style="min-width:280px">
+      <div id="savedLogFilters" class="mb-2"></div>
+      <div class="input-group input-group-sm">
+        <input type="text" class="form-control" id="savedLogFilterName" placeholder="Preset name">
+        <button type="button" class="btn btn-outline-primary" onclick="saveCurrentLogFilter()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% macro sort_th(col, label) %}
 {% set next_dir = 'asc' if (sort == col and sort_dir == 'desc') else 'desc' %}
 {% set icon = 'bi-sort-down' if (sort == col and sort_dir == 'desc') else ('bi-sort-up' if sort == col else 'bi-arrow-down-up text-secondary opacity-50') %}
@@ -353,5 +377,49 @@ function confirmDelete(btn) {
   document.getElementById('deleteForm').action = '/logs/' + btn.dataset.deleteId + '/delete';
   new bootstrap.Modal(document.getElementById('deleteModal')).show();
 }
+const LOG_FILTERS_KEY = 'rangeSavedLogFilters_v1';
+function savedLogFilters() {
+  try { return JSON.parse(localStorage.getItem(LOG_FILTERS_KEY) || '[]'); } catch (e) { return []; }
+}
+function setSavedLogFilters(items) {
+  try { localStorage.setItem(LOG_FILTERS_KEY, JSON.stringify(items.slice(0, 12))); } catch (e) {}
+}
+function renderSavedLogFilters() {
+  const target = document.getElementById('savedLogFilters');
+  if (!target) return;
+  const items = savedLogFilters();
+  if (!items.length) {
+    target.innerHTML = '<div class="text-muted small px-1 py-1">No saved filters yet.</div>';
+    return;
+  }
+  target.innerHTML = items.map((item, idx) => `
+    <div class="d-flex align-items-center gap-1 mb-1">
+      <a class="btn btn-sm btn-outline-secondary flex-grow-1 text-start" href="/logs?${item.query}">${escapeHtml(item.name)}</a>
+      <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteSavedLogFilter(${idx})" title="Delete"><i class="bi bi-trash"></i></button>
+    </div>`).join('');
+}
+function saveCurrentLogFilter() {
+  const input = document.getElementById('savedLogFilterName');
+  const name = (input?.value || '').trim() || 'Log filter';
+  const params = new URLSearchParams(window.location.search);
+  params.delete('page');
+  const query = params.toString();
+  if (!query) {
+    showToast('Apply a filter first, then save it.', 'warning');
+    return;
+  }
+  const items = savedLogFilters().filter(item => item.name !== name);
+  items.unshift({ name, query });
+  setSavedLogFilters(items);
+  if (input) input.value = '';
+  renderSavedLogFilters();
+}
+function deleteSavedLogFilter(idx) {
+  const items = savedLogFilters();
+  items.splice(idx, 1);
+  setSavedLogFilters(items);
+  renderSavedLogFilters();
+}
+document.addEventListener('DOMContentLoaded', renderSavedLogFilters);
 </script>
 {% endblock %}

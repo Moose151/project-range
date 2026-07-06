@@ -38,6 +38,30 @@
   <span><span class="badge border border-light" style="background:#f8f9fa">&nbsp;</span> Live routed path</span>
 </div>
 
+<div class="card border-secondary mb-3">
+  <div class="card-body py-2">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <div class="input-group input-group-sm" style="max-width:340px">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="search" class="form-control" id="topologySearch"
+               placeholder="Find device, port, label..." oninput="applyTopologyControls()">
+      </div>
+      <label class="form-check form-check-sm mb-0">
+        <input class="form-check-input" type="checkbox" id="showManualLinks" checked onchange="applyTopologyControls()">
+        <span class="form-check-label small">Manual links</span>
+      </label>
+      <label class="form-check form-check-sm mb-0">
+        <input class="form-check-input" type="checkbox" id="showInferredLinks" checked onchange="applyTopologyControls()">
+        <span class="form-check-label small">Auto links</span>
+      </label>
+      <label class="form-check form-check-sm mb-0">
+        <input class="form-check-input" type="checkbox" id="showLiveRoutes" checked onchange="applyTopologyControls()">
+        <span class="form-check-label small">Live routes</span>
+      </label>
+    </div>
+  </div>
+</div>
+
 {# ── SVG diagram ── #}
 <div class="card border-secondary mb-3">
   <div class="card-header d-flex align-items-center gap-2">
@@ -116,7 +140,8 @@
       <tbody id="linkTableBody">
         {% if links %}
         {% for lnk in links %}
-        <tr data-link-type="{{ lnk.link_type }}">
+        <tr data-link-type="{{ lnk.link_type }}" data-inferred="{{ '1' if lnk.inferred else '0' }}"
+            data-search="{{ (lnk.from_device.name ~ ' ' ~ lnk.to_device.name ~ ' ' ~ (lnk.from_port or '') ~ ' ' ~ (lnk.to_port or '') ~ ' ' ~ (lnk.label or '')) | lower }}">
           <td class="fw-semibold">
             {{ lnk.from_device.name }}
             {% if lnk.inferred %}<span class="badge bg-info text-dark ms-1">auto</span>{% endif %}
@@ -253,10 +278,49 @@ function showTab(tab, btn) {
   activeTab = tab;
   document.querySelectorAll('#topoTabs .nav-link').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  applyTopologyControls();
+}
+
+function topologyControls() {
+  return {
+    search: (document.getElementById('topologySearch')?.value || '').toLowerCase().trim(),
+    manual: document.getElementById('showManualLinks')?.checked !== false,
+    inferred: document.getElementById('showInferredLinks')?.checked !== false,
+    live: document.getElementById('showLiveRoutes')?.checked !== false,
+  };
+}
+
+function linkMatchesSearch(lnk, needle) {
+  if (!needle) return true;
+  const from = DEVICE_MAP[lnk.from]?.name || '';
+  const to = DEVICE_MAP[lnk.to]?.name || '';
+  return `${from} ${to} ${lnk.fromPort} ${lnk.toPort} ${lnk.label}`.toLowerCase().includes(needle);
+}
+
+function routeMatchesSearch(route, needle) {
+  if (!needle) return true;
+  const from = DEVICE_MAP[route.from]?.name || '';
+  const through = DEVICE_MAP[route.through]?.name || '';
+  const to = DEVICE_MAP[route.to]?.name || '';
+  return `${from} ${through} ${to} ${route.label}`.toLowerCase().includes(needle);
+}
+
+function visibleLink(lnk, filterType, controls) {
+  if (filterType !== 'all' && lnk.lt !== filterType) return false;
+  if (lnk.inferred && !controls.inferred) return false;
+  if (!lnk.inferred && !controls.manual) return false;
+  return linkMatchesSearch(lnk, controls.search);
+}
+
+function applyTopologyControls() {
+  const controls = topologyControls();
   document.querySelectorAll('#linkTableBody tr[data-link-type]').forEach(row => {
-    row.style.display = (tab === 'all' || row.dataset.linkType === tab) ? '' : 'none';
+    const tabOk = activeTab === 'all' || row.dataset.linkType === activeTab;
+    const typeOk = row.dataset.inferred === '1' ? controls.inferred : controls.manual;
+    const searchOk = !controls.search || (row.dataset.search || '').includes(controls.search);
+    row.style.display = tabOk && typeOk && searchOk ? '' : 'none';
   });
-  renderDiagram(tab);
+  renderDiagram(activeTab);
 }
 
 // ── Device / link data (embedded as JSON for the SVG renderer) ────────────
@@ -298,8 +362,11 @@ const TYPE_LAYER = {
 function renderDiagram(filterType) {
   const container = document.getElementById('topoDiagram');
   const note = document.getElementById('diagramNote');
-  const filteredLinks = filterType === 'all' ? ALL_LINKS : ALL_LINKS.filter(l => l.lt === filterType);
-  const filteredRoutes = filterType === 'all' || filterType === 'rf' ? LIVE_ROUTES : [];
+  const controls = topologyControls();
+  const filteredLinks = ALL_LINKS.filter(l => visibleLink(l, filterType, controls));
+  const filteredRoutes = controls.live && (filterType === 'all' || filterType === 'rf')
+    ? LIVE_ROUTES.filter(r => routeMatchesSearch(r, controls.search))
+    : [];
 
   // Collect visible device IDs
   const visIds = new Set();
@@ -357,6 +424,7 @@ function renderDiagram(filterType) {
     path.setAttribute('stroke-width', '2');
     path.setAttribute('fill', 'none');
     path.setAttribute('opacity', '0.8');
+    path.setAttribute('stroke-dasharray', lnk.inferred ? '4 3' : 'none');
     svg.appendChild(path);
 
     // Arrowhead
@@ -441,6 +509,10 @@ function renderDiagram(filterType) {
     rect.setAttribute('fill', '#2b2d31');
     rect.setAttribute('stroke', '#6c757d');
     rect.setAttribute('stroke-width', '1.5');
+    if (controls.search && d.name.toLowerCase().includes(controls.search)) {
+      rect.setAttribute('stroke', '#ffc107');
+      rect.setAttribute('stroke-width', '3');
+    }
     g.appendChild(rect);
 
     const nameEl = document.createElementNS(NS, 'text');
@@ -492,9 +564,7 @@ wirePortIdx('toDevSel', 'toPortIdxWrap');
 document.addEventListener('DOMContentLoaded', () => {
   renderDiagram('rf');
   // Apply tab filter to table rows on load
-  document.querySelectorAll('#linkTableBody tr[data-link-type]').forEach(row => {
-    row.style.display = row.dataset.linkType === 'rf' ? '' : 'none';
-  });
+  applyTopologyControls();
 });
 </script>
 {% endblock %}

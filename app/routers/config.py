@@ -1,11 +1,14 @@
 from typing import Optional
+from pathlib import Path
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi import HTTPException
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import require_supervisor, get_current_range_state, is_testing_state
-from app.models import ModulationType, FecType, SignalSource, AntennaType, Signal, FrequencyTemplate, User, DutyRole, RFDevice
+from app.config import AUDIT_ARCHIVE_DIR, DATABASE_URL, SERIAL_ARCHIVE_DIR
+from app.models import AuditLog, ModulationType, FecType, SignalSource, AntennaType, Signal, FrequencyTemplate, User, DutyRole, RFDevice
 from app.settings import (
     AUDIT_LIVE_RECORD_LIMIT_KEY,
     MAX_AUDIT_LIVE_RECORD_LIMIT,
@@ -20,6 +23,37 @@ from app.settings import (
 
 router = APIRouter(prefix="/config")
 from app.templating import templates
+
+
+def _sqlite_db_path() -> Path | None:
+    if DATABASE_URL.startswith("sqlite:///"):
+        return Path(DATABASE_URL.removeprefix("sqlite:///"))
+    return None
+
+
+def _archive_files(path: Path, kind: str) -> list[dict]:
+    if not path.exists():
+        return []
+    files = []
+    for file in sorted(path.glob("*.xlsx"), key=lambda p: p.stat().st_mtime, reverse=True)[:50]:
+        stat = file.stat()
+        files.append({
+            "name": file.name,
+            "kind": kind,
+            "size_kb": max(1, round(stat.st_size / 1024)),
+            "modified": stat.st_mtime,
+        })
+    return files
+
+
+def _archive_path(kind: str, filename: str) -> Path:
+    base = AUDIT_ARCHIVE_DIR if kind == "audit" else SERIAL_ARCHIVE_DIR if kind == "serial" else None
+    if base is None or "/" in filename or "\\" in filename or not filename.endswith(".xlsx"):
+        raise HTTPException(status_code=404)
+    path = base / filename
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404)
+    return path
 
 
 @router.get("", response_class=HTMLResponse)
@@ -48,6 +82,8 @@ async def config_page(
     groups = sorted(set(s.exclusivity_group for s in signals if s.exclusivity_group))
     freq_templates = db.query(FrequencyTemplate).order_by(FrequencyTemplate.name).all()
     duty_roles = db.query(DutyRole).order_by(DutyRole.display_order, DutyRole.name).all()
+    db_path = _sqlite_db_path()
+    archive_files = _archive_files(AUDIT_ARCHIVE_DIR, "audit") + _archive_files(SERIAL_ARCHIVE_DIR, "serial")
     return templates.TemplateResponse(request, "config.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
@@ -66,9 +102,34 @@ async def config_page(
         "audit_live_record_limit": get_audit_live_record_limit(db),
         "audit_live_record_min": MIN_AUDIT_LIVE_RECORD_LIMIT,
         "audit_live_record_max": MAX_AUDIT_LIVE_RECORD_LIMIT,
+        "system_health": {
+            "database": str(db_path) if db_path else DATABASE_URL,
+            "database_size_mb": round(db_path.stat().st_size / (1024 * 1024), 2) if db_path and db_path.exists() else None,
+            "live_audit_count": db.query(AuditLog).filter(AuditLog.is_testing == False).count(),
+            "testing_audit_count": db.query(AuditLog).filter(AuditLog.is_testing == True).count(),
+            "audit_archive_dir": str(AUDIT_ARCHIVE_DIR),
+            "serial_archive_dir": str(SERIAL_ARCHIVE_DIR),
+            "audit_archive_count": len(_archive_files(AUDIT_ARCHIVE_DIR, "audit")),
+            "serial_archive_count": len(_archive_files(SERIAL_ARCHIVE_DIR, "serial")),
+        },
+        "archive_files": archive_files,
         "page": "config",
         "toast": request.query_params.get("toast", ""),
     })
+
+
+@router.get("/archives/{kind}/{filename}")
+async def archive_download(
+    kind: str,
+    filename: str,
+    current_user: User = Depends(require_supervisor),
+):
+    path = _archive_path(kind, filename)
+    return FileResponse(
+        path,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=filename,
+    )
 
 
 # ── Desktop shortcuts ─────────────────────────────────────────────────────────

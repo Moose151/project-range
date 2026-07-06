@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.19.2` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.19.7` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -188,6 +188,33 @@ Theme: blessed for use. Gate criteria:
 - [ ] User + administrator documentation complete in the wiki module.
 - [ ] Password/secret hygiene enforced (no default `admin/changeme`, real `SECRET_KEY`).
 - [ ] **Critical** security items below are closed (they gate 1.0.0).
+
+## QoL / navigation backlog
+
+These are usability and navigation improvements identified after the 0.19.x
+device-routing, audit-retention, and archive work.
+
+- [x] **Global command palette** — `Ctrl+K` search/jump for devices, serials,
+  packages, docs, logs, topology, calculators, config, and common actions.
+- [x] **Recently viewed shortcuts** — terminal-local quick links for the last
+  pages a user opened.
+- [ ] **Breadcrumb consistency** — add lightweight breadcrumbs to deeper pages
+  where users commonly need to get back to a parent view.
+- [x] **Dashboard layout management** — reset layout, collapse/expand all, search
+  widget picker, and checkbox toggle state for visible widgets.
+- [x] **Saved log filters and date chips** — quick filters for Today, Yesterday,
+  Last 7 days, Current Serial, Faulted, and local saved filter presets.
+- [x] **Admin health/archive tools** — surface DB size, audit/archive counts,
+  archive folders, and browse/download server-side audit/serial archive files.
+- [x] **Topology search and visibility controls** — search/highlight devices and
+  toggle manual/inferred/live route visibility.
+- [ ] **Topology route explanations** — explain routed paths through
+  splitter/combiner devices with source, destination, matrix ports, and whether
+  the link is manual or inferred.
+- [ ] **Docs organisation** — tags/categories and related docs, plus a recycle
+  bin if deleted docs need recoverability.
+- [ ] **Form ergonomics** — duplicate-from-existing, inline validation, and
+  preserved form values after validation errors.
 
 ---
 

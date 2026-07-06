@@ -701,6 +701,61 @@ document.addEventListener('DOMContentLoaded', () => {
             </button>
           </div>
         </form>
+        <hr class="border-secondary my-4">
+        <div class="row g-3">
+          <div class="col-lg-4">
+            <div class="border border-secondary rounded p-3 h-100">
+              <h6 class="mb-2"><i class="bi bi-activity me-1"></i>System Health</h6>
+              <dl class="row small mb-0">
+                <dt class="col-5 text-muted">Database</dt>
+                <dd class="col-7 text-break">{{ system_health.database }}</dd>
+                <dt class="col-5 text-muted">DB size</dt>
+                <dd class="col-7">{{ system_health.database_size_mb if system_health.database_size_mb is not none else 'n/a' }} MB</dd>
+                <dt class="col-5 text-muted">Audit rows</dt>
+                <dd class="col-7">{{ system_health.live_audit_count }} live / {{ system_health.testing_audit_count }} testing</dd>
+                <dt class="col-5 text-muted">Archives</dt>
+                <dd class="col-7">{{ system_health.audit_archive_count }} audit / {{ system_health.serial_archive_count }} serial</dd>
+              </dl>
+            </div>
+          </div>
+          <div class="col-lg-8">
+            <div class="border border-secondary rounded p-3 h-100">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <h6 class="mb-0"><i class="bi bi-archive me-1"></i>Server Archive Files</h6>
+                <span class="text-muted small ms-auto">Newest 50 per archive type</span>
+              </div>
+              <div class="small text-muted mb-2">
+                Audit: <code>{{ system_health.audit_archive_dir }}</code><br>
+                Serial: <code>{{ system_health.serial_archive_dir }}</code>
+              </div>
+              {% if archive_files %}
+              <div class="table-responsive" style="max-height:260px;overflow:auto">
+                <table class="table table-dark table-sm align-middle mb-0">
+                  <thead class="table-secondary">
+                    <tr><th>Type</th><th>File</th><th class="text-end">Size</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    {% for file in archive_files %}
+                    <tr>
+                      <td><span class="badge bg-secondary">{{ file.kind }}</span></td>
+                      <td class="font-monospace small text-break">{{ file.name }}</td>
+                      <td class="text-end small">{{ file.size_kb }} KB</td>
+                      <td class="text-end">
+                        <a href="/config/archives/{{ file.kind }}/{{ file.name }}" class="btn btn-sm btn-outline-secondary py-0 px-2">
+                          <i class="bi bi-download"></i>
+                        </a>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              {% else %}
+              <div class="text-muted small py-3">No archive spreadsheets have been created yet.</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

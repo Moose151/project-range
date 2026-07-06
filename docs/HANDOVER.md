@@ -267,6 +267,12 @@
   - Local dev archive directories `audit_archives/` and `serial_archives/` are gitignored. The Docker defaults live under the existing `range-data` volume.
   - Documentation pages now have an administrator-only delete action on the page toolbar (`POST /docs/{slug}/delete`), which deletes the page/versions and records a `doc_delete` audit entry.
   - Dashboard widget selection is checkbox-based: the Widgets dropdown reflects visible static/utility widgets and deselecting an item removes or hides it without needing to press the widget's X button.
+- **0.19.7 — QoL navigation/admin tools:**
+  - Global command palette is available from the topbar Jump button or `Ctrl+K` (`app/routers/search.py` + `app/static/js/app.js`). It searches static destinations plus devices, serials, packages, docs, and signal names in the current Testing/Live scope. Recent pages are terminal-local in `localStorage`.
+  - Dashboard QoL controls now include widget search, collapse all, expand all, and reset terminal-local layout/utility widgets.
+  - `/logs` now has quick date/status chips, saved terminal-local filter presets, and inclusive date-only `date_to` filtering.
+  - Admin Config → System includes a compact system-health/archive panel and safe download endpoints at `/config/archives/{audit|serial}/{filename}`.
+  - `/devices/topology` has client-side search/highlighting plus manual/auto/live-route visibility toggles.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.
