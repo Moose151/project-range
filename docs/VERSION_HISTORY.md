@@ -8,7 +8,8 @@ Current version: **0.20.2**
 ## 0.20.2 — Light Mode Readability Fix
 
 - Fixed all **light-mode** themes where the left sidebar and top bar text was unreadable (dark text on the dark sidebar/topbar). Those surfaces keep a dark background in light mode by design, so their text is now always light regardless of the light/dark toggle. Applies to Classic, SEW Gold, Night Ops, and Spectrum.
-- Static cache key bumped to `app.css?v=28`.
+- Fixed remaining light-mode table readability issues where dashboard signal lists, Signal Logs, history, audit/config, and other operational tables still used dark table backgrounds.
+- Static cache key bumped to `app.css?v=29`.
 
 ## 0.20.1 — Chat Receipts and Typing Indicator
 

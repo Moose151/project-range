@@ -865,6 +865,40 @@ html[data-bs-theme] {
 body {
   background-color: var(--range-body-bg) !important;
 }
+
+/* Legacy templates still use Bootstrap's .table-dark for operational data
+   tables. In light mode, remap that class to the light palette so dashboard
+   signal lists, logs, audit/config tables, and history all stay readable. */
+[data-bs-theme="light"] .table-dark {
+  --bs-table-color: var(--bs-body-color);
+  --bs-table-bg: var(--range-card-bg);
+  --bs-table-border-color: var(--range-card-border);
+  --bs-table-striped-bg: rgba(42, 52, 64, 0.045);
+  --bs-table-striped-color: var(--bs-body-color);
+  --bs-table-active-bg: rgba(var(--range-accent-rgb), 0.13);
+  --bs-table-active-color: var(--bs-body-color);
+  --bs-table-hover-bg: rgba(var(--range-accent-rgb), 0.085);
+  --bs-table-hover-color: var(--bs-body-color);
+  color: var(--bs-body-color);
+  border-color: var(--range-card-border);
+}
+[data-bs-theme="light"] .table-dark > :not(caption) > * > * {
+  background-color: var(--bs-table-bg);
+  color: var(--bs-table-color);
+  border-bottom-color: var(--bs-table-border-color);
+}
+[data-bs-theme="light"] .table-dark thead,
+[data-bs-theme="light"] .table-dark .table-secondary {
+  --bs-table-color: #17202a;
+  --bs-table-bg: var(--range-muted-panel);
+  --bs-table-border-color: var(--range-card-border);
+  color: #17202a;
+}
+[data-bs-theme="light"] .table-dark .text-muted,
+[data-bs-theme="light"] .table-dark .text-body-secondary,
+[data-bs-theme="light"] .table-dark .text-secondary {
+  color: var(--bs-secondary-color) !important;
+}
 .navbar {
   background-color: var(--range-nav-bg) !important;
 }
