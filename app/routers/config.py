@@ -20,6 +20,9 @@ from app.settings import (
     get_local_timezone,
     set_setting,
     LOCAL_TIMEZONE_KEY,
+    CBM_EBNO_LOG_THRESHOLD_KEY,
+    DEFAULT_CBM_EBNO_LOG_THRESHOLD,
+    get_cbm_ebno_log_threshold,
 )
 
 router = APIRouter(prefix="/config")
@@ -106,6 +109,7 @@ async def config_page(
         "audit_live_record_limit": get_audit_live_record_limit(db),
         "audit_live_record_min": MIN_AUDIT_LIVE_RECORD_LIMIT,
         "audit_live_record_max": MAX_AUDIT_LIVE_RECORD_LIMIT,
+        "cbm_ebno_log_threshold": get_cbm_ebno_log_threshold(db),
         "system_health": {
             "database": str(db_path) if db_path else DATABASE_URL,
             "database_size_mb": round(db_path.stat().st_size / (1024 * 1024), 2) if db_path and db_path.exists() else None,
@@ -195,12 +199,18 @@ async def shortcut_linux(
 async def system_settings_save(
     local_timezone: str = Form("UTC"),
     audit_live_record_limit: str = Form("1000"),
+    cbm_ebno_log_threshold: str = Form("3"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
     if local_timezone in TIME_ZONES:
         set_setting(db, LOCAL_TIMEZONE_KEY, local_timezone)
     set_setting(db, AUDIT_LIVE_RECORD_LIMIT_KEY, str(clamp_audit_live_record_limit(audit_live_record_limit)))
+    try:
+        ebno_thr = max(0.0, float(cbm_ebno_log_threshold))
+    except (TypeError, ValueError):
+        ebno_thr = DEFAULT_CBM_EBNO_LOG_THRESHOLD
+    set_setting(db, CBM_EBNO_LOG_THRESHOLD_KEY, f"{ebno_thr:g}")
     db.commit()
     return RedirectResponse("/config?toast=System+settings+saved", status_code=302)
 

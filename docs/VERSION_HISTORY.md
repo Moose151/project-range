@@ -1,9 +1,17 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.19.10**
+Current version: **0.20.0**
 
 ---
+
+## 0.20.0 — Closed-Loop (IF-only) Packages + Eb/No Logging Controls
+
+- **Closed loop vs Live (RF) packages:** a signal package now has an **Environment** toggle. Closed-loop packages are **IF-only** — no band, antenna, TxLO/RxLO or TTF, and no out-of-band warnings. The RF fields are hidden in the editor and cleared when a package is set to closed loop.
+- Serials show as **Closed loop** automatically when all their packages are IF-only (packages drive it). Closed-loop / Live badges appear on the packages list, serials, the dashboard serial widget, and the **add-package picker** on serials.
+- **Dashboard** hides the RF-only columns (TxRF, RxRF, Band, Antenna) for closed-loop serials, showing only IF frequencies.
+- **Eb/No logging is now less noisy:** during CBM/EBEM sync, small Eb/No drifts no longer create a new log every poll. Only changes beyond a threshold — **default ±3 dB**, configurable in **Admin → Config → System** — are logged. A carrier appearing or disappearing always logs.
+- **Eb/No now clears when the modem stops transmitting/receiving** (reports "No Carrier"), instead of keeping the last value. This, together with the threshold, fixes the CBM sync writing a signal-log entry on every poll.
 
 ## 0.19.10 — EBEM ICC Parser Fix (Status + Eb/No)
 

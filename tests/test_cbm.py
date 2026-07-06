@@ -12,7 +12,37 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.cbm import parse_icc_response, CBMSnapshot  # noqa: E402
-from app.cbm_sync import _status_from_snapshot, _entry_values_from_snapshot  # noqa: E402
+from app.cbm_sync import (  # noqa: E402
+    _status_from_snapshot, _entry_values_from_snapshot, _ebno_changed, _changed,
+)
+
+
+class _Log:
+    def __init__(self, **kw):
+        defaults = dict(signal_status=None, modulation=None, symbol_rate=None, fec=None,
+                        power=None, eb_no=None, tx_if=None, tx_rf=None, rx_rf=None, rx_if=None)
+        defaults.update(kw)
+        self.__dict__.update(defaults)
+
+
+def test_ebno_threshold_small_change_ignored():
+    # Within +/-3 dB: not a change.
+    assert _ebno_changed(7.8, 8.0, 3.0) is False
+    assert _ebno_changed(7.8, 10.7, 3.0) is False
+    # Beyond threshold: a change.
+    assert _ebno_changed(7.8, 11.0, 3.0) is True
+    # Carrier lost / acquired always counts.
+    assert _ebno_changed(7.8, None, 3.0) is True
+    assert _ebno_changed(None, 7.8, 3.0) is True
+    assert _ebno_changed(None, None, 3.0) is False
+
+
+def test_changed_ignores_small_ebno_but_catches_other_fields():
+    latest = _Log(signal_status="Up", power=-10.0, eb_no=7.8)
+    # Only a tiny Eb/No drift -> not logged.
+    assert _changed(latest, {"signal_status": "Up", "power": -10.0, "eb_no": 8.5}, 3.0) is False
+    # Power change -> logged even with tiny Eb/No drift.
+    assert _changed(latest, {"signal_status": "Up", "power": -12.0, "eb_no": 8.5}, 3.0) is True
 
 
 # Real format: the shell echoes "tx_cfg ?" before the "TX_CFG ..." response, and the

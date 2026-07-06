@@ -27,15 +27,15 @@
       <th data-col="status">Status</th>
       <th data-col="engaged">Engaged</th>
       <th data-col="tx_if">TxIF</th>
-      <th data-col="tx_rf">TxRF</th>
-      <th data-col="rx_rf">RxRF</th>
+      {% if not closed_loop %}<th data-col="tx_rf">TxRF</th>
+      <th data-col="rx_rf">RxRF</th>{% endif %}
       <th data-col="rx_if">RxIF</th>
       <th data-col="unit">Unit</th>
-      <th data-col="band">Band</th>
+      {% if not closed_loop %}<th data-col="band">Band</th>{% endif %}
       <th data-col="mod">Mod</th>
       <th data-col="sym">Sym Rate</th>
       <th data-col="fec">FEC</th>
-      <th data-col="antenna">Antenna</th>
+      {% if not closed_loop %}<th data-col="antenna">Antenna</th>{% endif %}
       <th data-col="power">Power</th>
       <th data-col="ebno">Eb/No</th>
       <th data-col="updated">Updated</th>
@@ -100,15 +100,15 @@
         </div>
       </td>
       <td data-col="tx_if">{{ log.tx_if if log.tx_if is not none else '—' }}</td>
-      <td data-col="tx_rf">{{ log.tx_rf if log.tx_rf is not none else '—' }}</td>
-      <td data-col="rx_rf">{{ log.rx_rf if log.rx_rf is not none else '—' }}</td>
+      {% if not closed_loop %}<td data-col="tx_rf">{{ log.tx_rf if log.tx_rf is not none else '—' }}</td>
+      <td data-col="rx_rf">{{ log.rx_rf if log.rx_rf is not none else '—' }}</td>{% endif %}
       <td data-col="rx_if">{{ log.rx_if if log.rx_if is not none else '—' }}</td>
       <td data-col="unit" class="text-muted">{{ log.freq_unit }}</td>
-      <td data-col="band">{{ log.band or '—' }}</td>
+      {% if not closed_loop %}<td data-col="band">{{ log.band or '—' }}</td>{% endif %}
       <td data-col="mod">{{ log.modulation or '—' }}</td>
       <td data-col="sym">{{ log.symbol_rate or '—' }}</td>
       <td data-col="fec">{{ log.fec or '—' }}</td>
-      <td data-col="antenna" class="text-muted small">{{ log.antenna or '—' }}</td>
+      {% if not closed_loop %}<td data-col="antenna" class="text-muted small">{{ log.antenna or '—' }}</td>{% endif %}
       <td data-col="power" style="min-width:160px">
         <div class="input-group input-group-sm flex-nowrap" style="width:160px">
           <button type="button" class="btn btn-outline-secondary px-1" title="Decrease power by 1"

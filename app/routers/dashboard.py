@@ -413,6 +413,7 @@ async def dashboard_fragment(
         "signals": signals,
         "buzzer_active": _buzzer_active(signals, range_state),
         "serial_id": serial_id,
+        "closed_loop": bool(serial and serial.is_closed_loop),
         "pkg_rf": _pkg_rf_for_serial(db, serial_id),
         "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial_id, signals),
     })

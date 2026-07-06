@@ -92,6 +92,7 @@ def _migrate(conn):
         "ALTER TABLE signal_packages ADD COLUMN ttf FLOAT",
         "ALTER TABLE signal_packages ADD COLUMN ttf_direction VARCHAR(4) DEFAULT '+'",
         "ALTER TABLE signal_packages ADD COLUMN freq_unit VARCHAR(4) DEFAULT 'MHz'",
+        "ALTER TABLE signal_packages ADD COLUMN loop_mode VARCHAR(8) DEFAULT 'live'",
         "ALTER TABLE signal_package_entries ADD COLUMN cbm_device_id INTEGER REFERENCES rf_devices(id)",
         "ALTER TABLE signal_package_entries ADD COLUMN cbm_path VARCHAR(16)",
         "ALTER TABLE signal_package_entries ADD COLUMN cbm_carrier VARCHAR(64)",

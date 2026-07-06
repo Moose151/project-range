@@ -131,6 +131,10 @@ class SignalPackage(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     is_testing: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # "live" = normal RF package; "closed" = closed-loop / IF-only (no band, antenna,
+    # TxLO/RxLO or TTF — only IF frequencies are meaningful).
+    loop_mode: Mapped[str] = mapped_column(String(8), default="live")
+
     # Package-level RF configuration — shared by all signals in this package
     band: Mapped[str | None] = mapped_column(String(8), nullable=True)
     antenna: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -139,6 +143,10 @@ class SignalPackage(Base):
     ttf: Mapped[float | None] = mapped_column(Float, nullable=True)
     ttf_direction: Mapped[str] = mapped_column(String(4), default="+")
     freq_unit: Mapped[str] = mapped_column(String(4), default="MHz")
+
+    @property
+    def is_closed_loop(self) -> bool:
+        return self.loop_mode == "closed"
 
     created_by: Mapped[User] = relationship("User", foreign_keys="SignalPackage.created_by_id")
     signals: Mapped[list["SignalPackageEntry"]] = relationship(
@@ -207,6 +215,13 @@ class Serial(Base):
     @property
     def display_title(self) -> str:
         return f"{self.opened_at.strftime('%Y-%m-%d')} — {self.title}"
+
+    @property
+    def is_closed_loop(self) -> bool:
+        """Derived (packages drive it): closed-loop when the serial has packages and
+        every assigned package is closed-loop / IF-only."""
+        packages = [link.package for link in self.package_links if link.package]
+        return bool(packages) and all(p.is_closed_loop for p in packages)
 
 
 class SerialPackage(Base):

@@ -42,6 +42,7 @@
           <div class="flex-grow-1">
             <span class="fw-semibold">{{ serial.title }}</span>
             <span class="badge bg-warning text-dark ms-2 small">Pending</span>
+            {% if serial.is_closed_loop %}<span class="badge bg-info text-dark ms-1 small"><i class="bi bi-arrow-repeat me-1"></i>Closed loop</span>{% endif %}
             {% if serial.package_links %}
             <div class="text-muted small mt-1">
               <i class="bi bi-box-seam me-1"></i>
@@ -78,6 +79,9 @@
     <div class="card border-success">
       <div class="card-header d-flex align-items-center gap-2">
         <span class="badge bg-success">Active</span>
+        {% if serial.is_closed_loop %}
+        <span class="badge bg-info text-dark" title="Closed loop — IF only"><i class="bi bi-arrow-repeat me-1"></i>Closed loop</span>
+        {% endif %}
         <span class="fw-semibold">{{ serial.title }}</span>
         <span class="text-muted small ms-auto">Started {{ serial.opened_at.strftime('%d/%m/%y %H:%M') }}</span>
       </div>
@@ -99,7 +103,7 @@
         <form method="post" action="/serials/{{ serial.id }}/packages/add" class="d-flex gap-2 mt-2">
           <select class="form-select form-select-sm" name="package_id">
             {% for pkg in packages %}
-            <option value="{{ pkg.id }}">{{ pkg.name }}</option>
+            <option value="{{ pkg.id }}">{{ pkg.name }} — {% if pkg.is_closed_loop %}Closed loop (IF){% else %}Live (RF){% endif %}</option>
             {% endfor %}
           </select>
           <button type="submit" class="btn btn-sm btn-outline-secondary text-nowrap">
@@ -203,6 +207,11 @@
                 <label class="form-check-label" for="pkg_{{ pkg.id }}">
                   {{ pkg.name }}
                   <span class="text-muted small">({{ pkg.signals | length }} signals)</span>
+                  {% if pkg.is_closed_loop %}
+                  <span class="badge bg-info text-dark small"><i class="bi bi-arrow-repeat me-1"></i>Closed loop</span>
+                  {% else %}
+                  <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle small"><i class="bi bi-broadcast me-1"></i>Live</span>
+                  {% endif %}
                 </label>
               </div>
               {% endfor %}

@@ -82,7 +82,22 @@
             <textarea class="form-control" name="description" rows="2">{{ package.description or '' }}</textarea>
           </div>
 
+          <!-- Environment: Live (RF) vs Closed loop (IF only) -->
+          <div class="mb-3">
+            <label class="form-label">Environment</label>
+            <div class="btn-group w-100" role="group">
+              <input type="radio" class="btn-check" name="loop_mode" id="lm_live" value="live"
+                     {% if not package or not package.is_closed_loop %}checked{% endif %} onchange="pkgLoopMode()">
+              <label class="btn btn-outline-primary" for="lm_live"><i class="bi bi-broadcast me-1"></i>Live (RF)</label>
+              <input type="radio" class="btn-check" name="loop_mode" id="lm_closed" value="closed"
+                     {% if package and package.is_closed_loop %}checked{% endif %} onchange="pkgLoopMode()">
+              <label class="btn btn-outline-primary" for="lm_closed"><i class="bi bi-arrow-repeat me-1"></i>Closed loop (IF only)</label>
+            </div>
+            <div class="form-text">Closed loop is IF-only — no band, antenna, TxLO/RxLO or TTF, and no out-of-band warnings.</div>
+          </div>
+
           <!-- RF Configuration (shared across all signals in this package) -->
+          <div id="pkgRfConfig">
           <hr class="border-secondary my-3">
           <div class="text-muted small fw-semibold mb-2">
             <i class="bi bi-broadcast me-1"></i>RF Configuration
@@ -146,6 +161,18 @@
             <span class="ms-1">({{ package.freq_unit or 'MHz' }})</span>
           </div>
           {% endif %}
+          </div> <!-- /#pkgRfConfig -->
+          <script>
+            function pkgLoopMode() {
+              var closed = document.getElementById('lm_closed') && document.getElementById('lm_closed').checked;
+              var rf = document.getElementById('pkgRfConfig');
+              if (rf) rf.style.display = closed ? 'none' : '';
+              document.querySelectorAll('.rf-only').forEach(function (el) {
+                el.style.display = closed ? 'none' : '';
+              });
+            }
+            document.addEventListener('DOMContentLoaded', pkgLoopMode);
+          </script>
 
           {% if user.role == 'observer' %}</fieldset>{% endif %}
           {% if user.role != 'observer' %}
@@ -202,8 +229,8 @@
               {% if user.role != 'observer' %}<th style="width:28px"></th>{% endif %}
               <th>Name</th>
               <th>TxIF</th>
-              <th>TxRF</th>
-              <th>RxRF</th>
+              <th class="rf-only">TxRF</th>
+              <th class="rf-only">RxRF</th>
               <th>RxIF</th>
               <th>Unit</th>
               <th>Mod</th>
@@ -222,8 +249,8 @@
               {% if user.role != 'observer' %}<td class="drag-handle text-muted ps-2" style="cursor:grab"><i class="bi bi-grip-vertical"></i></td>{% endif %}
               <td class="fw-semibold">{{ entry.signal_name }}</td>
               <td>{{ entry.tx_if or '—' }}</td>
-              <td>{{ entry.tx_rf or '—' }}</td>
-              <td>{{ entry.rx_rf or '—' }}</td>
+              <td class="rf-only">{{ entry.tx_rf or '—' }}</td>
+              <td class="rf-only">{{ entry.rx_rf or '—' }}</td>
               <td>{{ entry.rx_if or '—' }}</td>
               <td class="text-muted small">{{ entry.freq_unit }}</td>
               <td class="small">{{ entry.modulation or '—' }}</td>
@@ -294,7 +321,7 @@
                 {% for u in freq_units %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
               </select>
             </div>
-            <div class="col-12">
+            <div class="col-12 rf-only">
               <span class="small text-muted">
                 <i class="bi bi-calculator me-1"></i>Enter any one frequency — the others auto-calculate from the package TxLO/RxLO/TTF above.
               </span>
@@ -303,11 +330,11 @@
               <label class="form-label small">TxIF</label>
               <input type="number" class="form-control form-control-sm" name="tx_if" id="f_tx_if" step="any">
             </div>
-            <div class="col-sm-3">
+            <div class="col-sm-3 rf-only">
               <label class="form-label small">TxRF</label>
               <input type="number" class="form-control form-control-sm" name="tx_rf" id="f_tx_rf" step="any">
             </div>
-            <div class="col-sm-3">
+            <div class="col-sm-3 rf-only">
               <label class="form-label small">RxRF</label>
               <input type="number" class="form-control form-control-sm" name="rx_rf" id="f_rx_rf" step="any">
             </div>

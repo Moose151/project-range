@@ -695,6 +695,14 @@ document.addEventListener('DOMContentLoaded', () => {
               Older live audit records are archived to XLSX; testing audit records are pruned. Range: {{ audit_live_record_min }}-{{ audit_live_record_max }}.
             </div>
           </div>
+          <div class="col-lg-3 col-md-5">
+            <label class="form-label small">Eb/No change to log (dB)</label>
+            <input type="number" class="form-control form-control-sm" name="cbm_ebno_log_threshold"
+                   value="{{ cbm_ebno_log_threshold }}" min="0" step="0.1">
+            <div class="form-text">
+              During CBM/EBEM sync, Eb/No changes smaller than this are not logged; a carrier appearing/disappearing always logs. Default 3.
+            </div>
+          </div>
           <div class="col-auto">
             <button type="submit" class="btn btn-sm btn-primary">
               <i class="bi bi-check2 me-1"></i>Save System Settings

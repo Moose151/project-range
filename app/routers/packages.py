@@ -635,6 +635,7 @@ async def package_create(
     request: Request,
     name: str = Form(...),
     description: str = Form(""),
+    loop_mode: str = Form("live"),
     band: str = Form(""),
     antenna: str = Form(""),
     tx_lo: Optional[float] = Form(None),
@@ -645,14 +646,17 @@ async def package_create(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    closed = loop_mode == "closed"
     pkg = SignalPackage(
         name=name.strip(),
         description=description.strip() or None,
-        band=band or None,
-        antenna=antenna.strip() or None,
-        tx_lo=tx_lo,
-        rx_lo=rx_lo,
-        ttf=ttf,
+        loop_mode="closed" if closed else "live",
+        # Closed-loop (IF-only) packages carry no RF config.
+        band=None if closed else (band or None),
+        antenna=None if closed else (antenna.strip() or None),
+        tx_lo=None if closed else tx_lo,
+        rx_lo=None if closed else rx_lo,
+        ttf=None if closed else ttf,
         ttf_direction=ttf_direction or "+",
         freq_unit=freq_unit or "MHz",
         is_testing=is_testing_state(db),
@@ -697,6 +701,7 @@ async def package_update_meta(
     pkg_id: int,
     name: str = Form(...),
     description: str = Form(""),
+    loop_mode: str = Form("live"),
     band: str = Form(""),
     antenna: str = Form(""),
     tx_lo: Optional[float] = Form(None),
@@ -709,15 +714,25 @@ async def package_update_meta(
 ):
     pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id, SignalPackage.is_testing == is_testing_state(db)).first()
     if pkg:
+        closed = loop_mode == "closed"
         pkg.name = name.strip() or pkg.name
         pkg.description = description.strip() or None
-        pkg.band = band or None
-        pkg.antenna = antenna.strip() or None
-        pkg.tx_lo = tx_lo
-        pkg.rx_lo = rx_lo
-        pkg.ttf = ttf
+        pkg.loop_mode = "closed" if closed else "live"
+        # Closed-loop (IF-only) packages carry no RF config — clear it if switched.
+        pkg.band = None if closed else (band or None)
+        pkg.antenna = None if closed else (antenna.strip() or None)
+        pkg.tx_lo = None if closed else tx_lo
+        pkg.rx_lo = None if closed else rx_lo
+        pkg.ttf = None if closed else ttf
         pkg.ttf_direction = ttf_direction or "+"
         pkg.freq_unit = freq_unit or "MHz"
+        if closed:
+            # Drop RF-only fields from every signal in the package.
+            for e in pkg.signals:
+                e.tx_rf = None
+                e.rx_rf = None
+                e.band = None
+                e.antenna = None
         pkg.updated_at = datetime.utcnow()
         db.commit()
     return RedirectResponse(f"/packages/{pkg_id}?toast=Package+updated", status_code=302)

@@ -42,6 +42,11 @@
         <i class="bi bi-box-seam text-primary me-1"></i>
         <span class="fw-semibold">{{ pkg.name }}</span>
         <span class="badge bg-secondary ms-1">{{ pkg.signals | length }} signal{{ 's' if pkg.signals | length != 1 }}</span>
+        {% if pkg.is_closed_loop %}
+        <span class="badge bg-info text-dark" title="Closed loop — IF only, no RF"><i class="bi bi-arrow-repeat me-1"></i>Closed loop</span>
+        {% else %}
+        <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle" title="Live — RF"><i class="bi bi-broadcast me-1"></i>Live</span>
+        {% endif %}
         <div class="ms-auto d-flex gap-1">
           {% if user.role != 'observer' %}
           <a href="/packages/{{ pkg.id }}/import" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Import CBM config into this package">

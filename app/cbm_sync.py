@@ -14,6 +14,7 @@ from app.crypto import decrypt_secret
 from app.deps import get_current_range_state, is_testing_state
 from app.models import AuditLog, RFDevice, Serial, SignalLog, SignalPackageEntry
 from app.rf_config import serial_package_rf_config, recalculate_from_values
+from app.settings import get_cbm_ebno_log_threshold
 from app.signal_warnings import warning_flags_for
 
 
@@ -112,9 +113,11 @@ def _status_from_snapshot(snapshot: CBMSnapshot, path: str | None) -> str | None
 def _entry_values_from_snapshot(entry: SignalPackageEntry, snapshot: CBMSnapshot) -> dict:
     path = entry.cbm_path or "tx"
     summary = snapshot.summary
-    # Eb/No (and Rx level) are live receive-demod telemetry that are meaningful on any
-    # mapping when the modem is actually receiving a locked carrier; read them for every
-    # path and only fall back to the stored value when the modem reports no carrier.
+    # Eb/No is the modem's live receive-demod reading. It is authoritative: when the
+    # modem reports "No Carrier" (not receiving) it parses to None and Eb/No is CLEARED,
+    # rather than keeping a stale value from when a carrier was present. Using the modem
+    # value directly (including None) also stops the sync from logging a spurious change
+    # every poll when the stored value and the live value disagree.
     modem_ebno = _float_text(summary.get("rx_ebno_db"))
     values = {
         "signal_status": _status_from_snapshot(snapshot, path),
@@ -122,7 +125,7 @@ def _entry_values_from_snapshot(entry: SignalPackageEntry, snapshot: CBMSnapshot
         "symbol_rate": entry.symbol_rate,
         "fec": entry.fec,
         "power": entry.power,
-        "eb_no": modem_ebno if modem_ebno is not None else entry.eb_no,
+        "eb_no": modem_ebno,
         "tx_if": entry.tx_if,
         "rx_if": entry.rx_if,
     }
@@ -147,10 +150,25 @@ def _entry_values_from_snapshot(entry: SignalPackageEntry, snapshot: CBMSnapshot
     return values
 
 
-def _changed(latest: SignalLog | None, values: dict) -> bool:
+def _ebno_changed(old, new, threshold: float) -> bool:
+    """Eb/No is noisy: only count a change worth logging when it crosses the threshold,
+    OR when a carrier appears/disappears (a value <-> no-value transition)."""
+    if (old is None) != (new is None):
+        return True          # carrier acquired or lost
+    if old is None and new is None:
+        return False
+    try:
+        return abs(float(new) - float(old)) >= threshold
+    except (TypeError, ValueError):
+        return old != new
+
+
+def _changed(latest: SignalLog | None, values: dict, ebno_threshold: float = 0.0) -> bool:
     if latest is None:
         return True
-    fields = ("signal_status", "modulation", "symbol_rate", "fec", "power", "eb_no", "tx_if", "tx_rf", "rx_rf", "rx_if")
+    if _ebno_changed(latest.eb_no, values.get("eb_no"), ebno_threshold):
+        return True
+    fields = ("signal_status", "modulation", "symbol_rate", "fec", "power", "tx_if", "tx_rf", "rx_rf", "rx_if")
     return any(getattr(latest, field) != values.get(field) for field in fields)
 
 
@@ -162,6 +180,7 @@ def sync_active_cbms(db: Session, actor_id: int | None, audit_when_noop: bool = 
     result = CBMSyncResult(errors=[])
     range_state = get_current_range_state(db)
     testing = is_testing_state(db)
+    ebno_threshold = get_cbm_ebno_log_threshold(db)
     active_serials = db.query(Serial).filter(
         Serial.closed_at == None,
         Serial.is_started == True,
@@ -238,7 +257,7 @@ def sync_active_cbms(db: Session, actor_id: int | None, audit_when_noop: bool = 
             serial_package_rf_config(db, serial.id, entry.signal_name),
             preferred=[field for field in ("tx_if", "rx_if") if values.get(field) is not None],
         ))
-        if not _changed(latest, values):
+        if not _changed(latest, values, ebno_threshold):
             continue
 
         power = values.get("power") if values.get("power") is not None else (latest.power if latest else None)
@@ -258,7 +277,7 @@ def sync_active_cbms(db: Session, actor_id: int | None, audit_when_noop: bool = 
             fec=values.get("fec"),
             power=power,
             power_unit="dBm",
-            eb_no=values.get("eb_no") if values.get("eb_no") is not None else (latest.eb_no if latest else entry.eb_no),
+            eb_no=values.get("eb_no"),  # modem-authoritative; None when no carrier
             engaged=latest.engaged if latest else False,
             source=latest.source if latest else entry.source,
             antenna=latest.antenna if latest else (entry.package.antenna or entry.antenna),
