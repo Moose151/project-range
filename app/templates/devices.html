@@ -297,6 +297,10 @@
                 <i class="bi bi-plug"></i>
               </button>
             </form>
+            <a href="/devices/{{ d.id }}/cbm/diagnostics" target="_blank" rel="noopener"
+               class="btn btn-sm btn-outline-secondary py-0 px-1" title="Raw modem ICC output (diagnostics)">
+              <i class="bi bi-bug"></i>
+            </a>
             {% endif %}
             {% if d.device_type in snmp_monitor_types and d.snmp_enabled %}
             <form method="post" action="/devices/{{ d.id }}/snmp/test" class="d-inline">

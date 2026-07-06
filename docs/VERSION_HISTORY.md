@@ -1,9 +1,15 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.19.9**
+Current version: **0.19.10**
 
 ---
+
+## 0.19.10 — EBEM ICC Parser Fix (Status + Eb/No)
+
+- Fixed the root cause of EBEM/CBM signal status not going **Up** when transmitting: the modem echoes the query command (e.g. `tx_cfg ?`) before its `TX_CFG TX_OP=ON,…` reply, and the parser was locking onto the lowercase echo and corrupting the first field (`TX_OP`). It now skips the echoed line and reads `TX_OP` correctly, so `TX_OP=ON` maps to **Up**.
+- **Eb/No** is now read from the modem's `RX_EBNO` on any mapping (not only receive paths) whenever the modem reports a real value, and stays blank when the modem reports "No Carrier".
+- Added an admin **CBM diagnostics** button (raw ICC output + how each field parsed) on the Devices page, so modem responses can be verified without guessing field names.
 
 ## 0.19.9 — EBEM Sync Status Fix
 

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, is_testing_state, require_supervisor
-from app.cbm import CBMError, poll_cbm_ssh
+from app.cbm import CBMError, poll_cbm_ssh, cbm_diagnostic
 from app.cbm_sync import sync_active_cbms
 import json
 
@@ -349,6 +349,26 @@ async def device_cbm_test(
             f"/devices?toast={quote_plus('CBM poll failed: ' + dev.name)}",
             status_code=302,
         )
+
+
+@router.get("/{dev_id}/cbm/diagnostics", response_class=PlainTextResponse)
+async def device_cbm_diagnostics(
+    dev_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    """Raw ICC output from the modem (read-only) — for verifying status/Eb/No fields."""
+    dev = db.query(RFDevice).filter(RFDevice.id == dev_id, RFDevice.is_testing == is_testing_state(db)).first()
+    if not dev or not _is_ebem_device(dev.device_type, dev.name, dev.device_model):
+        return PlainTextResponse("Device not found or not a CBM/EBEM modem.", status_code=404)
+    password = decrypt_secret(dev.cbm_password_encrypted)
+    if not dev.host or not dev.cbm_username or not password:
+        return PlainTextResponse("Host, username, and a readable password are required.", status_code=400)
+    header = f"# CBM/EBEM ICC diagnostic for {dev.name} ({dev.host})\n\n"
+    try:
+        return PlainTextResponse(header + cbm_diagnostic(dev.host, dev.cbm_username, password))
+    except CBMError as exc:
+        return PlainTextResponse(header + f"# poll failed: {exc}\n", status_code=200)
 
 
 @router.post("/{dev_id}/snmp/test")

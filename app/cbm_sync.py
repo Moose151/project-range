@@ -112,13 +112,17 @@ def _status_from_snapshot(snapshot: CBMSnapshot, path: str | None) -> str | None
 def _entry_values_from_snapshot(entry: SignalPackageEntry, snapshot: CBMSnapshot) -> dict:
     path = entry.cbm_path or "tx"
     summary = snapshot.summary
+    # Eb/No (and Rx level) are live receive-demod telemetry that are meaningful on any
+    # mapping when the modem is actually receiving a locked carrier; read them for every
+    # path and only fall back to the stored value when the modem reports no carrier.
+    modem_ebno = _float_text(summary.get("rx_ebno_db"))
     values = {
         "signal_status": _status_from_snapshot(snapshot, path),
         "modulation": entry.modulation,
         "symbol_rate": entry.symbol_rate,
         "fec": entry.fec,
         "power": entry.power,
-        "eb_no": entry.eb_no,
+        "eb_no": modem_ebno if modem_ebno is not None else entry.eb_no,
         "tx_if": entry.tx_if,
         "rx_if": entry.rx_if,
     }
@@ -132,7 +136,6 @@ def _entry_values_from_snapshot(entry: SignalPackageEntry, snapshot: CBMSnapshot
         })
     if path in ("rx", "tx_rx", "dvb"):
         values.update({
-            "eb_no": _float_text(summary.get("rx_ebno_db")),
             "rx_if": _mhz_from_khz_text(summary.get("rx_if_frequency_khz")),
         })
         if path in ("rx", "dvb"):

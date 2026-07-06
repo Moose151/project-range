@@ -52,20 +52,35 @@ class CBMSnapshot:
 
 
 def parse_icc_response(text: str, command_name: str) -> dict[str, str]:
-    """Parse `TX_CFG A=B,C=D` style ICC output into a dict."""
-    pattern = re.compile(rf"\b{re.escape(command_name)}\b\s*(.*)", re.IGNORECASE | re.DOTALL)
+    """Parse `TX_CFG A=B,C=D` style ICC output into a dict.
+
+    The EBEM shell echoes the query back before answering, e.g.::
+
+        tx_cfg ?
+        TX_CFG TX_OP=ON,TXIF_LVL=-10.00,...
+
+    The command name is matched case-insensitively, so we must NOT lock onto the
+    lowercase echo line (`tx_cfg ?`) — doing so corrupts the first real field. The
+    lookahead requires the command name to be followed by a `KEY=` list, which only
+    the response line has, so the echoed query is skipped. The response can wrap over
+    several lines, so whitespace is collapsed before splitting on commas.
+    """
+    pattern = re.compile(
+        rf"\b{re.escape(command_name)}\b\s+(?=[A-Za-z0-9_]+\s*=)(.*)",
+        re.IGNORECASE | re.DOTALL,
+    )
     match = pattern.search(text)
     if not match:
         return {}
-    payload = match.group(1).strip()
-    payload = re.sub(r"\s+", "", payload)
+    payload = re.sub(r"\s+", "", match.group(1))
     result: dict[str, str] = {}
     for part in payload.split(","):
         if "=" not in part:
             continue
         key, value = part.split("=", 1)
+        key = key.strip().upper()
         if key:
-            result[key.upper()] = value
+            result[key] = value
     return result
 
 
@@ -117,6 +132,48 @@ def poll_cbm_ssh(host: str, username: str, password: str, *, timeout: float = 6.
             rx_config=parse_icc_response(outputs["rx_cfg ?"], "RX_CFG"),
             status=parse_icc_response(outputs["all_stat ?"], "ALL_STAT"),
         )
+    except Exception as exc:
+        raise CBMError(str(exc)) from exc
+    finally:
+        client.close()
+
+
+def cbm_diagnostic(host: str, username: str, password: str, *, timeout: float = 6.0) -> str:
+    """Return the raw ICC output for the status/config commands (read-only diagnostics).
+
+    Lets an operator/administrator see exactly what the modem reports and how the parser
+    interprets it, without guessing field names.
+    """
+    try:
+        import paramiko
+    except ImportError as exc:
+        raise CBMError("paramiko is not installed; rebuild/install requirements first") from exc
+
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    commands = ("tx_cfg ?", "rx_cfg ?", "all_stat ?")
+    parsers = {"tx_cfg ?": "TX_CFG", "rx_cfg ?": "RX_CFG", "all_stat ?": "ALL_STAT"}
+    sections: list[str] = []
+    try:
+        client.connect(
+            host, port=22, username=username, password=password,
+            timeout=timeout, banner_timeout=timeout, auth_timeout=timeout,
+            look_for_keys=False, allow_agent=False,
+        )
+        channel = client.invoke_shell(width=200, height=40)
+        _read_available(channel, 1.0)
+        channel.send("i\n")
+        _read_available(channel, 0.5)
+        for command in commands:
+            channel.send(command + "\n")
+            raw = _read_available(channel, 1.5)
+            parsed = parse_icc_response(raw, parsers[command])
+            sections.append(
+                f"### {command}\n--- raw ---\n{raw.strip()}\n"
+                f"--- parsed ({len(parsed)} fields) ---\n"
+                + "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
+            )
+        return "\n\n".join(sections)
     except Exception as exc:
         raise CBMError(str(exc)) from exc
     finally:
