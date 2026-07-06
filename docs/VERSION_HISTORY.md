@@ -1,9 +1,14 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.19.7**
+Current version: **0.19.8**
 
 ---
+
+## 0.19.8 — Session Hardening
+
+- Login now clears any pre-auth session state before writing authenticated claims, which hardens the signed-cookie session flow against fixation-style reuse.
+- Sessions now carry `session_issued_at`; malformed timestamps expire safely, and the absolute cookie-age ceiling is enforced server-side as well as by the browser cookie.
 
 ## 0.19.7 — QoL Navigation and Admin Tools
 

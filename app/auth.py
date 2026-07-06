@@ -4,7 +4,7 @@ import bcrypt
 from sqlalchemy.orm import Session
 from app.models import User
 from app.config import (
-    SESSION_TIMEOUT_MINUTES, MIN_PASSWORD_LENGTH,
+    SESSION_TIMEOUT_MINUTES, SESSION_MAX_AGE_DAYS, MIN_PASSWORD_LENGTH,
     LOGIN_MAX_ATTEMPTS, LOGIN_LOCKOUT_SECONDS,
 )
 
@@ -65,13 +65,42 @@ def authenticate_user(db: Session, username: str, password: str) -> User | None:
     return user
 
 
+def start_authenticated_session(session: dict, user: User, session_token: str, remember: bool) -> None:
+    """Replace any anonymous/pre-login session state with authenticated claims.
+
+    Starlette's signed cookie session has no server-side session id to rotate, so
+    clearing before setting auth claims is the fixation defence: any state that
+    existed before login is discarded and a fresh signed cookie is emitted.
+    """
+    now = datetime.utcnow().isoformat()
+    session.clear()
+    session["user_id"] = user.id
+    session["username"] = user.username
+    session["display_name"] = user.display_name
+    session["role"] = user.role.value if hasattr(user.role, "value") else str(user.role)
+    session["logged_in_at"] = now
+    session["session_issued_at"] = now
+    session["remember"] = bool(remember)
+    session["session_token"] = session_token
+
+
 def session_is_expired(session: dict) -> bool:
     logged_in_at = session.get("logged_in_at")
     if not logged_in_at:
         return True
+    issued_at = session.get("session_issued_at")
+    if issued_at:
+        try:
+            if datetime.utcnow() - datetime.fromisoformat(issued_at) > timedelta(days=SESSION_MAX_AGE_DAYS):
+                return True
+        except ValueError:
+            return True
     # "Remember this terminal" sessions are not subject to the inactivity timeout
     # (they last until the session cookie itself expires or the user logs out).
     if session.get("remember"):
         return False
-    elapsed = datetime.utcnow() - datetime.fromisoformat(logged_in_at)
+    try:
+        elapsed = datetime.utcnow() - datetime.fromisoformat(logged_in_at)
+    except ValueError:
+        return True
     return elapsed > timedelta(minutes=SESSION_TIMEOUT_MINUTES)

@@ -1,4 +1,3 @@
-from datetime import datetime
 import secrets
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -7,6 +6,7 @@ from app.database import get_db
 from app.models import AuditLog, User
 from app.auth import (
     authenticate_user, login_lock_remaining, register_failed_login, reset_login_attempts,
+    start_authenticated_session,
 )
 from app import chat_state
 
@@ -67,13 +67,7 @@ async def login_submit(
     db.add(AuditLog(user_id=user.id, action_type="LOGIN_SUCCESS",
                     comment=f"{user.username} from {ip}; previous sessions invalidated"))
     db.commit()
-    request.session["user_id"] = user.id
-    request.session["username"] = user.username
-    request.session["display_name"] = user.display_name
-    request.session["role"] = user.role.value if hasattr(user.role, "value") else str(user.role)
-    request.session["logged_in_at"] = datetime.utcnow().isoformat()
-    request.session["remember"] = bool(remember)
-    request.session["session_token"] = session_token
+    start_authenticated_session(request.session, user, session_token, bool(remember))
     return RedirectResponse("/", status_code=302)
 
 

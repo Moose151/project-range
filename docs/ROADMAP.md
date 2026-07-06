@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.19.7` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.19.8` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -255,9 +255,11 @@ fully trusted.
   (first-party; `'unsafe-inline'` allowed for our inline scripts/styles),
   `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`.
   Add `Strict-Transport-Security` once TLS is in place.
-- [ ] **Session hardening:** rotate the session ID on login (prevent fixation);
-  keep both idle and absolute timeouts; re-review the 30-day "remember this
-  terminal" cookie — fine for a locked ops room, risky on any shared/general PC.
+- [x] **Session hardening:** login now clears pre-auth session state before
+  writing authenticated claims, stamps `session_issued_at`, enforces the absolute
+  cookie-age ceiling server-side, and handles malformed timestamps as expired.
+  Re-review the 30-day "remember this terminal" policy operationally — fine for
+  a locked ops room, risky on any shared/general PC.
 - [ ] **Least-privilege data store:** on Postgres use a dedicated app role with
   minimal grants; on SQLite lock down file permissions. Restrict who can read the
   DB/backups (they contain the full audit trail).
