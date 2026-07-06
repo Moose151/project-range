@@ -1,9 +1,6 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-For planned work, see [ROADMAP.md](ROADMAP.md). For deep implementation notes and
-handover details, see [HANDOVER.md](HANDOVER.md).
-
 Current version: **0.19.7**
 
 ---
@@ -16,6 +13,10 @@ Current version: **0.19.7**
 - Added log quick filters for Today, Yesterday, Last 7 days, Faulted, and Current serial, plus terminal-local saved log filter presets.
 - Admin Config → System now shows database/audit/archive health and lets administrators download audit and serial archive spreadsheets from the server.
 - Topology now has search/highlight plus visibility toggles for manual links, auto-inferred links, and live routed paths.
+- Topology live routes now include an explanation row showing source, matrix device, observed input/output ports, destination, and data source.
+- Documentation pages now support categories and comma-separated tags, category filtering, related-doc suggestions, and an administrator recycle bin for deleted pages.
+- The top of the in-app Version History no longer links out to Roadmap/Handover.
+- The New Package screen now has a "Start from existing" duplicate shortcut.
 
 ## 0.19.6 — Audit Retention and Serial History Archiving
 

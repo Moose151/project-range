@@ -16,6 +16,9 @@
       <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ pending_count }}</span>
       {% endif %}
     </a>
+    <a href="/docs/deleted" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-archive me-1"></i>Deleted
+    </a>
     <a href="/docs/new" class="btn btn-sm btn-success">
       <i class="bi bi-plus-lg me-1"></i>New Page
     </a>
@@ -24,14 +27,25 @@
 </div>
 
 <form method="get" class="mb-3">
-  <div class="input-group" style="max-width:400px">
+  <div class="input-group" style="max-width:720px">
     <input type="search" class="form-control" name="q" value="{{ q }}" placeholder="Search documentation…">
+    <select class="form-select" name="category" style="max-width:220px">
+      <option value="">All categories</option>
+      {% for cat in categories %}
+      <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>{{ cat }}</option>
+      {% endfor %}
+    </select>
     <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
   </div>
 </form>
 
-{% if q %}
-<p class="text-muted small">Showing results for "<strong>{{ q }}</strong>" — <a href="/docs">clear</a></p>
+{% if q or category %}
+<p class="text-muted small">
+  Showing
+  {% if q %}results for "<strong>{{ q }}</strong>"{% endif %}
+  {% if category %}{% if q %} in {% endif %}<span class="badge bg-secondary">{{ category }}</span>{% endif %}
+  — <a href="/docs">clear</a>
+</p>
 {% endif %}
 
 {% if pages %}
@@ -45,6 +59,14 @@
         Updated
         {% if doc.updated_at %}{{ doc.updated_at.strftime('%d %b %Y') }} by {{ doc.updated_by.display_name }}
         {% else %}{{ doc.created_at.strftime('%d %b %Y') }} by {{ doc.created_by.display_name }}{% endif %}
+      </div>
+      <div class="small mt-1">
+        {% if doc.category %}<span class="badge bg-secondary me-1">{{ doc.category }}</span>{% endif %}
+        {% if doc.tags %}
+        {% for tag in doc.tags.split(',') %}
+        {% if tag.strip() %}<span class="badge bg-dark border border-secondary me-1">{{ tag.strip() }}</span>{% endif %}
+        {% endfor %}
+        {% endif %}
       </div>
     </div>
     <i class="bi bi-chevron-right ms-auto text-secondary mt-1"></i>

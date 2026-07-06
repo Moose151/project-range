@@ -89,12 +89,23 @@ async def quick_search(
 
         docs = (
             db.query(DocPage)
-            .filter(DocPage.is_published == True, or_(DocPage.title.ilike(needle), DocPage.content.ilike(needle)))
+            .filter(
+                DocPage.is_published == True,
+                or_(
+                    DocPage.title.ilike(needle),
+                    DocPage.content.ilike(needle),
+                    DocPage.category.ilike(needle),
+                    DocPage.tags.ilike(needle),
+                ),
+            )
             .order_by(DocPage.title)
             .limit(8)
             .all()
         )
-        results.extend(_item(d.title, f"/docs/{d.slug}", "Doc", "Documentation page", "bi-file-earmark-text") for d in docs)
+        results.extend(
+            _item(d.title, f"/docs/{d.slug}", "Doc", d.category or "Documentation page", "bi-file-earmark-text")
+            for d in docs
+        )
 
         logs = (
             db.query(SignalLog.signal_name)

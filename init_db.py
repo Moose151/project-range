@@ -124,6 +124,8 @@ def _migrate(conn):
         "ALTER TABLE incidents ADD COLUMN rejection_reason TEXT",
         "ALTER TABLE cease_events ADD COLUMN is_testing BOOLEAN DEFAULT 0",
         "ALTER TABLE doc_versions ADD COLUMN base_content TEXT",
+        "ALTER TABLE doc_pages ADD COLUMN category VARCHAR(128)",
+        "ALTER TABLE doc_pages ADD COLUMN tags VARCHAR(256)",
         "ALTER TABLE rf_devices ADD COLUMN snmp_enabled BOOLEAN DEFAULT 0",
         "ALTER TABLE rf_devices ADD COLUMN snmp_version VARCHAR(4) DEFAULT '2c'",
         "ALTER TABLE rf_devices ADD COLUMN snmp_port INTEGER DEFAULT 161",

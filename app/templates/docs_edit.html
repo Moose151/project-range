@@ -51,6 +51,28 @@
         </div>
       </div>
 
+      {% if mode == 'new' or user.role == 'administrator' %}
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Category <span class="text-muted fw-normal">(optional)</span></label>
+          <input type="text" class="form-control" name="category" list="docCategoryList"
+                 value="{{ doc_page.category if doc_page and doc_page.category else '' }}"
+                 placeholder="e.g. Operations, Devices, Safety">
+          <datalist id="docCategoryList">
+            {% for cat in categories %}
+            <option value="{{ cat }}"></option>
+            {% endfor %}
+          </datalist>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Tags <span class="text-muted fw-normal">(optional, comma separated)</span></label>
+          <input type="text" class="form-control" name="tags"
+                 value="{{ doc_page.tags if doc_page and doc_page.tags else '' }}"
+                 placeholder="e.g. checklist, rf, handover">
+        </div>
+      </div>
+      {% endif %}
+
       <div class="mb-3">
         <label class="form-label fw-semibold">Change Summary <span class="text-muted fw-normal">(optional)</span></label>
         <input type="text" class="form-control" name="change_summary"

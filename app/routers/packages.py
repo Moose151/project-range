@@ -583,10 +583,12 @@ async def package_new_page(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    testing = is_testing_state(db)
     return templates.TemplateResponse(request, "package_edit.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
         "package": None,
+        "packages_for_duplicate": db.query(SignalPackage).filter(SignalPackage.is_testing == testing).order_by(SignalPackage.name).all(),
         "page": "packages",
         **_dropdown_lists(db),
     })
@@ -647,6 +649,7 @@ async def package_detail(
         "user": current_user,
         "range_state": get_current_range_state(db),
         "package": pkg,
+        "packages_for_duplicate": [],
         "toast": request.query_params.get("toast", ""),
         "page": "packages",
         **_dropdown_lists(db),

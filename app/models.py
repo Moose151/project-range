@@ -318,6 +318,8 @@ class DocPage(Base):
     title: Mapped[str] = mapped_column(String(256), nullable=False)
     slug: Mapped[str] = mapped_column(String(256), nullable=False, unique=True, index=True)
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    category: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    tags: Mapped[str | None] = mapped_column(String(256), nullable=True)
     is_published: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

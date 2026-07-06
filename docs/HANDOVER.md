@@ -273,6 +273,10 @@
   - `/logs` now has quick date/status chips, saved terminal-local filter presets, and inclusive date-only `date_to` filtering.
   - Admin Config → System includes a compact system-health/archive panel and safe download endpoints at `/config/archives/{audit|serial}/{filename}`.
   - `/devices/topology` has client-side search/highlighting plus manual/auto/live-route visibility toggles.
+  - Topology live-routed paths now include explanatory detail rows under each route.
+  - Docs have category/tag fields (`doc_pages.category`, `doc_pages.tags`), category filtering, related-doc suggestions, and an admin Deleted Docs recycle-bin page. The standard delete action now soft-deletes (`is_published=False`); permanent delete is available from `/docs/deleted`.
+  - The app-rendered Version History top matter no longer references Roadmap/Handover links.
+  - The New Package screen can duplicate an existing package directly via the "Start from existing" card.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.

@@ -8,6 +8,7 @@ import markdown as md_lib
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -60,20 +61,31 @@ def _next_version(db: Session, page_id: int) -> int:
     return existing + 1
 
 
+def _doc_categories(db: Session, published_only: bool = False) -> list[str]:
+    q = db.query(DocPage.category).filter(DocPage.category != None, DocPage.category != "")
+    if published_only:
+        q = q.filter(DocPage.is_published == True)
+    return [row[0] for row in q.distinct().order_by(DocPage.category).all()]
+
+
 # ── List / Home ────────────────────────────────────────────────────────────────
 
 @router.get("", response_class=HTMLResponse)
 async def docs_home(
     request: Request,
     q: str = "",
+    category: str = "",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     query = db.query(DocPage).filter(DocPage.is_published == True)
+    categories = _doc_categories(db, published_only=True)
+    if category:
+        query = query.filter(DocPage.category == category)
     if q:
         q_lower = f"%{q.lower()}%"
         query = query.filter(
-            DocPage.title.ilike(q_lower) | DocPage.content.ilike(q_lower)
+            or_(DocPage.title.ilike(q_lower), DocPage.content.ilike(q_lower), DocPage.tags.ilike(q_lower))
         )
     pages = query.order_by(DocPage.title).all()
 
@@ -86,6 +98,8 @@ async def docs_home(
         "range_state": get_current_range_state(db),
         "pages": pages,
         "q": q,
+        "category": category,
+        "categories": categories,
         "pending_count": pending_count,
         "page": "docs",
         "toast": request.query_params.get("toast", ""),
@@ -105,6 +119,7 @@ async def docs_new_page(
         "range_state": get_current_range_state(db),
         "doc_page": None,
         "mode": "new",
+        "categories": _doc_categories(db),
         "page": "docs",
     })
 
@@ -114,6 +129,8 @@ async def docs_create_page(
     request: Request,
     title: str = Form(...),
     content: str = Form(""),
+    category: str = Form(""),
+    tags: str = Form(""),
     change_summary: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
@@ -133,6 +150,8 @@ async def docs_create_page(
         title=title,
         slug=slug,
         content=content,
+        category=category.strip() or None,
+        tags=tags.strip() or None,
         is_published=True,
         created_by_id=current_user.id,
     )
@@ -202,6 +221,70 @@ async def docs_version_history(
         "rendered": rendered,
         "page": "version_history",
     })
+
+
+@router.get("/deleted", response_class=HTMLResponse)
+async def docs_deleted(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    pages = db.query(DocPage).filter(DocPage.is_published == False).order_by(DocPage.updated_at.desc(), DocPage.title).all()
+    return templates.TemplateResponse(request, "docs_deleted.html", {
+        "user": current_user,
+        "range_state": get_current_range_state(db),
+        "pages": pages,
+        "page": "docs",
+        "toast": request.query_params.get("toast", ""),
+    })
+
+
+@router.post("/deleted/{page_id}/restore")
+async def docs_restore_deleted(
+    page_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    doc = db.query(DocPage).filter(DocPage.id == page_id, DocPage.is_published == False).first()
+    if not doc:
+        return RedirectResponse("/docs/deleted?toast=Deleted+page+not+found", status_code=302)
+    doc.is_published = True
+    doc.updated_by_id = current_user.id
+    doc.updated_at = datetime.utcnow()
+    db.add(AuditLog(
+        user_id=current_user.id,
+        action_type="doc_restore_deleted",
+        entity_type="DocPage",
+        entity_id=doc.id,
+        previous_value=doc.title,
+        comment="Restored documentation page from recycle bin",
+    ))
+    db.commit()
+    return RedirectResponse(f"/docs/{doc.slug}?toast=Documentation+page+restored", status_code=302)
+
+
+@router.post("/deleted/{page_id}/permanent-delete")
+async def docs_permanent_delete(
+    page_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    doc = db.query(DocPage).filter(DocPage.id == page_id, DocPage.is_published == False).first()
+    if not doc:
+        return RedirectResponse("/docs/deleted?toast=Deleted+page+not+found", status_code=302)
+    doc_id = doc.id
+    title = doc.title
+    db.delete(doc)
+    db.add(AuditLog(
+        user_id=current_user.id,
+        action_type="doc_permanent_delete",
+        entity_type="DocPage",
+        entity_id=doc_id,
+        previous_value=title,
+        comment="Permanently deleted documentation page",
+    ))
+    db.commit()
+    return RedirectResponse("/docs/deleted?toast=Documentation+page+permanently+deleted", status_code=302)
 
 
 def _version_has_conflict(version: DocVersion) -> bool:
@@ -324,16 +407,16 @@ async def docs_delete_page(
     if not doc:
         return RedirectResponse("/docs?toast=Documentation+page+not+found", status_code=302)
 
-    doc_id = doc.id
-    title = doc.title
-    db.delete(doc)
+    doc.is_published = False
+    doc.updated_by_id = current_user.id
+    doc.updated_at = datetime.utcnow()
     db.add(AuditLog(
         user_id=current_user.id,
         action_type="doc_delete",
         entity_type="DocPage",
-        entity_id=doc_id,
-        previous_value=title,
-        comment="Documentation page deleted",
+        entity_id=doc.id,
+        previous_value=doc.title,
+        comment="Documentation page moved to recycle bin",
     ))
     db.commit()
     return RedirectResponse("/docs?toast=Documentation+page+deleted", status_code=302)
@@ -354,10 +437,20 @@ async def docs_view(
         }, status_code=404)
 
     rendered = _render_markdown(doc.content)
+    related_docs = []
+    if doc.category:
+        related_docs = (
+            db.query(DocPage)
+            .filter(DocPage.is_published == True, DocPage.id != doc.id, DocPage.category == doc.category)
+            .order_by(DocPage.title)
+            .limit(5)
+            .all()
+        )
     return templates.TemplateResponse(request, "docs_page.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
         "doc_page": doc,
+        "related_docs": related_docs,
         "rendered": rendered,
         "page": "docs",
         "toast": request.query_params.get("toast", ""),
@@ -392,7 +485,7 @@ async def docs_edit_page(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    doc = db.query(DocPage).filter(DocPage.slug == slug).first()
+    doc = db.query(DocPage).filter(DocPage.slug == slug, DocPage.is_published == True).first()
     if not doc:
         return RedirectResponse("/docs", status_code=302)
     mode = "edit" if current_user.role == "administrator" else "propose"
@@ -401,6 +494,7 @@ async def docs_edit_page(
         "range_state": get_current_range_state(db),
         "doc_page": doc,
         "mode": mode,
+        "categories": _doc_categories(db),
         "page": "docs",
     })
 
@@ -411,11 +505,13 @@ async def docs_submit_edit(
     request: Request,
     title: str = Form(""),
     content: str = Form(""),
+    category: str = Form(""),
+    tags: str = Form(""),
     change_summary: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    doc = db.query(DocPage).filter(DocPage.slug == slug).first()
+    doc = db.query(DocPage).filter(DocPage.slug == slug, DocPage.is_published == True).first()
     if not doc:
         return RedirectResponse("/docs", status_code=302)
 
@@ -427,6 +523,8 @@ async def docs_submit_edit(
         # Direct publish
         if title.strip():
             doc.title = title.strip()
+        doc.category = category.strip() or None
+        doc.tags = tags.strip() or None
         doc.content = content
         doc.updated_by_id = current_user.id
         doc.updated_at = now

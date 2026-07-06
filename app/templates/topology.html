@@ -90,7 +90,7 @@
       <tbody>
         {% if live_routes %}
         {% for route in live_routes %}
-        <tr>
+        <tr data-live-route-row data-search="{{ (route.from_device ~ ' ' ~ route.through_device ~ ' ' ~ route.to_device ~ ' ' ~ route.input_label ~ ' ' ~ route.output_label) | lower }}">
           <td>
             <span class="fw-semibold">{{ route.from_device }}</span>
             <span class="text-muted small d-block">{{ route.from_port }}</span>
@@ -109,6 +109,30 @@
           <td>
             <span class="fw-semibold">{{ route.to_device }}</span>
             <span class="text-muted small d-block">{{ route.to_port }}</span>
+          </td>
+        </tr>
+        <tr data-live-route-row data-route-detail data-search="{{ (route.from_device ~ ' ' ~ route.through_device ~ ' ' ~ route.to_device ~ ' ' ~ route.input_label ~ ' ' ~ route.output_label) | lower }}">
+          <td colspan="4" class="bg-dark-subtle small">
+            <div class="d-flex align-items-start gap-2">
+              <i class="bi bi-info-circle text-info mt-1"></i>
+              <div>
+                <div>
+                  <strong>{{ route.from_device }}</strong> {{ route.from_port or '' }}
+                  feeds <strong>{{ route.through_device }}</strong>
+                  input <span class="text-info">I{{ route.input_idx }}</span>
+                  {% if route.input_label %}<span class="text-muted">({{ route.input_label }})</span>{% endif %}.
+                </div>
+                <div>
+                  The {{ route.through_type }} reports that input routed to
+                  output <span class="text-warning">O{{ route.output_idx }}</span>
+                  {% if route.output_label %}<span class="text-muted">({{ route.output_label }})</span>{% endif %},
+                  which feeds <strong>{{ route.to_device }}</strong> {{ route.to_port or '' }}.
+                </div>
+                <div class="text-muted">
+                  Source: SNMP observed matrix state plus manual/auto topology port links.
+                </div>
+              </div>
+            </div>
           </td>
         </tr>
         {% endfor %}
@@ -319,6 +343,11 @@ function applyTopologyControls() {
     const typeOk = row.dataset.inferred === '1' ? controls.inferred : controls.manual;
     const searchOk = !controls.search || (row.dataset.search || '').includes(controls.search);
     row.style.display = tabOk && typeOk && searchOk ? '' : 'none';
+  });
+  document.querySelectorAll('tr[data-live-route-row]').forEach(row => {
+    const tabOk = activeTab === 'all' || activeTab === 'rf';
+    const searchOk = !controls.search || (row.dataset.search || '').includes(controls.search);
+    row.style.display = controls.live && tabOk && searchOk ? '' : 'none';
   });
   renderDiagram(activeTab);
 }

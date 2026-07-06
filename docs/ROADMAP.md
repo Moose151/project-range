@@ -208,12 +208,12 @@ device-routing, audit-retention, and archive work.
   archive folders, and browse/download server-side audit/serial archive files.
 - [x] **Topology search and visibility controls** — search/highlight devices and
   toggle manual/inferred/live route visibility.
-- [ ] **Topology route explanations** — explain routed paths through
+- [x] **Topology route explanations** — explain routed paths through
   splitter/combiner devices with source, destination, matrix ports, and whether
   the link is manual or inferred.
-- [ ] **Docs organisation** — tags/categories and related docs, plus a recycle
+- [x] **Docs organisation** — tags/categories and related docs, plus a recycle
   bin if deleted docs need recoverability.
-- [ ] **Form ergonomics** — duplicate-from-existing, inline validation, and
+- [~] **Form ergonomics** — duplicate-from-existing, inline validation, and
   preserved form values after validation errors.
 
 ---
