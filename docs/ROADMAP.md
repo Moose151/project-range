@@ -442,6 +442,9 @@ and match the modem's baud/format (front panel → CONFIG → Remote Control). *
 converter DB9-M ↔ modem P4B DB9-M needs a **female-female, likely null-modem (crossover)**
 cable — verify TX/RX against the manual's **P4B pinout (Table 5-5)** at install.
 
+**Candidate hardware links (verify specs before buying — must be ≥6 ports / RS-232 / TCP-Server):**
+- RS Components AU (Option B hub candidate): https://au.rs-online.com/web/p/serial-device-servers/0799631 — *spec not auto-verified; confirm it's an 8-port RS-232 device server with TCP Server mode.*
+
 **Feasibility: confirmed possible, but a different transport from the CBM-400.**
 The CDM-600L Installation & Operation Manual (Rev 2, reviewed locally — held
 out of git, see `.gitignore`) documents the full remote-control protocol in
