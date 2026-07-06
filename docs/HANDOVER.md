@@ -283,6 +283,7 @@
   - `app/upload_validation.py` centralises upload limits. Package/CBM imports and CDA CSV imports now reject unexpected file types, oversized uploads, excessive zip members, and malformed legacy package JSON before processing.
   - `docker-compose.yml` hardens the web container with read-only root filesystem, `/tmp` tmpfs, `no-new-privileges`, dropped capabilities, and memory/process limits while keeping `/app/data` writable as the persistent volume.
   - `app/audit_integrity.py` adds a per-scope HMAC-SHA-256 audit hash chain using `AUDIT_HASH_SECRET` (defaults to `SECRET_KEY`). New rows are signed automatically from the SQLAlchemy model hook, `init_db.py` backfills existing rows as a baseline, `/audit` shows chain health, and audit archive XLSX files include previous/record hash fields.
+  - Work is intentionally paused here for now. The next recommended security item is encrypted backups (`BACKUP_ENCRYPTION_KEY` or similar, encrypted backup output, documented decrypt/restore flow, and a round-trip test), but do not start it until the user asks to resume.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 1. **Theme QA / refinement** — 0.9.5 made the themes much more distinct and softened light mode, but it still needs a real browser pass with user feedback. If users still find a palette too bright/dim, tune `app/static/css/app.css` theme blocks.
@@ -310,6 +311,7 @@
 9. **Dashboard Engaged column browser QA** — with an active serial, toggle Engaged on/off from the dashboard and confirm it saves immediately without using Submit All Changes, survives the 10-second dashboard refresh, appears/disappears through the Columns menu, and remains set after a status/power update or CBM sync update.
 
 ### Also pending (from ROADMAP)
+- **Next recommended app-contained security item:** encrypted backups. Plain backups are currently permission-hardened but not encrypted.
 - **Deferred infra (user's call):** HTTPS/TLS, PostgreSQL (+ Alembic). Cookies are TLS-ready (`SESSION_HTTPS_ONLY=1`).
 - **1.0.0 gate:** deploy validated on range server, docs complete, backups verified, security Critical items closed (most are — see ROADMAP "Security hardening").
 
