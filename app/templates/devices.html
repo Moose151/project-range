@@ -60,7 +60,7 @@
       <input class="form-check-input" type="checkbox" name="cbm_sync_enabled" value="1" id="cbm-sync-{{ action | replace('/', '_') }}"
              {% if d and d.cbm_sync_enabled %}checked{% endif %}>
       <label class="form-check-label small" for="cbm-sync-{{ action | replace('/', '_') }}">
-        Enable CBM read-only sync
+        This modem is a CBM/EBEM - enable read-only sync
       </label>
     </div>
   </div>
@@ -232,7 +232,7 @@
             {% endif %}
           </td>
           <td>
-            {% if d.id in ebem_device_ids and d.cbm_sync_enabled %}
+            {% if d.id in cbm_sync_device_ids %}
               {% if d.cbm_username and d.cbm_password_encrypted %}
               <span class="badge bg-success">Ready</span>
               {% else %}
@@ -249,7 +249,7 @@
                 {{ d.cbm_last_sync_error[:60] }}{% if d.cbm_last_sync_error|length > 60 %}…{% endif %}
               </div>
               {% endif %}
-            {% elif d.id in ebem_device_ids %}
+            {% elif d.id in modem_device_ids %}
               <span class="text-muted small">Disabled</span>
             {% else %}
               <span class="text-muted small">—</span>
@@ -291,7 +291,7 @@
             </a>
             {% endif %}
             {% if user.role == 'administrator' %}
-            {% if d.id in ebem_device_ids %}
+            {% if d.id in cbm_sync_device_ids %}
             <form method="post" action="/devices/{{ d.id }}/cbm/test" class="d-inline">
               <button type="submit" class="btn btn-sm btn-outline-success py-0 px-1" title="Test read-only CBM poll">
                 <i class="bi bi-plug"></i>
@@ -358,17 +358,9 @@ const STATUS_MAP = {
 const MATRIX_TYPES = new Set(['splitter', 'combiner', 'switch']);
 const SNMP_TYPES = new Set(['splitter', 'combiner']);
 
-function normaliseDeviceName(value) {
-  return (value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-}
-
-function isEbEmForm(form) {
+function isModemForm(form) {
   const type = form.querySelector('[name="device_type"]')?.value || '';
-  if (type !== 'modem') return false;
-  const name = normaliseDeviceName(form.querySelector('[name="name"]')?.value || '');
-  const model = normaliseDeviceName(form.querySelector('[name="device_model"]')?.value || '');
-  const combined = name + model;
-  return combined.includes('cbm') || combined.includes('ebem');
+  return type === 'modem';
 }
 
 function setSectionVisible(form, selector, visible) {
@@ -384,7 +376,7 @@ function updateDeviceFormSections(form) {
   const type = form.querySelector('[name="device_type"]')?.value || '';
   const isMatrix = MATRIX_TYPES.has(type);
   const canSnmp = SNMP_TYPES.has(type);
-  const canEbEm = isEbEmForm(form);
+  const canEbEm = isModemForm(form);
   setSectionVisible(form, '.matrix-field', isMatrix);
   setSectionVisible(form, '.snmp-field', canSnmp);
   setSectionVisible(form, '.ebem-field', canEbEm);
@@ -393,7 +385,7 @@ function updateDeviceFormSections(form) {
     if (isMatrix) {
       help.textContent = 'Host + Check Port enable reachability. Inputs/Outputs define the matrix size.';
     } else if (canEbEm) {
-      help.textContent = 'Host + Check Port enable reachability. EBEM sync is available for CBM/EBEM modems.';
+      help.textContent = 'Host + Check Port enable reachability. Tick CBM/EBEM sync only for CBM/EBEM modems, not CDMs.';
     } else {
       help.textContent = 'Host + Check Port enable the reachability badge.';
     }
@@ -417,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateDeviceFormSections(form);
     ['change', 'input'].forEach(evt => {
       form.addEventListener(evt, event => {
-        if (event.target.matches('[name="device_type"], [name="name"], [name="device_model"]')) {
+        if (event.target.matches('[name="device_type"]')) {
           updateDeviceFormSections(form);
         }
       });

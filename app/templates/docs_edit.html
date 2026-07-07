@@ -31,10 +31,21 @@
   <div class="row g-4">
     <div class="col-lg-8">
       {% if mode == 'new' or user.role == 'administrator' %}
+      {% if mode == 'new' %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Page Template</label>
+        <select class="form-select" onchange="location.href='/docs/new?page_template=' + encodeURIComponent(this.value) + '&title=' + encodeURIComponent(document.querySelector('[name=title]')?.value || '')">
+          {% for key, tpl in page_templates.items() %}
+          <option value="{{ key }}" {% if selected_template == key %}selected{% endif %}>{{ tpl.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
       <div class="mb-3">
         <label class="form-label fw-semibold">Page Title</label>
         <input type="text" class="form-control" name="title" required
-               value="{{ doc_page.title if doc_page else '' }}"
+               value="{{ doc_page.title if doc_page else (draft_title if draft_title is defined else '') }}"
                placeholder="e.g. Signal Setup Procedure">
         {% if mode == 'new' %}
         <div class="form-text">The URL slug will be auto-generated from the title.</div>
@@ -45,18 +56,18 @@
       <div class="mb-3">
         <label class="form-label fw-semibold">Content <span class="text-muted fw-normal">(Markdown)</span></label>
         <textarea class="form-control font-monospace" name="content" rows="28"
-                  placeholder="Write your content using Markdown…">{{ doc_page.content if doc_page else '' }}</textarea>
+                  placeholder="Write your content using Markdown…">{{ doc_page.content if doc_page else (draft_content if draft_content is defined else '') }}</textarea>
         <div class="form-text">
-          Supports Markdown: **bold**, *italic*, # headings, | tables |, ```code blocks```, - lists.
+          Supports Markdown plus wiki links: [[Page Title]] or [[Page Title|label]].
         </div>
       </div>
 
       {% if mode == 'new' or user.role == 'administrator' %}
       <div class="row g-3 mb-3">
-        <div class="col-md-6">
+        <div class="col-md-4">
           <label class="form-label fw-semibold">Category <span class="text-muted fw-normal">(optional)</span></label>
           <input type="text" class="form-control" name="category" list="docCategoryList"
-                 value="{{ doc_page.category if doc_page and doc_page.category else '' }}"
+                 value="{{ doc_page.category if doc_page and doc_page.category else (draft_category if draft_category is defined else '') }}"
                  placeholder="e.g. Operations, Devices, Safety">
           <datalist id="docCategoryList">
             {% for cat in categories %}
@@ -64,11 +75,20 @@
             {% endfor %}
           </datalist>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
           <label class="form-label fw-semibold">Tags <span class="text-muted fw-normal">(optional, comma separated)</span></label>
           <input type="text" class="form-control" name="tags"
-                 value="{{ doc_page.tags if doc_page and doc_page.tags else '' }}"
+                 value="{{ doc_page.tags if doc_page and doc_page.tags else (draft_tags if draft_tags is defined else '') }}"
                  placeholder="e.g. checklist, rf, handover">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Visibility</label>
+          <select class="form-select" name="visibility">
+            {% set current_visibility = (doc_page.visibility or 'all') if doc_page else 'all' %}
+            {% for value, label in visibility_labels.items() %}
+            <option value="{{ value }}" {% if current_visibility == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
         </div>
       </div>
       {% endif %}
@@ -101,6 +121,8 @@
           <div class="mb-2">- Bullet list item</div>
           <div class="mb-2">1. Numbered item</div>
           <div class="mb-2">[Link text](url)</div>
+          <div class="mb-2">[[Wiki Page]]</div>
+          <div class="mb-2">[[Wiki Page|label]]</div>
           <div class="mb-2">```<br>code block<br>```</div>
           <div class="mb-2">`inline code`</div>
           <div class="mb-2">---  (horizontal rule)</div>

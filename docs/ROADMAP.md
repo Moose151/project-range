@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.20.1` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.20.2` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -213,6 +213,12 @@ device-routing, audit-retention, and archive work.
   the link is manual or inferred.
 - [x] **Docs organisation** — tags/categories and related docs, plus a recycle
   bin if deleted docs need recoverability.
+- [~] **Documentation Wiki Lite** — turn `/docs` into a MediaWiki-lite range
+  wiki while preserving Markdown, approvals, version history, and audit logging.
+  First slices: `[[Page Title]]` / `[[Page Title|label]]` wiki links,
+  missing-page links, backlinks, wanted pages, aliases/redirects, page
+  visibility levels, page templates, and a denser wiki home. Later slices:
+  richer search snippets, orphan pages, and optional pinned/start-here pages.
 - [~] **Form ergonomics** — duplicate-from-existing, inline validation, and
   preserved form values after validation errors.
 

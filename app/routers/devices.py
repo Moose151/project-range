@@ -51,11 +51,16 @@ def _normalise_name(value: str | None) -> str:
 
 
 def _is_ebem_device(device_type: str, name: str | None, device_model: str | None) -> bool:
-    """Only CBM/EBEM modem devices should expose/use EBEM read-only sync."""
-    if device_type != "modem":
-        return False
-    combined = _normalise_name(f"{name or ''} {device_model or ''}")
-    return "cbm" in combined or "ebem" in combined
+    """Legacy heuristic for seeded/older CBM devices.
+
+    New devices are explicitly marked with ``cbm_sync_enabled``. Keep this helper
+    only for old rows/docs that still infer CBM/EBEM from name/model.
+    """
+    return device_type == "modem" and ("cbm" in _normalise_name(f"{name or ''} {device_model or ''}") or "ebem" in _normalise_name(f"{name or ''} {device_model or ''}"))
+
+
+def _can_have_cbm_sync(device_type: str) -> bool:
+    return device_type == "modem"
 
 
 def _device_port_counts(device_type: str, num_inputs: int, num_outputs: int) -> tuple[int, int]:
@@ -120,7 +125,8 @@ async def devices_list(
         "device_types": DEVICE_TYPES,
         "routing_types": ROUTING_TYPES,
         "snmp_monitor_types": SNMP_MONITOR_TYPES,
-        "ebem_device_ids": {d.id for d in devices if _is_ebem_device(d.device_type, d.name, d.device_model)},
+        "cbm_sync_device_ids": {d.id for d in devices if d.device_type == "modem" and d.cbm_sync_enabled},
+        "modem_device_ids": {d.id for d in devices if d.device_type == "modem"},
         "toast": request.query_params.get("toast", ""),
         "page": "devices",
         "page_name": "devices",
@@ -180,7 +186,7 @@ async def device_create(
     if name:
         clean_type = device_type if device_type in dict(DEVICE_TYPES) else "other"
         clean_model = device_model.strip() or None
-        is_ebem = _is_ebem_device(clean_type, name, clean_model)
+        can_cbm_sync = _can_have_cbm_sync(clean_type)
         snmp_allowed = clean_type in SNMP_MONITOR_TYPES
         clean_inputs, clean_outputs = _device_port_counts(clean_type, num_inputs, num_outputs)
         dev = RFDevice(
@@ -190,9 +196,9 @@ async def device_create(
             host=host.strip() or None,
             check_port=int(check_port) if check_port.strip().isdigit() else None,
             has_web_gui=bool(has_web_gui),
-            cbm_sync_enabled=bool(cbm_sync_enabled) if is_ebem else False,
-            cbm_username=(cbm_username.strip() or None) if is_ebem else None,
-            cbm_password_encrypted=encrypt_secret(cbm_password.strip()) if is_ebem and cbm_password.strip() else None,
+            cbm_sync_enabled=bool(cbm_sync_enabled) if can_cbm_sync else False,
+            cbm_username=(cbm_username.strip() or None) if can_cbm_sync else None,
+            cbm_password_encrypted=encrypt_secret(cbm_password.strip()) if can_cbm_sync and cbm_password.strip() else None,
             snmp_enabled=bool(snmp_enabled) if snmp_allowed else False,
             snmp_version="3" if snmp_version == "3" else "2c",
             snmp_port=int(snmp_port) if snmp_port.strip().isdigit() else 161,
@@ -248,14 +254,14 @@ async def device_update(
         dev.name = name.strip() or dev.name
         dev.device_model = device_model.strip() or None
         dev.device_type = device_type if device_type in dict(DEVICE_TYPES) else dev.device_type
-        is_ebem = _is_ebem_device(dev.device_type, dev.name, dev.device_model)
+        can_cbm_sync = _can_have_cbm_sync(dev.device_type)
         snmp_allowed = dev.device_type in SNMP_MONITOR_TYPES
         dev.host = host.strip() or None
         dev.check_port = int(check_port) if check_port.strip().isdigit() else None
         dev.has_web_gui = bool(has_web_gui)
-        dev.cbm_sync_enabled = bool(cbm_sync_enabled) if is_ebem else False
-        dev.cbm_username = (cbm_username.strip() or None) if is_ebem else None
-        if not is_ebem:
+        dev.cbm_sync_enabled = bool(cbm_sync_enabled) if can_cbm_sync else False
+        dev.cbm_username = (cbm_username.strip() or None) if can_cbm_sync else None
+        if not can_cbm_sync:
             dev.cbm_password_encrypted = None
         elif clear_cbm_password:
             dev.cbm_password_encrypted = None
@@ -300,7 +306,7 @@ async def device_cbm_test(
     current_user: User = Depends(require_supervisor),
 ):
     dev = db.query(RFDevice).filter(RFDevice.id == dev_id, RFDevice.is_testing == is_testing_state(db)).first()
-    if not dev or not _is_ebem_device(dev.device_type, dev.name, dev.device_model):
+    if not dev or dev.device_type != "modem" or not dev.cbm_sync_enabled:
         return RedirectResponse("/devices?toast=CBM+device+not+found", status_code=302)
     if not dev.host or not dev.cbm_username or not dev.cbm_password_encrypted:
         dev.cbm_last_sync_status = "missing_credentials"
@@ -359,7 +365,7 @@ async def device_cbm_diagnostics(
 ):
     """Raw ICC output from the modem (read-only) — for verifying status/Eb/No fields."""
     dev = db.query(RFDevice).filter(RFDevice.id == dev_id, RFDevice.is_testing == is_testing_state(db)).first()
-    if not dev or not _is_ebem_device(dev.device_type, dev.name, dev.device_model):
+    if not dev or dev.device_type != "modem" or not dev.cbm_sync_enabled:
         return PlainTextResponse("Device not found or not a CBM/EBEM modem.", status_code=404)
     password = decrypt_secret(dev.cbm_password_encrypted)
     if not dev.host or not dev.cbm_username or not password:

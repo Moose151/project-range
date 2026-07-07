@@ -12,7 +12,7 @@ from app.file_security import harden_sqlite_storage
 from app.models import (
     User, RangeStateLog, Signal, ModulationType, FecType, SignalSource, AntennaType,
     LogSession, SignalPackage, SignalPackageEntry, Serial, SerialPackage,
-    DocPage, DocVersion, AppSetting, RFDevice, DevicePort, DeviceLink,
+    DocPage, DocVersion, DocLink, DocAlias, AppSetting, RFDevice, DevicePort, DeviceLink,
     CDATable, CDAWindow, SerialCDATable, Incident, CeaseEvent, DutyRole,
 )
 from app.auth import hash_password
@@ -133,6 +133,7 @@ def _migrate(conn):
         "ALTER TABLE doc_versions ADD COLUMN base_content TEXT",
         "ALTER TABLE doc_pages ADD COLUMN category VARCHAR(128)",
         "ALTER TABLE doc_pages ADD COLUMN tags VARCHAR(256)",
+        "ALTER TABLE doc_pages ADD COLUMN visibility VARCHAR(16) DEFAULT 'all'",
         "ALTER TABLE rf_devices ADD COLUMN snmp_enabled BOOLEAN DEFAULT 0",
         "ALTER TABLE rf_devices ADD COLUMN snmp_version VARCHAR(4) DEFAULT '2c'",
         "ALTER TABLE rf_devices ADD COLUMN snmp_port INTEGER DEFAULT 161",
@@ -159,6 +160,7 @@ def _migrate(conn):
         conn.execute(text("UPDATE users SET role = 'administrator' WHERE role IN ('SUPERVISOR', 'supervisor')"))
         conn.execute(text("UPDATE users SET role = 'user' WHERE role IN ('OPERATOR', 'operator')"))
         conn.execute(text("UPDATE users SET role = 'observer' WHERE role IN ('SAFETY_SUPERVISOR', 'safety_supervisor')"))
+        conn.execute(text("UPDATE doc_pages SET visibility = 'all' WHERE visibility IS NULL OR visibility = ''"))
         conn.commit()
     except Exception:
         pass

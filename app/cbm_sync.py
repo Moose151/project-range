@@ -212,9 +212,9 @@ def sync_active_cbms(db: Session, actor_id: int | None, audit_when_noop: bool = 
             result.skipped += 1
             result.add_error(f"{entry.signal_name}: mapped CBM device id {device_id} was not found in this range state")
             continue
-        if not device.cbm_sync_enabled:
-            result.skipped += 1
-            result.add_error(f"{entry.signal_name}: {device.name} has CBM read-only sync disabled")
+        if device.device_type != "modem" or not device.cbm_sync_enabled:
+            # Non-CBM modem sources such as CDMs may still be valid signal
+            # sources, but they are not EBEM/CBM poll targets.
             continue
         if device_id not in snapshots:
             password = decrypt_secret(device.cbm_password_encrypted)

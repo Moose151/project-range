@@ -147,13 +147,24 @@ def _dropdown_lists(db: Session) -> dict:
         .filter(
             RFDevice.is_active == True,
             RFDevice.device_type == "modem",
+            RFDevice.cbm_sync_enabled == True,
+            RFDevice.is_testing == testing,
+        )
+        .order_by(RFDevice.name)
+        .all()
+    )
+    modem_devices = (
+        db.query(RFDevice)
+        .filter(
+            RFDevice.is_active == True,
+            RFDevice.device_type == "modem",
             RFDevice.is_testing == testing,
         )
         .order_by(RFDevice.name)
         .all()
     )
     source_names = [s.name for s in db.query(SignalSource).filter(SignalSource.is_active == True).order_by(SignalSource.display_order).all()]
-    for device in cbm_devices:
+    for device in modem_devices:
         if device.name not in source_names:
             source_names.append(device.name)
     return {
@@ -362,7 +373,12 @@ def _cbm_source_device(db: Session, source: str, testing: bool) -> RFDevice | No
         return None
     devices = (
         db.query(RFDevice)
-        .filter(RFDevice.is_active == True, RFDevice.device_type == "modem", RFDevice.is_testing == testing)
+        .filter(
+            RFDevice.is_active == True,
+            RFDevice.device_type == "modem",
+            RFDevice.cbm_sync_enabled == True,
+            RFDevice.is_testing == testing,
+        )
         .order_by(RFDevice.name)
         .all()
     )

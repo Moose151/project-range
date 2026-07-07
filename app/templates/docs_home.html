@@ -7,8 +7,11 @@
 {% endif %}
 
 <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
-  <h4 class="mb-0"><i class="bi bi-book me-2"></i>Documentation</h4>
+  <h4 class="mb-0"><i class="bi bi-book me-2"></i>Range Wiki</h4>
   <div class="ms-auto d-flex gap-2">
+    <a href="/docs/wanted" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-question-diamond me-1"></i>Wanted Pages
+    </a>
     {% if user.role == 'administrator' %}
     <a href="/docs/proposals" class="btn btn-sm btn-outline-warning position-relative">
       <i class="bi bi-hourglass-split me-1"></i>Approval Queue
@@ -27,7 +30,7 @@
 </div>
 
 <form method="get" class="mb-3">
-  <div class="input-group" style="max-width:720px">
+  <div class="input-group" style="max-width:860px">
     <input type="search" class="form-control" name="q" value="{{ q }}" placeholder="Search documentation…">
     <select class="form-select" name="category" style="max-width:220px">
       <option value="">All categories</option>
@@ -48,6 +51,74 @@
 </p>
 {% endif %}
 
+{% if not q and not category %}
+<div class="row g-3 mb-3">
+  <div class="col-lg-8">
+    <div class="card border-secondary h-100">
+      <div class="card-header d-flex align-items-center">
+        <span><i class="bi bi-compass me-1"></i>Wiki Index</span>
+        <span class="badge bg-secondary ms-auto">{{ all_pages | length }} page{{ 's' if all_pages | length != 1 else '' }}</span>
+      </div>
+      <div class="card-body">
+        {% if categories %}
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          {% for cat in categories %}
+          <a class="btn btn-sm btn-outline-secondary" href="/docs?category={{ cat | urlencode }}">
+            <i class="bi bi-folder2-open me-1"></i>{{ cat }}
+          </a>
+          {% endfor %}
+          {% if uncategorized_count %}
+          <span class="btn btn-sm btn-outline-secondary disabled">{{ uncategorized_count }} uncategorised</span>
+          {% endif %}
+        </div>
+        {% endif %}
+        <div class="wiki-a-z">
+          {% for doc in all_pages %}
+          <a href="/docs/{{ doc.slug }}" class="wiki-page-chip">
+            <i class="bi bi-file-earmark-text"></i>{{ doc.title }}
+            {% if user.role == 'administrator' and (doc.visibility or 'all') != 'all' %}
+            <span class="badge bg-warning text-dark">{{ visibility_labels.get(doc.visibility, doc.visibility) }}</span>
+            {% endif %}
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card border-secondary mb-3">
+      <div class="card-header small"><i class="bi bi-clock-history me-1"></i>Recently Updated</div>
+      <div class="list-group list-group-flush">
+        {% for doc in recent_pages %}
+        <a href="/docs/{{ doc.slug }}" class="list-group-item list-group-item-action list-group-item-dark py-2">
+          <div class="fw-semibold small">{{ doc.title }}</div>
+          <div class="text-muted small">{{ (doc.updated_at or doc.created_at).strftime('%d %b %Y') }}</div>
+        </a>
+        {% else %}
+        <div class="list-group-item list-group-item-dark text-muted small">No pages yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="card border-secondary">
+      <div class="card-header small"><i class="bi bi-question-diamond me-1"></i>Wanted Pages</div>
+      <div class="list-group list-group-flush">
+        {% for link in wanted_links %}
+        <a href="/docs/new?title={{ link.target_title | urlencode }}" class="list-group-item list-group-item-action list-group-item-dark py-2">
+          <span class="wiki-missing">{{ link.target_title }}</span>
+          <span class="badge bg-secondary float-end">{{ link.count }}</span>
+        </a>
+        {% else %}
+        <div class="list-group-item list-group-item-dark text-muted small">No missing wiki links.</div>
+        {% endfor %}
+      </div>
+      {% if wanted_links %}
+      <div class="card-footer py-2"><a href="/docs/wanted" class="small">View all wanted pages</a></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% if pages %}
 <div class="list-group list-group-flush">
   {% for doc in pages %}
@@ -62,6 +133,9 @@
       </div>
       <div class="small mt-1">
         {% if doc.category %}<span class="badge bg-secondary me-1">{{ doc.category }}</span>{% endif %}
+        {% if user.role == 'administrator' and (doc.visibility or 'all') != 'all' %}
+        <span class="badge bg-warning text-dark me-1">{{ visibility_labels.get(doc.visibility, doc.visibility) }}</span>
+        {% endif %}
         {% if doc.tags %}
         {% for tag in doc.tags.split(',') %}
         {% if tag.strip() %}<span class="badge bg-dark border border-secondary me-1">{{ tag.strip() }}</span>{% endif %}

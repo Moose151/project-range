@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.20.1` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.20.2` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -27,6 +27,7 @@
 - **Theme system** (0.9.1): two axes — `data-bs-theme` (light/dark navbar toggle) × `data-theme` (palette: classic/sew-gold/night-ops/spectrum), chosen on `/preferences`, persisted in localStorage, applied pre-paint. CSS in `app/static/css/app.css`.
 - **Preferences page** (`/preferences`, router `preferences.py`): theme, light/dark, default freq/power units (per-user on `User`).
 - **Shared templates:** `app/templating.py` exports the single `templates` instance (with `app_version` global). All routers import it — do NOT create per-router `Jinja2Templates`.
+- **Documentation Wiki Lite:** `/docs` remains Markdown-based with approvals/version history/audit, and now supports `[[Page Title]]` / `[[Page Title|label]]` wiki links, aliases/redirects, page visibility (`all`/`users`/`admins`), and new-page templates. `DocLink` indexes outgoing links, backlinks, and missing/wanted pages; `DocAlias` stores alternate names. The index lazily backfills on wiki entry points and refreshes on page create/edit/approval/restore/delete/alias changes. New route/template: `/docs/wanted`, `docs_wanted.html`.
 - **Devices** (`routers/devices.py`, models `RFDevice`/`DevicePort`): registry CRUD, splitter/combiner **routing matrix** (crossbar + per-port labels), live **TCP reachability** status (`/devices/status`, polled). Nav: "Devices".
 - **Incidents** (`routers/incidents.py`, model `Incident`): log/list/update/CSV export. Nav: "Incidents".
 - **Security hardening:** `SECRET_KEY` no longer has a static default (ephemeral if unset); forced password change (`User.must_change_password`, enforced in `deps.get_current_user`, page `/account/password` via `routers/account.py`); password policy + login throttle + auth audit (`auth.py`); security headers + CSRF origin-check + `SameSite=Strict` cookies (middleware in `main.py`, knobs in `config.py`).

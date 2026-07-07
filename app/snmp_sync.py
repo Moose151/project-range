@@ -87,7 +87,9 @@ def poll_snmp_device(db: Session, dev: RFDevice) -> tuple[MatrixSnapshot | None,
             port = inputs.get(input_idx)
             if port is None:
                 continue
-            new_val = output_idx or None
+            # Preserve explicit 0 from the matrix: 0 = observed terminated,
+            # None = no observed routing entry for this port.
+            new_val = output_idx
             if port.observed_routed_from != new_val:
                 port.observed_routed_from = new_val
                 changed = True
@@ -100,7 +102,9 @@ def poll_snmp_device(db: Session, dev: RFDevice) -> tuple[MatrixSnapshot | None,
             port = outputs.get(output_idx)
             if port is None:
                 continue
-            new_val = input_idx or None
+            # Preserve explicit 0 from the matrix: 0 = observed terminated,
+            # None = no observed routing entry for this port.
+            new_val = input_idx
             if port.observed_routed_from != new_val:
                 port.observed_routed_from = new_val
                 changed = True

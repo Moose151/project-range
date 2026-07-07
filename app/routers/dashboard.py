@@ -127,7 +127,12 @@ def _cbm_source_device(db: Session, source: str, testing: bool) -> RFDevice | No
     key = _source_key(name)
     devices = (
         db.query(RFDevice)
-        .filter(RFDevice.is_active == True, RFDevice.device_type == "modem", RFDevice.is_testing == testing)
+        .filter(
+            RFDevice.is_active == True,
+            RFDevice.device_type == "modem",
+            RFDevice.cbm_sync_enabled == True,
+            RFDevice.is_testing == testing,
+        )
         .order_by(RFDevice.name)
         .all()
     )

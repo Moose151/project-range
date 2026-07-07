@@ -335,6 +335,8 @@ class DocPage(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
     category: Mapped[str | None] = mapped_column(String(128), nullable=True)
     tags: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    # all = observers/users/admins, users = users/admins, admins = administrators only.
+    visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="all")
     is_published: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -347,6 +349,54 @@ class DocPage(Base):
         "DocVersion", back_populates="page",
         cascade="all, delete-orphan",
         order_by="DocVersion.version_number.desc()",
+    )
+    outgoing_links: Mapped[list["DocLink"]] = relationship(
+        "DocLink",
+        back_populates="from_page",
+        cascade="all, delete-orphan",
+        foreign_keys="DocLink.from_page_id",
+    )
+    aliases: Mapped[list["DocAlias"]] = relationship(
+        "DocAlias",
+        back_populates="page",
+        cascade="all, delete-orphan",
+        order_by="DocAlias.alias_title",
+    )
+
+
+class DocAlias(Base):
+    __tablename__ = "doc_aliases"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    page_id: Mapped[int] = mapped_column(ForeignKey("doc_pages.id"), nullable=False, index=True)
+    alias_title: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
+    alias_slug: Mapped[str] = mapped_column(String(256), nullable=False, unique=True, index=True)
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    page: Mapped[DocPage] = relationship("DocPage", back_populates="aliases")
+    created_by: Mapped[User | None] = relationship("User", foreign_keys=[created_by_id])
+
+
+class DocLink(Base):
+    __tablename__ = "doc_links"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    from_page_id: Mapped[int] = mapped_column(ForeignKey("doc_pages.id"), nullable=False, index=True)
+    target_title: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
+    target_slug: Mapped[str | None] = mapped_column(String(256), nullable=True, index=True)
+    target_page_id: Mapped[int | None] = mapped_column(ForeignKey("doc_pages.id"), nullable=True, index=True)
+    is_missing: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    from_page: Mapped[DocPage] = relationship(
+        "DocPage",
+        back_populates="outgoing_links",
+        foreign_keys=[from_page_id],
+    )
+    target_page: Mapped[DocPage | None] = relationship(
+        "DocPage",
+        foreign_keys=[target_page_id],
     )
 
 
@@ -533,7 +583,8 @@ class DevicePort(Base):
     label: Mapped[str | None] = mapped_column(String(128), nullable=True)
     routed_from: Mapped[int | None] = mapped_column(Integer, nullable=True)  # planned input idx feeding an output
     # SNMP-observed (live) routing, kept separate from the manually-entered plan so the
-    # routing page can show planned-vs-actual and highlight mismatches. 0 = unrouted.
+    # routing page can show planned-vs-actual and highlight mismatches.
+    # None = no observed route; 0 = explicitly terminated by the matrix.
     observed_routed_from: Mapped[int | None] = mapped_column(Integer, nullable=True)
     observed_label: Mapped[str | None] = mapped_column(String(128), nullable=True)
 

@@ -85,8 +85,10 @@
                 {% else %}
                 {% if src %}
                   <span class="text-info">I{{ src }}</span> · {{ in_name.get(src, 'Input ' ~ src) }}
-                {% else %}
+                {% elif src == 0 %}
                   <span class="text-muted fst-italic">terminated</span>
+                {% else %}
+                  <span class="text-muted fst-italic">not routed</span>
                 {% endif %}
                 {% if planned_mismatch %}
                 <span class="badge bg-warning text-dark ms-1" title="Planned: input {{ p.routed_from }}">≠ plan</span>
@@ -128,6 +130,8 @@
                 {% if routing_mode == 'input_to_output' %}
                   {% if dst %}
                     <span class="text-warning">O{{ dst }}</span> · {{ out_name.get(dst, 'Output ' ~ dst) }}
+                  {% elif dst == 0 %}
+                    <span class="text-muted fst-italic">terminated</span>
                   {% else %}
                     <span class="text-muted fst-italic">not routed</span>
                   {% endif %}

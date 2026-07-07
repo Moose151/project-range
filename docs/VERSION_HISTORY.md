@@ -1,16 +1,22 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.20.2**
+Current version: **0.21.0**
 
 ---
+
+## 0.21.0 — Documentation Wiki Lite, CBM/CDM Sync Fix, Readability
+
+- **Documentation Wiki Lite:** docs now support `[[Page Title]]` / `[[Page Title|label]]` wiki links, missing-page links, backlinks/related pages, a wanted-pages view, aliases/redirects, admin-managed page **visibility** (all logged-in users / users + administrators / administrators only), new-page **templates** (Blank, Device, Procedure, Troubleshooting, Configuration, Range Rule), and a denser wiki-style home page. Visibility is enforced across docs home/search, recent/wanted pages, wiki-link resolution, backlinks, direct URLs, and print/edit/history routes.
+- **CBM/CDM modem fix:** only modems explicitly ticked as **CBM/EBEM sync** are polled. Other modems (e.g. CDM-600Ls, which aren't reachable over IP) can still be selected as a signal **Source** but are never treated as CBM poll targets, so they no longer generate failed-sync errors. The Devices form shows the CBM/EBEM sync checkbox for any modem (tick it only for real CBM/EBEM units); the Sources list in App Config now labels non-CBM modems as plain **Modem** instead of "CBM modem".
+- Fixed remaining **light-mode table readability** where dashboard signal lists, Signal Logs, history, and audit/config tables still used dark table backgrounds.
+- Renamed user-facing signal-active indicators to **Transmitting / Not transmitting** on the dashboard, banner badge, widgets, and handover exports.
+- Fixed live splitter/combiner routing display so explicit matrix **terminated** states stay distinct from ports with no observed route.
+- Static cache key bumped to `app.css?v=30`.
 
 ## 0.20.2 — Light Mode Readability Fix
 
 - Fixed all **light-mode** themes where the left sidebar and top bar text was unreadable (dark text on the dark sidebar/topbar). Those surfaces keep a dark background in light mode by design, so their text is now always light regardless of the light/dark toggle. Applies to Classic, SEW Gold, Night Ops, and Spectrum.
-- Fixed remaining light-mode table readability issues where dashboard signal lists, Signal Logs, history, audit/config, and other operational tables still used dark table backgrounds.
-- Renamed user-facing signal-active indicators to **Transmitting / Not transmitting** on the dashboard, banner badge, widgets, and handover exports.
-- Static cache key bumped to `app.css?v=29`.
 
 ## 0.20.1 — Chat Receipts and Typing Indicator
 

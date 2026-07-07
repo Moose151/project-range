@@ -223,6 +223,41 @@ code {
 .doc-content th, .doc-content td { border: 1px solid #495057; padding: 6px 12px; }
 .doc-content th { background: #212529; font-weight: 600; }
 .doc-content pre { background: #1a1d20; border: 1px solid #343a40; border-radius: 4px; padding: 12px; overflow-x: auto; }
+.wiki-link {
+  font-weight: 600;
+  text-decoration-style: dotted;
+  text-underline-offset: 0.18em;
+}
+.wiki-missing {
+  color: #dc3545;
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 0.18em;
+}
+.wiki-a-z {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.wiki-page-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.35rem;
+  background: var(--bs-tertiary-bg);
+  color: var(--bs-body-color);
+  text-decoration: none;
+  font-size: 0.86rem;
+}
+.wiki-page-chip:hover {
+  border-color: var(--range-accent);
+  color: var(--range-accent);
+}
+.wiki-article .doc-content {
+  min-height: 22rem;
+}
 
 /* ── Instant chat dock ─────────────────────────────────────── */
 .chat-dock {
