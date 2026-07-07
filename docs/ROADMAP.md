@@ -224,6 +224,41 @@ device-routing, audit-retention, and archive work.
 
 ---
 
+## Spectrum occupancy / signal plan view (future)
+
+A visual frequency-plan chart showing signals as blocks on a spectrum plot — matching the paper signal-plan format already in use on the range. Rendered with **HTML5 Canvas** (no external charting library; keeps the offline/LAN requirement).
+
+### Axis mapping
+
+Each signal block is drawn using its existing logged/planned parameters:
+
+| Axis | Source field | Notes |
+|---|---|---|
+| X position (centre) | `tx_rf` / `rx_rf` (MHz) | Separate Tx and Rx views |
+| X width (occupied BW) | Symbol rate × (1 + rolloff) | Rolloff by modulation type: DVB-S2 ≈ 0.2, legacy QPSK ≈ 0.35, default 0.25 |
+| Y height | Power (dBm) | Y axis is a dBm scale with configurable reference level |
+| Label | Signal name | Shown above the bar; red dot at centre frequency |
+
+Signals without a symbol rate or power value are shown as a thin marker line rather than a block.
+
+### Planned views
+
+- [ ] **Package spectrum page** — static signal plan on the signal package detail page. Shows all signals in the package as they'd appear if all transmitting simultaneously. Tx and Rx panes (tabbed). Useful for pre-exercise planning and briefing.
+- [ ] **Dashboard — Package Plan widget** — add from the widget picker; select a signal package; shows its full spectrum plan. Updates only when the widget is added or refreshed.
+- [ ] **Dashboard — Live Spectrum widget** — shows signals from the active serial using the most recent signal log values. Signals currently **Up** are shown in solid colour; **Down** signals are shown greyed/outlined. Refreshes on the existing 5-second HTMX poll. Clicking a signal block navigates to its log entry.
+- [ ] **Tx / Rx toggle** — tab or button on each widget/view to switch between the uplink (Tx RF) and downlink (Rx RF) spectrum plan.
+- [ ] **Guard-band / frequency limit overlays** — optional red boundary lines (like the image) marking frequency limits or exclusion zones configured per-package or per-activity.
+
+### Implementation notes
+
+- Canvas rendering fits the existing pattern planned for Signal Hound sweep display.
+- Occupied bandwidth formula: `BW_MHz = (symbol_rate_Msps) × (1 + rolloff)`. Rolloff mapped from modulation type string; unknown modulations use 0.25.
+- Power-to-height scale: normalised so the highest-power signal fills ~80% of the canvas height. Y-axis labels in dBm; reference level adjustable per widget.
+- No new models or migrations needed — all data is already in `SignalPackageEntry` and `SignalLog`.
+- Live widget endpoint can reuse or extend the existing `/dashboard/fragment/{serial_id}` poll.
+
+---
+
 ## Signal Hound instrument integration (future)
 
 Signal Hound devices in use on the range: **SM435C** (real-time spectrum analyser, 100 Hz–43.5 GHz), **BB60D** (USB spectrum analyser, 9 kHz–6 GHz), **VSG60A** (vector signal generator, up to 6 GHz). Their SDKs are C libraries with Python ctypes bindings (`smapi`, `bbapi`, `vsgapi`).
