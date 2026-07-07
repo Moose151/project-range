@@ -1,9 +1,15 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.21.0**
+Current version: **0.22.0**
 
 ---
+
+## 0.22.0 — EBEM LED Indicators, Cross-Workspace Copy, Routing Presets
+
+- **EBEM LED status indicators on the dashboard:** The dashboard signal table now has a selectable **EBEM Sync** column showing three coloured LED dots (green/red/grey) for Embedded Channel Sync, Carrier Lock, and Bit Sync on CBM/EBEM modem signals. The LED states are polled automatically during the existing 5-second CBM auto-sync cycle. Non-CBM/EBEM signals show **N/A** in this column.
+- **Cross-workspace copy (Live ↔ Sandbox):** Signal Packages, CDA Tables, and Serials can now be copied between the Live and Sandbox (Testing) workspaces with a single button. Copying a serial also carries its assigned packages across, reusing any existing package with the same name or creating a copy. Copied serials arrive as Pending in the target workspace.
+- **Routing presets tied to range states:** Administrators can now save the current SNMP-observed routing of any splitter/combiner as a **named preset** for each range state (Standby/Off, Closed Loop, Live). When changing range state, the app compares live observed routing against the preset for the target state and shows a warning panel listing which ports need to change and what they need to be changed to. The operator can fix the hardware and re-submit, or confirm they have reviewed the mismatch and proceed anyway. Advisory only — routing checks never block the state change.
 
 ## 0.21.0 — Documentation Wiki Lite, CBM/CDM Sync Fix, Readability
 

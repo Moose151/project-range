@@ -5,7 +5,7 @@
 
 ---
 
-## ⚑ Current Status & Handover — 2026-06-29 (READ THIS FIRST)
+## ⚑ Current Status & Handover — 2026-07-07 (READ THIS FIRST)
 
 > The detailed sections **below this block predate a large body of work** and are
 > partially stale (e.g. port, model/router lists, "dark only", **top navbar** —
@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.20.2` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.22.0` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -299,6 +299,10 @@
   - `app/cbm_sync.py` now accepts active/enabled/engaged modem state variants instead of only exact `TX_OP=ON`.
   - CBM sync no longer forces a signal Down when the poll has no confident Tx/Rx state; it preserves the latest dashboard status and can still write telemetry changes.
   - Eb/No parsing accepts numeric strings with units plus EBEM aliases (`RX_EBNO`, `EBNO`, `EBN0`, `EB_N0`, `EB_NO`). Tests live in `tests/test_cbm_sync.py`.
+- **0.22.0 — EBEM LED indicators, cross-workspace copy, routing presets:**
+  - **EBEM LED status column on dashboard**: `RFDevice.cbm_sync_state_json` (TEXT, additive migration) stores tri-state LED values for Embedded Channel Sync (`ESYNC_STAT`), Carrier Lock (`ACQ_STATE`), and Bit Sync (`BSYNC_STAT`). Written during the 5-second CBM auto-sync via `sync_states_from_snapshot()` in `app/cbm_sync.py`. New selectable `EBEM Sync` column (`data-col="ebem"`) in the dashboard signal table; non-CBM sources show N/A. Three `.ebem-led` CSS dot spans (green/red/grey) with Bootstrap tooltips. `cbm_status_by_source` dict built in `dashboard.py` and keyed by device name against `log.source`.
+  - **Cross-workspace copy (Live ↔ Sandbox)**: `POST /packages/{id}/copy-to-other`, `POST /cda/{id}/copy-to-other`, `POST /serials/{id}/copy-to-other`. Package copy clears `cbm_device_id` (device IDs are workspace-specific). Serial copy carries packages across by name-match-or-copy; arrives in target workspace as fresh Pending serial. Button labels show "→ Live" or "→ Sandbox" based on current range state.
+  - **Routing presets tied to range states**: new `RoutingPreset` model (`routing_presets` table, auto-created by `create_all`; no manual migration needed). Admins snapshot current live SNMP observed routing per device per range state via `POST /devices/{id}/routing-presets/save`. On state change, `_routing_mismatches(db, target_state)` in `range_state.py` compares observed routing against presets; if mismatches, re-renders confirm page with a warning table (Port / Required for target state / Currently observed). Routing check runs before Live auth step so supervisor creds are not required twice. Advisory only — operator ticks `routing_confirmed` checkbox to proceed. Preset management cards shown in `device_routing.html` (one card per non-Testing range state; save/update/delete). `from_json` Jinja2 filter added to `app/templating.py`.
 
 ### ⚠ Outstanding REQUESTED work (NOT yet done — next assistant should pick these up)
 0. **Chat receipts + typing broken in the FLOATING window only (bottom-right launcher) — dashboard chat WIDGET works fine.** Reported after 0.20.1. Verified: the **server logic is correct** (simulated two users: receipts go sent→received→read and typing detection all work at the data layer in `app/chat_state.py`), `/chat/*` POSTs are allowed for all roles (middleware exempts them), and `app.js` is syntactically valid. The widget and the floating window are **two separate front-end implementations**: the dashboard widget (`renderDashboardChatWidget` in `dashboard.html`) re-renders fully from `chatState` each poll and works; the floating window (`app/static/js/app.js`: `appendChatMessages` + incremental `updateChatReceipts` / `renderChatTypingIndicators` / `markChatRoomRead`, driven by `pollChatRoom`) shows/sends messages but does NOT update read receipts, own-message receipts, or typing dots. Couldn't pin the exact fault by static reading — needs a **live two-session repro**, OR (recommended) **rework the floating window to reuse the widget's full-rerender-from-state approach** instead of incremental DOM patching. Contained front-end change; no server work needed.
@@ -343,6 +347,9 @@
 - **Settings area** — now reached via the sidebar (user footer → Preferences/Password; administrator → Admin → App Config). The old Settings dropdown is gone.
 - **`DeviceLink` and `RFDevice` new columns are fully implemented** — `device_model`, `has_web_gui`, and the `device_links` table are all in place. Device type list now includes `antenna`. No further migration needed for those.
 - **CBM sync columns:** `signal_package_entries.cbm_device_id` / `cbm_path` / legacy `cbm_carrier`; `rf_devices.cbm_sync_enabled` / `cbm_username` / `cbm_password_encrypted` / `cbm_last_sync_*`; `users.active_session_token` for single-session enforcement. `cbm_carrier` remains in the DB for backward compatibility but is no longer shown in package signal parameters. Additive migrations are in `init_db.py`.
+- **`RFDevice.cbm_sync_state_json`** (added 0.22.0) — TEXT column storing JSON dict `{"ebem_sync": bool|null, "carrier_lock": bool|null, "bit_sync": bool|null}`. Written during CBM auto-sync. Additive migration in `init_db.py`. Used by `dashboard.py::_cbm_status_by_source` and rendered as coloured LED dots in `partials/signal_table.html`.
+- **`RoutingPreset` model** (added 0.22.0) — new table `routing_presets`, auto-created by `Base.metadata.create_all()` in `init_db.py`. Stores: `device_id`, `range_state` (string: "Live", "Closed Loop", "Standby/Off"), `name`, `routes_json` (JSON dict: str(port_idx) → int(routed_from)), `created_by_id`, `created_at`. Keys are output port indices for splitters, input port indices for combiners. No manual `ALTER TABLE` needed — `create_all` handles it.
+- **`from_json` Jinja2 filter** (added 0.22.0) — registered in `app/templating.py`; decodes a JSON string to a Python dict/list; returns `{}` on null/error. Used in `device_routing.html` to render preset routes.
 - **Dashboard Engaged column:** `SignalLog.engaged` is a per-signal visual flag used by operators to mark whether mission systems are affecting that signal. It is intentionally not part of the status enum and should not drive buzzer/range-state behavior.
 
 ### Caveats / verification gaps

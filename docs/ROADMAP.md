@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.20.2` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.22.0` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -340,10 +340,7 @@ positions, module presence, input/output levels, and PSU/fan/temperature alarms.
 - [x] Show system alarm/module health status — shipped in 0.19.0 (`systemSummaryAlarm`
   + `moduleInfoTable` on the Devices page and routing panel). *(Per-port input/output
   level detail can be added later if operators want it.)*
-- [ ] **Guided state changes (follow-up):** capture **named presets** of known-good
-  routing (user decision), match live routing to a preset, and present plain-language
-  guidance on what to re-route to reach a target preset. **Read-only guidance only** —
-  the app advises; the operator changes the matrix. Not started.
+- [x] **Guided state changes (follow-up):** named routing presets per device per range state — shipped in **0.22.0**. Admins snapshot current SNMP routing as a preset for each state. When changing state, the app compares live observed routing against the preset and shows a warning table listing port / required routing / current routing. Advisory only — operator confirms they've reviewed it and can proceed. Preset management on the device routing page.
 - [ ] **Hardware validation:** confirm observed routing/alarm reads against the matrix
   front panel once SNMP is enabled + credentials obtained (v2c vs v3), and confirm the
   routing-table row/column → output-index interpretation in `app/snmp.py::parse_routing`.
@@ -352,9 +349,9 @@ positions, module presence, input/output levels, and PSU/fan/temperature alarms.
 extra EBEM status fields as red/green dashboard indicators: unit fault, Tx/Rx
 traffic, modem/demod lock & sync, EDMAC **embedded channel**, and link status.
 
-- [ ] Extend `app/cbm.py` parsing to capture the additional status fields.
+- [~] Extend `app/cbm.py` parsing to capture the additional status fields. *(Partial: `ESYNC_STAT`, `ACQ_STATE`, and `BSYNC_STAT` are read in `cbm_sync.py` and stored as `cbm_sync_state_json`. Remaining fields such as unit fault and Tx/Rx traffic are not yet surfaced.)*
 - [ ] Confirm exact EBEM status field names/values against the EBEM manual.
-- [ ] Render red/green status lights on the dashboard signal/device view.
+- [x] Render red/green status lights on the dashboard signal/device view — shipped in **0.22.0** (the three-LED EBEM Sync column in the dashboard signal table).
 
 **3-infra. Sync Server, 10 MHz reference, DC injector.**
 
