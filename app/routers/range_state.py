@@ -18,6 +18,27 @@ from app.templating import templates
 VALID_STATES = [s.value for s in RangeState]
 
 
+def _poll_devices_for_presets(db: Session, target_state: str) -> None:
+    """Fresh SNMP poll of every SNMP-enabled device that has a routing preset for target_state.
+
+    Called before _routing_mismatches so the comparison is against live routing, not
+    stale cached data. Silent on poll failure — stale/missing data is then flagged as
+    unverified inside _routing_mismatches.
+    """
+    from app.snmp_sync import poll_snmp_device
+    presets = db.query(RoutingPreset).filter(RoutingPreset.range_state == target_state).all()
+    polled_ids: set[int] = set()
+    for preset in presets:
+        dev = preset.device
+        if dev and dev.snmp_enabled and dev.id not in polled_ids:
+            polled_ids.add(dev.id)
+            try:
+                poll_snmp_device(db, dev)
+                db.flush()
+            except Exception:
+                pass
+
+
 def _routing_mismatches(db: Session, target_state: str) -> list[dict]:
     """Return per-device lists of routing changes required to match the preset for target_state.
 
@@ -217,6 +238,9 @@ async def change_state_page(
     current_user: User = Depends(get_current_user),
 ):
     current = get_current_range_state(db)
+    if target:
+        _poll_devices_for_presets(db, target)
+        db.commit()
     mismatches = _routing_mismatches(db, target) if target else []
     return templates.TemplateResponse(request, "range_state_confirm.html", {
         "user": current_user,
@@ -270,7 +294,11 @@ async def change_state_submit(
 
     # Routing preset check — show before Live auth so supervisor creds aren't needed twice.
     # Advisory only: operator can proceed by confirming they've reviewed the routing.
+    # Do a fresh SNMP poll first so the comparison is against live hardware state, not
+    # stale cached data (the background SNMP poller is off by default).
     if routing_confirmed != "1":
+        _poll_devices_for_presets(db, new_state)
+        db.flush()
         mismatches = _routing_mismatches(db, new_state)
         if mismatches:
             return templates.TemplateResponse(request, "range_state_confirm.html", {
