@@ -83,9 +83,13 @@
         <i class="bi bi-clock-history"></i>
         <span class="sidebar-label">History</span>
       </a>
-      <a href="/docs" class="sidebar-link {% if page == 'docs' or page == 'version_history' %}active{% endif %}">
+      <a href="/docs" class="sidebar-link {% if page == 'docs' %}active{% endif %}">
         <i class="bi bi-book"></i>
         <span class="sidebar-label">Documentation</span>
+      </a>
+      <a href="/docs/version-history" class="sidebar-link {% if page == 'version_history' %}active{% endif %}">
+        <i class="bi bi-tag"></i>
+        <span class="sidebar-label">Version History</span>
       </a>
 
       <!-- Tools: devices and calculators -->
