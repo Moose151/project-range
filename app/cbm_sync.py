@@ -15,7 +15,11 @@ from app.crypto import decrypt_secret
 from app.deps import get_current_range_state, is_testing_state
 from app.models import AuditLog, RFDevice, Serial, SignalLog, SignalPackageEntry
 from app.rf_config import serial_package_rf_config, recalculate_from_values
-from app.settings import get_cbm_ebno_log_threshold, get_cbm_ebno_log_enabled
+from app.settings import (
+    get_cbm_ebno_log_threshold,
+    get_cbm_ebno_log_enabled,
+    get_sandbox_hardware_sync_paused,
+)
 from app.signal_warnings import warning_flags_for
 
 
@@ -207,6 +211,18 @@ def sync_active_cbms(db: Session, actor_id: int | None, audit_when_noop: bool = 
     result = CBMSyncResult(errors=[])
     range_state = get_current_range_state(db)
     testing = is_testing_state(db)
+    if testing and get_sandbox_hardware_sync_paused(db):
+        result.skipped = 1
+        result.add_error("Sandbox hardware sync is paused; EBEM/CBM sync skipped")
+        if audit_when_noop:
+            db.add(AuditLog(
+                user_id=actor_id,
+                action_type="CBM_SYNC_PAUSED",
+                entity_type="SignalLog",
+                new_value="Sandbox hardware sync paused",
+            ))
+            db.commit()
+        return result
     ebno_threshold = get_cbm_ebno_log_threshold(db)
     ebno_log_enabled = get_cbm_ebno_log_enabled(db)
     active_serials = db.query(Serial).filter(

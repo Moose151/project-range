@@ -25,6 +25,9 @@ def _poll_devices_for_presets(db: Session, target_state: str) -> None:
     stale cached data. Silent on poll failure — stale/missing data is then flagged as
     unverified inside _routing_mismatches.
     """
+    from app.settings import get_sandbox_hardware_sync_paused
+    if get_current_range_state(db) == RangeState.TESTING.value and get_sandbox_hardware_sync_paused(db):
+        return
     from app.snmp_sync import poll_snmp_device
     presets = db.query(RoutingPreset).filter(RoutingPreset.range_state == target_state).all()
     polled_ids: set[int] = set()

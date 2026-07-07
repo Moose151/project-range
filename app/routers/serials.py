@@ -388,6 +388,7 @@ async def serial_copy_to_other(
         opened_by_id=current_user.id,
         is_testing=target,
     )
+    new_serial._preserve_testing_scope = True
     db.add(new_serial)
     db.flush()
 

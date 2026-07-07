@@ -14,6 +14,20 @@ templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["app_version"] = APP_VERSION
 
 
+def _sandbox_hardware_sync_paused() -> bool:
+    from app.database import SessionLocal
+    from app.settings import get_sandbox_hardware_sync_paused
+
+    db = SessionLocal()
+    try:
+        return get_sandbox_hardware_sync_paused(db)
+    finally:
+        db.close()
+
+
+templates.env.globals["sandbox_hardware_sync_paused"] = _sandbox_hardware_sync_paused
+
+
 def _from_json(value: str | None) -> dict | list | None:
     if not value:
         return {}

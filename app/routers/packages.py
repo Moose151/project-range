@@ -973,6 +973,7 @@ def _copy_package_to_workspace(
         is_testing=target_testing,
         created_by_id=actor_id,
     )
+    copy._preserve_testing_scope = True
     db.add(copy)
     db.flush()
     for entry in pkg.signals:

@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Resp
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.deps import require_supervisor, get_current_range_state, is_testing_state
+from app.deps import get_current_user, require_supervisor, get_current_range_state, is_testing_state
 from app.config import AUDIT_ARCHIVE_DIR, DATABASE_URL, SERIAL_ARCHIVE_DIR
 from app.file_security import permission_status
 from app.models import AuditLog, ModulationType, FecType, SignalSource, AntennaType, Signal, FrequencyTemplate, User, DutyRole, RFDevice, ActivityType, Activity
@@ -26,6 +26,8 @@ from app.settings import (
     CBM_EBNO_LOG_ENABLED_KEY,
     DEFAULT_CBM_EBNO_LOG_ENABLED,
     get_cbm_ebno_log_enabled,
+    SANDBOX_HARDWARE_SYNC_PAUSED_KEY,
+    get_sandbox_hardware_sync_paused,
 )
 
 router = APIRouter(prefix="/config")
@@ -116,6 +118,7 @@ async def config_page(
         "audit_live_record_max": MAX_AUDIT_LIVE_RECORD_LIMIT,
         "cbm_ebno_log_threshold": get_cbm_ebno_log_threshold(db),
         "cbm_ebno_log_enabled": get_cbm_ebno_log_enabled(db),
+        "sandbox_hardware_sync_paused": get_sandbox_hardware_sync_paused(db),
         "system_health": {
             "database": str(db_path) if db_path else DATABASE_URL,
             "database_size_mb": round(db_path.stat().st_size / (1024 * 1024), 2) if db_path and db_path.exists() else None,
@@ -207,6 +210,7 @@ async def system_settings_save(
     audit_live_record_limit: str = Form("1000"),
     cbm_ebno_log_threshold: str = Form("3"),
     cbm_ebno_log_enabled: str = Form(""),
+    sandbox_hardware_sync_paused: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
@@ -219,8 +223,28 @@ async def system_settings_save(
         ebno_thr = DEFAULT_CBM_EBNO_LOG_THRESHOLD
     set_setting(db, CBM_EBNO_LOG_THRESHOLD_KEY, f"{ebno_thr:g}")
     set_setting(db, CBM_EBNO_LOG_ENABLED_KEY, "1" if cbm_ebno_log_enabled == "1" else "0")
+    set_setting(db, SANDBOX_HARDWARE_SYNC_PAUSED_KEY, "1" if sandbox_hardware_sync_paused == "1" else "0")
     db.commit()
     return RedirectResponse("/config?toast=System+settings+saved", status_code=302)
+
+
+@router.post("/sandbox-hardware-sync")
+async def sandbox_hardware_sync_toggle(
+    request: Request,
+    paused: str = Form(""),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role == "observer":
+        raise HTTPException(status_code=403, detail="Observer accounts cannot change sandbox sync settings")
+    set_setting(db, SANDBOX_HARDWARE_SYNC_PAUSED_KEY, "1" if paused == "1" else "0")
+    db.commit()
+    dest = request.headers.get("referer") or "/"
+    if not dest.startswith(str(request.base_url)) and not dest.startswith("/"):
+        dest = "/"
+    label = "paused" if paused == "1" else "enabled"
+    sep = "&" if "?" in dest else "?"
+    return RedirectResponse(f"{dest}{sep}toast=Sandbox+hardware+sync+{label}", status_code=302)
 
 
 # ── Modulation types ────────────────────────────────────────────────────────────

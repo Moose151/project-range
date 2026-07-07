@@ -832,6 +832,8 @@ def _mark_testing_scoped_rows(session: SASession, flush_context, instances) -> N
         return
     testing = _session_testing_state(session)
     for obj in new_scoped:
+        if getattr(obj, "_preserve_testing_scope", False):
+            continue
         obj.is_testing = testing
 
 

@@ -18,6 +18,7 @@ from app.crypto import decrypt_secret
 from app.deps import is_testing_state
 from app.models import AuditLog, DevicePort, RFDevice
 from app.snmp import MatrixSnapshot, SNMPError, poll_genus_matrix
+from app.settings import get_sandbox_hardware_sync_paused
 
 ROUTING_TYPES = {"splitter", "combiner"}
 
@@ -135,6 +136,18 @@ def poll_active_snmp_devices(
     """Poll every SNMP-enabled routing device in the current range-state scope."""
     result = SNMPSyncResult()
     testing = is_testing_state(db)
+    if testing and get_sandbox_hardware_sync_paused(db):
+        result.skipped = 1
+        result.add_error("Sandbox hardware sync is paused; SNMP polling skipped")
+        if audit_when_noop:
+            db.add(AuditLog(
+                user_id=actor_id,
+                action_type="SNMP_POLL_PAUSED",
+                entity_type="RFDevice",
+                new_value="Sandbox hardware sync paused",
+            ))
+            db.commit()
+        return result
     devices = db.query(RFDevice).filter(
         RFDevice.snmp_enabled == True,   # noqa: E712
         RFDevice.is_testing == testing,

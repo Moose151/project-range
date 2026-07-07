@@ -536,6 +536,13 @@ function utilityBody(id, type, config = {}) {
                     <option value="rx">RX only</option>
                   </select>
                 </div>
+                <div>
+                  <label class="form-label small mb-1 d-block">Freq</label>
+                  <select class="form-select form-select-sm spec-freq-mode" style="width:80px" onchange="liveSpecRedraw('${id}')">
+                    <option value="if">IF</option>
+                    <option value="rf">RF</option>
+                  </select>
+                </div>
                 <div class="d-flex gap-1">
                   <button class="btn btn-sm btn-outline-primary" onclick="liveSpecFetch('${id}')" title="Refresh now">
                     <i class="bi bi-arrow-clockwise"></i>
@@ -1371,6 +1378,7 @@ function liveSpecReadControls(id) {
     guardLeft: glv !== '' && glv ? parseFloat(glv) : null,
     guardRight: grv !== '' && grv ? parseFloat(grv) : null,
     view: _liveSpecEl(id, 'spec-view')?.value || 'both',
+    freqMode: _liveSpecEl(id, 'spec-freq-mode')?.value || 'if',
   };
 }
 
@@ -1379,10 +1387,19 @@ function liveSpecRedraw(id) {
   if (!canvas) return;
   const ctrl = liveSpecReadControls(id);
   if (!ctrl.centreFreq || !ctrl.span || ctrl.span <= 0) return;
+  const signals = (_liveSpecData[id] || {}).signals || [];
+  if (signals.length && !specHasVisibleSignals(signals, ctrl.centreFreq, ctrl.span, ctrl.view, ctrl.freqMode)) {
+    const auto = specAutoSettings(signals, ctrl.view, ctrl.freqMode);
+    ctrl.centreFreq = auto.centreFreq;
+    ctrl.span = auto.span;
+    const cf = _liveSpecEl(id, 'spec-centre');
+    const sp = _liveSpecEl(id, 'spec-span');
+    if (cf) cf.value = ctrl.centreFreq;
+    if (sp) sp.value = ctrl.span;
+  }
   try { localStorage.setItem('live_spec_' + id,
     JSON.stringify(ctrl)); } catch (e) {}
-  const signals = (_liveSpecData[id] || {}).signals || [];
-  drawSpectrumChart(canvas, signals, ctrl.centreFreq, ctrl.span, ctrl.guardLeft, ctrl.guardRight, ctrl.view);
+  drawSpectrumChart(canvas, signals, ctrl.centreFreq, ctrl.span, ctrl.guardLeft, ctrl.guardRight, ctrl.view, ctrl.freqMode);
 }
 
 function liveSpecClearGuards(id) {
@@ -1399,12 +1416,12 @@ function liveSpecFetch(id) {
     .then(data => {
       _liveSpecData[id] = { signals: data.signals || [] };
       const ctrl = liveSpecReadControls(id);
-      if (!ctrl.centreFreq) {
-        const auto = specAutoSettings(data.signals || []);
+      if (!ctrl.centreFreq || !ctrl.span) {
+        const auto = specAutoSettings(data.signals || [], ctrl.view, ctrl.freqMode);
         const cf = _liveSpecEl(id, 'spec-centre');
         const sp = _liveSpecEl(id, 'spec-span');
-        if (cf && !cf.value) cf.value = auto.centreFreq;
-        if (sp && !sp.value) sp.value = auto.span;
+        if (cf && !ctrl.centreFreq) cf.value = auto.centreFreq;
+        if (sp && !ctrl.span) sp.value = auto.span;
       }
       liveSpecRedraw(id);
     })
@@ -1426,11 +1443,13 @@ function liveSpecInit(id) {
     const gl = _liveSpecEl(id, 'spec-guard-left');
     const gr = _liveSpecEl(id, 'spec-guard-right');
     const vw = _liveSpecEl(id, 'spec-view');
+    const fm = _liveSpecEl(id, 'spec-freq-mode');
     if (cf) cf.value = saved.centreFreq ?? '';
     if (sp) sp.value = saved.span ?? '';
     if (gl && saved.guardLeft !== null && saved.guardLeft !== undefined) gl.value = saved.guardLeft;
     if (gr && saved.guardRight !== null && saved.guardRight !== undefined) gr.value = saved.guardRight;
     if (vw && saved.view) vw.value = saved.view;
+    if (fm) fm.value = saved.freqMode || 'if';
   }
   liveSpecFetch(id);
   window.addEventListener('resize', () => liveSpecRedraw(id));

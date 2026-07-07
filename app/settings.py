@@ -26,6 +26,12 @@ DEFAULT_CBM_EBNO_LOG_THRESHOLD = 3.0
 CBM_EBNO_LOG_ENABLED_KEY = "cbm_ebno_log_enabled"
 DEFAULT_CBM_EBNO_LOG_ENABLED = True
 
+# Testing/Sandbox-only pause for read-only hardware sync. When enabled, automatic
+# and active EBEM/CBM + SNMP syncs do not update Testing workspace rows, letting
+# users rehearse manual changes without modem/matrix reads immediately overriding them.
+SANDBOX_HARDWARE_SYNC_PAUSED_KEY = "sandbox_hardware_sync_paused"
+DEFAULT_SANDBOX_HARDWARE_SYNC_PAUSED = False
+
 try:
     TIME_ZONES = ["UTC"] + sorted(tz for tz in available_timezones() if tz != "UTC")
 except Exception:
@@ -72,6 +78,11 @@ def get_audit_live_record_limit(db: Session) -> int:
 def get_cbm_ebno_log_enabled(db: Session) -> bool:
     raw = get_setting(db, CBM_EBNO_LOG_ENABLED_KEY, "1")
     return raw.lower() not in ("0", "false", "no", "off")
+
+
+def get_sandbox_hardware_sync_paused(db: Session) -> bool:
+    raw = get_setting(db, SANDBOX_HARDWARE_SYNC_PAUSED_KEY, "0")
+    return raw.lower() in ("1", "true", "yes", "on")
 
 
 def get_cbm_ebno_log_threshold(db: Session) -> float:

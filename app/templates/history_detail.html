@@ -95,6 +95,13 @@
             <option value="rx">RX only</option>
           </select>
         </div>
+        <div class="col-auto">
+          <label class="form-label small mb-1">Freq</label>
+          <select id="hspecFreqMode" class="form-select form-select-sm" style="width:85px">
+            <option value="if">IF</option>
+            <option value="rf">RF</option>
+          </select>
+        </div>
         <div class="col-auto d-flex gap-1 align-items-center mt-3">
           <button class="btn btn-sm btn-primary" onclick="hspecRender()">
             <i class="bi bi-arrow-clockwise me-1"></i>Redraw
@@ -121,7 +128,8 @@
 const HSPEC_SERIAL_ID = {{ serial.id }};
 const hspecSignals = [
 {% for entry in all_pkg_signals %}
-  { name: {{ entry.signal_name | tojson }}, txRf: {{ entry.tx_rf | tojson }}, rxRf: {{ entry.rx_rf | tojson }},
+  { name: {{ entry.signal_name | tojson }}, txIf: {{ entry.tx_if | tojson }}, rxIf: {{ entry.rx_if | tojson }},
+    txRf: {{ entry.tx_rf | tojson }}, rxRf: {{ entry.rx_rf | tojson }},
     symbolRate: {{ entry.symbol_rate | tojson }}, modulation: {{ entry.modulation | tojson }},
     power: {{ entry.power | tojson }}, freqUnit: {{ entry.freq_unit | tojson }} },
 {% endfor %}
@@ -137,10 +145,19 @@ function hspecRender() {
   const gl = glv !== '' ? parseFloat(glv) : null;
   const gr = grv !== '' ? parseFloat(grv) : null;
   const view = document.getElementById('hspecView').value;
+  const freqMode = document.getElementById('hspecFreqMode').value || 'if';
   if (isNaN(cf) || isNaN(sp) || sp <= 0) return;
+  let centreFreq = cf, span = sp;
+  if (!specHasVisibleSignals(hspecSignals, centreFreq, span, view, freqMode)) {
+    const auto = specAutoSettings(hspecSignals, view, freqMode);
+    centreFreq = auto.centreFreq;
+    span = auto.span;
+    document.getElementById('hspecCentre').value = centreFreq;
+    document.getElementById('hspecSpan').value = span;
+  }
   try { localStorage.setItem('hspec_serial_' + HSPEC_SERIAL_ID,
-    JSON.stringify({ centreFreq: cf, span: sp, guardLeft: gl, guardRight: gr, view })); } catch (e) {}
-  drawSpectrumChart(canvas, hspecSignals, cf, sp, gl, gr, view);
+    JSON.stringify({ centreFreq, span, guardLeft: gl, guardRight: gr, view, freqMode })); } catch (e) {}
+  drawSpectrumChart(canvas, hspecSignals, centreFreq, span, gl, gr, view, freqMode);
 }
 
 function hspecClearGuards() {
@@ -153,8 +170,8 @@ function hspecInit() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem('hspec_serial_' + HSPEC_SERIAL_ID) || 'null'); } catch (e) {}
   if (!saved) {
-    const auto = specAutoSettings(hspecSignals);
-    saved = { centreFreq: auto.centreFreq, span: auto.span, guardLeft: null, guardRight: null, view: 'both' };
+    const auto = specAutoSettings(hspecSignals, 'both', 'if');
+    saved = { centreFreq: auto.centreFreq, span: auto.span, guardLeft: null, guardRight: null, view: 'both', freqMode: 'if' };
   }
   document.getElementById('hspecCentre').value = saved.centreFreq ?? '';
   document.getElementById('hspecSpan').value = saved.span ?? 500;
@@ -163,6 +180,7 @@ function hspecInit() {
   if (saved.guardRight !== null && saved.guardRight !== undefined)
     document.getElementById('hspecGuardRight').value = saved.guardRight;
   if (saved.view) document.getElementById('hspecView').value = saved.view;
+  document.getElementById('hspecFreqMode').value = saved.freqMode || 'if';
   hspecRender();
 }
 
@@ -170,7 +188,7 @@ document.getElementById('histSpecPanel')?.addEventListener('shown.bs.collapse', 
 window.addEventListener('resize', () => {
   if (document.getElementById('histSpecPanel')?.classList.contains('show')) hspecRender();
 });
-['hspecCentre','hspecSpan','hspecGuardLeft','hspecGuardRight','hspecView'].forEach(id => {
+['hspecCentre','hspecSpan','hspecGuardLeft','hspecGuardRight','hspecView','hspecFreqMode'].forEach(id => {
   document.getElementById(id)?.addEventListener('change', () => {
     if (document.getElementById('histSpecPanel')?.classList.contains('show')) hspecRender();
   });

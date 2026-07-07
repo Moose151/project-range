@@ -839,6 +839,11 @@ async def spectrum_signals_json(
     seen: set[str] = set()
     for serial in open_serials:
         latest = _latest_signal_status(db, serial_id=serial.id)
+        package_signals = {
+            entry.signal_name: entry
+            for link in serial.package_links
+            for entry in link.package.signals
+        }
         for log in latest:
             if log.signal_status != "Up":
                 continue
@@ -846,15 +851,18 @@ async def spectrum_signals_json(
             if key in seen:
                 continue
             seen.add(key)
+            package_entry = package_signals.get(log.signal_name)
             result.append({
                 "name": log.signal_name,
                 "serialName": serial.title,
-                "txRf": log.tx_rf,
-                "rxRf": log.rx_rf,
-                "freqUnit": log.freq_unit,
-                "symbolRate": log.symbol_rate,
+                "txIf": log.tx_if if log.tx_if is not None else (package_entry.tx_if if package_entry else None),
+                "rxIf": log.rx_if if log.rx_if is not None else (package_entry.rx_if if package_entry else None),
+                "txRf": log.tx_rf if log.tx_rf is not None else (package_entry.tx_rf if package_entry else None),
+                "rxRf": log.rx_rf if log.rx_rf is not None else (package_entry.rx_rf if package_entry else None),
+                "freqUnit": log.freq_unit or (package_entry.freq_unit if package_entry else "MHz"),
+                "symbolRate": log.symbol_rate or (package_entry.symbol_rate if package_entry else None),
                 "power": log.power,
-                "modulation": log.modulation,
+                "modulation": log.modulation or (package_entry.modulation if package_entry else None),
                 "isUp": log.signal_status == "Up",
                 "dimmed": False,
             })

@@ -426,6 +426,7 @@ async def cda_copy_to_other(
         created_by_id=current_user.id,
         is_testing=target,
     )
+    copy._preserve_testing_scope = True
     db.add(copy)
     db.flush()
     for window in orig.windows:

@@ -151,6 +151,22 @@
         <i class="bi bi-box-arrow-right"></i>
         <span class="sidebar-label">Logout</span>
       </a>
+      {% if range_state == "Testing" %}
+      {% set sandbox_sync_paused = sandbox_hardware_sync_paused() %}
+      <form method="post" action="/config/sandbox-hardware-sync" class="m-0">
+        <input type="hidden" name="paused" value="{% if sandbox_sync_paused %}0{% else %}1{% endif %}">
+        <button type="submit" class="sidebar-link w-100 border-0 bg-transparent text-start"
+                title="{% if sandbox_sync_paused %}Resume EBEM/CBM and SNMP sync in Sandbox{% else %}Pause EBEM/CBM and SNMP sync in Sandbox{% endif %}">
+          <i class="bi {% if sandbox_sync_paused %}bi-pause-circle-fill text-warning{% else %}bi-play-circle text-success{% endif %}"></i>
+          <span class="sidebar-label">
+            Sandbox Sync
+            <span class="badge {% if sandbox_sync_paused %}text-bg-warning{% else %}text-bg-success{% endif %} ms-1" style="font-size:.6rem;vertical-align:middle">
+              {% if sandbox_sync_paused %}PAUSED{% else %}ON{% endif %}
+            </span>
+          </span>
+        </button>
+      </form>
+      {% endif %}
     </div>
 
     <!-- CEASE: range-wide stop alert. Any user (incl. Observer) may raise it. -->
@@ -355,7 +371,7 @@
 
 <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="/static/vendor/htmx/htmx.min.js"></script>
-<script src="/static/js/app.js?v=30"></script>
+<script src="/static/js/app.js?v=32"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

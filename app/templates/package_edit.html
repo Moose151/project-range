@@ -339,6 +339,13 @@
                 <option value="rx">RX only</option>
               </select>
             </div>
+            <div class="col-auto">
+              <label class="form-label small mb-1">Freq</label>
+              <select id="specFreqMode" class="form-select form-select-sm" style="width:85px">
+                <option value="if">IF</option>
+                <option value="rf">RF</option>
+              </select>
+            </div>
             <div class="col-auto d-flex gap-1 align-items-center mt-3">
               <button class="btn btn-sm btn-primary" onclick="renderSpectrum()">
                 <i class="bi bi-arrow-clockwise me-1"></i>Redraw
@@ -640,7 +647,8 @@ function recalcSignalFreqs(changedField) {
 const SPEC_PKG_ID = {{ package.id if package else 0 }};
 const rawSpecSignals = [
 {% for entry in (package.signals if package else []) %}
-  { name: {{ entry.signal_name | tojson }}, txRf: {{ entry.tx_rf | tojson }}, rxRf: {{ entry.rx_rf | tojson }},
+  { name: {{ entry.signal_name | tojson }}, txIf: {{ entry.tx_if | tojson }}, rxIf: {{ entry.rx_if | tojson }},
+    txRf: {{ entry.tx_rf | tojson }}, rxRf: {{ entry.rx_rf | tojson }},
     symbolRate: {{ entry.symbol_rate | tojson }}, modulation: {{ entry.modulation | tojson }},
     power: {{ entry.power | tojson }}, freqUnit: {{ entry.freq_unit | tojson }} },
 {% endfor %}
@@ -649,25 +657,33 @@ const rawSpecSignals = [
 function renderSpectrum() {
   const canvas = document.getElementById('spectrumCanvas');
   if (!canvas) return;
-  const centreFreq = parseFloat(document.getElementById('specCentre').value);
-  const span = parseFloat(document.getElementById('specSpan').value);
+  let centreFreq = parseFloat(document.getElementById('specCentre').value);
+  let span = parseFloat(document.getElementById('specSpan').value);
   const glVal = document.getElementById('specGuardLeft').value;
   const grVal = document.getElementById('specGuardRight').value;
   const guardLeft = glVal !== '' ? parseFloat(glVal) : null;
   const guardRight = grVal !== '' ? parseFloat(grVal) : null;
   const view = document.getElementById('specView').value;
+  const freqMode = document.getElementById('specFreqMode').value || 'if';
   if (isNaN(centreFreq) || isNaN(span) || span <= 0) return;
+  if (!specHasVisibleSignals(rawSpecSignals, centreFreq, span, view, freqMode)) {
+    const auto = specAutoSettings(rawSpecSignals, view, freqMode);
+    centreFreq = auto.centreFreq;
+    span = auto.span;
+    document.getElementById('specCentre').value = centreFreq;
+    document.getElementById('specSpan').value = span;
+  }
   try { localStorage.setItem('spectrum_pkg_' + SPEC_PKG_ID,
-    JSON.stringify({ centreFreq, span, guardLeft, guardRight, view })); } catch (e) {}
-  drawSpectrumChart(canvas, rawSpecSignals, centreFreq, span, guardLeft, guardRight, view);
+    JSON.stringify({ centreFreq, span, guardLeft, guardRight, view, freqMode })); } catch (e) {}
+  drawSpectrumChart(canvas, rawSpecSignals, centreFreq, span, guardLeft, guardRight, view, freqMode);
 }
 
 function initSpectrum() {
   let settings = null;
   try { settings = JSON.parse(localStorage.getItem('spectrum_pkg_' + SPEC_PKG_ID) || 'null'); } catch (e) {}
   if (!settings) {
-    const auto = specAutoSettings(rawSpecSignals);
-    settings = { centreFreq: auto.centreFreq, span: auto.span, guardLeft: null, guardRight: null, view: 'both' };
+    const auto = specAutoSettings(rawSpecSignals, 'both', 'if');
+    settings = { centreFreq: auto.centreFreq, span: auto.span, guardLeft: null, guardRight: null, view: 'both', freqMode: 'if' };
   }
   document.getElementById('specCentre').value = settings.centreFreq ?? '';
   document.getElementById('specSpan').value = settings.span ?? 500;
@@ -676,6 +692,7 @@ function initSpectrum() {
   if (settings.guardRight !== null && settings.guardRight !== undefined)
     document.getElementById('specGuardRight').value = settings.guardRight;
   if (settings.view) document.getElementById('specView').value = settings.view;
+  document.getElementById('specFreqMode').value = settings.freqMode || 'if';
   renderSpectrum();
 }
 
@@ -689,7 +706,7 @@ document.getElementById('spectrumPanel')?.addEventListener('shown.bs.collapse', 
 window.addEventListener('resize', () => {
   if (document.getElementById('spectrumPanel')?.classList.contains('show')) renderSpectrum();
 });
-['specCentre','specSpan','specGuardLeft','specGuardRight','specView'].forEach(id => {
+['specCentre','specSpan','specGuardLeft','specGuardRight','specView','specFreqMode'].forEach(id => {
   document.getElementById(id)?.addEventListener('change', () => {
     if (document.getElementById('spectrumPanel')?.classList.contains('show')) renderSpectrum();
   });
