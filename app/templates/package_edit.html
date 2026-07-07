@@ -38,6 +38,9 @@
 {% if toast %}
 <div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
 {% endif %}
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show py-2"><i class="bi bi-exclamation-triangle me-2"></i>{{ error }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
 {% if user.role == 'observer' %}
 <div class="alert alert-info py-2">
   <i class="bi bi-eye me-2"></i>
@@ -256,7 +259,7 @@
               <td class="small">{{ entry.modulation or '—' }}</td>
               <td class="small">{{ entry.fec or '—' }}</td>
               <td class="small">{{ entry.inner_code or '—' }}</td>
-              <td class="small">{{ entry.symbol_rate or '—' }}</td>
+              <td class="small">{% if entry.symbol_rate %}{{ entry.symbol_rate }}{% else %}<span class="badge bg-warning text-dark" title="Symbol rate is required for spectrum planning">Missing</span>{% endif %}</td>
               <td class="small">{% if entry.power is not none %}{{ entry.power }} {{ entry.power_unit }}{% else %}—{% endif %}</td>
               <td class="small text-muted">{{ entry.source or (entry.cbm_device.name if entry.cbm_device else 'No modem assigned') }}</td>
               <td class="small text-muted">{{ entry.cbm_path or '—' }}</td>
@@ -295,6 +298,66 @@
             {% endfor %}
           </tbody>
         </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Spectrum Plan -->
+    {% if package and package.signals %}
+    <div class="card border-secondary mb-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-activity me-1"></i>Spectrum Plan</span>
+        <button class="btn btn-sm btn-outline-secondary py-0" type="button"
+                data-bs-toggle="collapse" data-bs-target="#spectrumPanel" aria-expanded="false">
+          <i class="bi bi-bar-chart-line me-1"></i>Show / Hide
+        </button>
+      </div>
+      <div class="collapse" id="spectrumPanel">
+        <div class="card-body">
+          <div class="row g-2 align-items-end mb-3">
+            <div class="col-auto">
+              <label class="form-label small mb-1">Centre (MHz)</label>
+              <input type="number" id="specCentre" class="form-control form-control-sm" style="width:130px" step="any">
+            </div>
+            <div class="col-auto">
+              <label class="form-label small mb-1">Span (MHz)</label>
+              <input type="number" id="specSpan" class="form-control form-control-sm" style="width:110px" min="1" step="any">
+            </div>
+            <div class="col-auto">
+              <label class="form-label small mb-1"><i class="bi bi-chevron-bar-left me-1"></i>Guard Left (MHz)</label>
+              <input type="number" id="specGuardLeft" class="form-control form-control-sm" style="width:145px" step="any" placeholder="—">
+            </div>
+            <div class="col-auto">
+              <label class="form-label small mb-1"><i class="bi bi-chevron-bar-right me-1"></i>Guard Right (MHz)</label>
+              <input type="number" id="specGuardRight" class="form-control form-control-sm" style="width:145px" step="any" placeholder="—">
+            </div>
+            <div class="col-auto">
+              <label class="form-label small mb-1">View</label>
+              <select id="specView" class="form-select form-select-sm" style="width:105px">
+                <option value="both">TX + RX</option>
+                <option value="tx">TX only</option>
+                <option value="rx">RX only</option>
+              </select>
+            </div>
+            <div class="col-auto d-flex gap-1 align-items-center mt-3">
+              <button class="btn btn-sm btn-primary" onclick="renderSpectrum()">
+                <i class="bi bi-arrow-clockwise me-1"></i>Redraw
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="clearGuardBands()" title="Clear guard bands">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+          </div>
+          <div style="position:relative;height:300px;">
+            <canvas id="spectrumCanvas" style="width:100%;height:100%;display:block;border-radius:4px;"></canvas>
+          </div>
+          <p class="text-muted small mt-2 mb-0">
+            Occupied BW = symbol rate × (1 + rolloff 0.25) / 1000 MHz &nbsp;·&nbsp;
+            <span style="color:#0d6efd;font-weight:bold">■</span> TX &nbsp;
+            <span style="color:#198754;font-weight:bold">■</span> RX &nbsp;·&nbsp;
+            <span style="color:#ffc107;font-weight:bold">━</span> Guard band boundary (outside = restricted zone)
+          </p>
+        </div>
       </div>
     </div>
     {% endif %}
@@ -361,8 +424,8 @@
               <input type="text" class="form-control form-control-sm" name="inner_code" id="f_inner_code" placeholder="TURBO">
             </div>
             <div class="col-sm-3">
-              <label class="form-label small">Symbol Rate</label>
-              <input type="text" class="form-control form-control-sm" name="symbol_rate" id="f_symbol_rate" placeholder="ksps">
+              <label class="form-label small">Symbol Rate <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-sm" name="symbol_rate" id="f_symbol_rate" placeholder="e.g. 2048 ksps" required>
             </div>
             <div class="col-sm-3">
               <label class="form-label small">Power</label>
@@ -570,6 +633,64 @@ function recalcSignalFreqs(changedField) {
   document.getElementById(id)?.addEventListener('input', () => {
     const filled = ['tx_if','tx_rf','rx_rf','rx_if'].find(f => document.getElementById('f_' + f)?.value !== '');
     if (filled) recalcSignalFreqs(filled);
+  });
+});
+
+// ── Spectrum Plan (package page) ──────────────────────────────────────────────
+const SPEC_PKG_ID = {{ package.id if package else 0 }};
+const rawSpecSignals = [
+{% for entry in (package.signals if package else []) %}
+  { name: {{ entry.signal_name | tojson }}, txRf: {{ entry.tx_rf | tojson }}, rxRf: {{ entry.rx_rf | tojson }},
+    symbolRate: {{ entry.symbol_rate | tojson }}, power: {{ entry.power | tojson }}, freqUnit: {{ entry.freq_unit | tojson }} },
+{% endfor %}
+];
+
+function renderSpectrum() {
+  const canvas = document.getElementById('spectrumCanvas');
+  if (!canvas) return;
+  const centreFreq = parseFloat(document.getElementById('specCentre').value);
+  const span = parseFloat(document.getElementById('specSpan').value);
+  const glVal = document.getElementById('specGuardLeft').value;
+  const grVal = document.getElementById('specGuardRight').value;
+  const guardLeft = glVal !== '' ? parseFloat(glVal) : null;
+  const guardRight = grVal !== '' ? parseFloat(grVal) : null;
+  const view = document.getElementById('specView').value;
+  if (isNaN(centreFreq) || isNaN(span) || span <= 0) return;
+  try { localStorage.setItem('spectrum_pkg_' + SPEC_PKG_ID,
+    JSON.stringify({ centreFreq, span, guardLeft, guardRight, view })); } catch (e) {}
+  drawSpectrumChart(canvas, rawSpecSignals, centreFreq, span, guardLeft, guardRight, view);
+}
+
+function initSpectrum() {
+  let settings = null;
+  try { settings = JSON.parse(localStorage.getItem('spectrum_pkg_' + SPEC_PKG_ID) || 'null'); } catch (e) {}
+  if (!settings) {
+    const auto = specAutoSettings(rawSpecSignals);
+    settings = { centreFreq: auto.centreFreq, span: auto.span, guardLeft: null, guardRight: null, view: 'both' };
+  }
+  document.getElementById('specCentre').value = settings.centreFreq ?? '';
+  document.getElementById('specSpan').value = settings.span ?? 500;
+  if (settings.guardLeft !== null && settings.guardLeft !== undefined)
+    document.getElementById('specGuardLeft').value = settings.guardLeft;
+  if (settings.guardRight !== null && settings.guardRight !== undefined)
+    document.getElementById('specGuardRight').value = settings.guardRight;
+  if (settings.view) document.getElementById('specView').value = settings.view;
+  renderSpectrum();
+}
+
+function clearGuardBands() {
+  document.getElementById('specGuardLeft').value = '';
+  document.getElementById('specGuardRight').value = '';
+  renderSpectrum();
+}
+
+document.getElementById('spectrumPanel')?.addEventListener('shown.bs.collapse', () => initSpectrum());
+window.addEventListener('resize', () => {
+  if (document.getElementById('spectrumPanel')?.classList.contains('show')) renderSpectrum();
+});
+['specCentre','specSpan','specGuardLeft','specGuardRight','specView'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', () => {
+    if (document.getElementById('spectrumPanel')?.classList.contains('show')) renderSpectrum();
   });
 });
 </script>

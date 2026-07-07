@@ -20,6 +20,7 @@
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="clock" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-clock-history"></i><span>Zulu / Local Clock</span></label></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="range-state" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-broadcast-pin"></i><span>Range State</span></label></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="active-signals" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-broadcast"></i><span>Active Signals</span></label></li>
+        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="live-spectrum" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-activity"></i><span>Live Spectrum</span></label></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="last-state-change" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-clock"></i><span>Last State Change</span></label></li>
         {% if cda_by_serial %}
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="cda" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-shield-exclamation"></i><span>CDA Timer</span></label></li>
@@ -504,6 +505,58 @@ function utilityBody(id, type, config = {}) {
                    hx-swap="innerHTML">{{ up_count }}</div>
             </div>`;
   }
+  if (type === 'live-spectrum') {
+    return `<div class="live-spectrum-widget" id="liveSpec-${id}" data-spec-id="${id}">
+              <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
+                <div>
+                  <label class="form-label small mb-1 d-block">Centre (MHz)</label>
+                  <input type="number" class="form-control form-control-sm spec-centre" style="width:120px" step="any"
+                         onchange="liveSpecRedraw('${id}')">
+                </div>
+                <div>
+                  <label class="form-label small mb-1 d-block">Span (MHz)</label>
+                  <input type="number" class="form-control form-control-sm spec-span" style="width:100px" min="1" step="any"
+                         onchange="liveSpecRedraw('${id}')">
+                </div>
+                <div>
+                  <label class="form-label small mb-1 d-block"><i class="bi bi-chevron-bar-left"></i> Guard L</label>
+                  <input type="number" class="form-control form-control-sm spec-guard-left" style="width:115px" step="any"
+                         placeholder="—" onchange="liveSpecRedraw('${id}')">
+                </div>
+                <div>
+                  <label class="form-label small mb-1 d-block"><i class="bi bi-chevron-bar-right"></i> Guard R</label>
+                  <input type="number" class="form-control form-control-sm spec-guard-right" style="width:115px" step="any"
+                         placeholder="—" onchange="liveSpecRedraw('${id}')">
+                </div>
+                <div>
+                  <label class="form-label small mb-1 d-block">View</label>
+                  <select class="form-select form-select-sm spec-view" style="width:100px" onchange="liveSpecRedraw('${id}')">
+                    <option value="both">TX + RX</option>
+                    <option value="tx">TX only</option>
+                    <option value="rx">RX only</option>
+                  </select>
+                </div>
+                <div class="d-flex gap-1">
+                  <button class="btn btn-sm btn-outline-primary" onclick="liveSpecFetch('${id}')" title="Refresh now">
+                    <i class="bi bi-arrow-clockwise"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" onclick="liveSpecClearGuards('${id}')" title="Clear guard bands">
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </div>
+              </div>
+              <div style="position:relative;height:270px;">
+                <canvas class="spec-canvas" style="width:100%;height:100%;display:block;border-radius:4px;"></canvas>
+              </div>
+              <p class="text-muted small mt-1 mb-0">
+                <span style="color:#0d6efd;font-weight:bold">■</span> TX &nbsp;
+                <span style="color:#198754;font-weight:bold">■</span> RX &nbsp;·&nbsp;
+                Dim = not Up &nbsp;·&nbsp;
+                <span style="color:#ffc107;font-weight:bold">━</span> Guard boundary &nbsp;·&nbsp;
+                Auto-refresh 30s
+              </p>
+            </div>`;
+  }
   if (type === 'last-state-change') {
     {% if last_state_change %}
     return `<div class="text-center py-2">
@@ -538,14 +591,14 @@ function renderUtilityWidget(widget) {
   const type = widget.type;
   const TITLES = {
     notes: 'Quick Notes', doc: 'Doc Reference', clock: 'Clock', links: 'Quick Links',
-    'range-state': 'Range State', 'active-signals': 'Active Signals',
+    'range-state': 'Range State', 'active-signals': 'Active Signals', 'live-spectrum': 'Live Spectrum',
     'last-state-change': 'Last State Change',
     calc: 'Calculator', 'rf-calc': 'RF Frequency', 'power-conv': 'Power Converter',
     chat: 'Chat',
   };
   const ICONS = {
     notes: 'bi-pencil-square', doc: 'bi-file-earmark-text', clock: 'bi-clock', links: 'bi-lightning',
-    'range-state': 'bi-broadcast-pin', 'active-signals': 'bi-broadcast',
+    'range-state': 'bi-broadcast-pin', 'active-signals': 'bi-broadcast', 'live-spectrum': 'bi-activity',
     'last-state-change': 'bi-clock-history',
     calc: 'bi-calculator', 'rf-calc': 'bi-broadcast', 'power-conv': 'bi-lightning-charge',
     chat: 'bi-chat-dots',
@@ -587,6 +640,7 @@ function renderUtilityWidget(widget) {
   if (type === 'doc' && widget.config?.slug) loadDocWidget(id, widget.config.slug);
   if (type === 'clock') updateUtilityClocks();
   if (type === 'chat') renderDashboardChatWidget();
+  if (type === 'live-spectrum') liveSpecInit(id);
 }
 function restoreUtilityWidgets() {
   utilityWidgets().forEach(renderUtilityWidget);
@@ -1299,6 +1353,86 @@ function updateCDATimers() {
     splitSerialOut(draggedTab.serialId);
   });
 })();
+
+// ── Live Spectrum Widget ──────────────────────────────────────────────────────
+const _liveSpecData = {};  // id → {signals, intervalId}
+
+function _liveSpecEl(id, cls) {
+  return document.querySelector(`#liveSpec-${id} .${cls}`);
+}
+
+function liveSpecReadControls(id) {
+  const cf = parseFloat(_liveSpecEl(id, 'spec-centre')?.value);
+  const sp = parseFloat(_liveSpecEl(id, 'spec-span')?.value);
+  const glv = _liveSpecEl(id, 'spec-guard-left')?.value;
+  const grv = _liveSpecEl(id, 'spec-guard-right')?.value;
+  return {
+    centreFreq: isNaN(cf) ? null : cf,
+    span: isNaN(sp) ? null : sp,
+    guardLeft: glv !== '' && glv ? parseFloat(glv) : null,
+    guardRight: grv !== '' && grv ? parseFloat(grv) : null,
+    view: _liveSpecEl(id, 'spec-view')?.value || 'both',
+  };
+}
+
+function liveSpecRedraw(id) {
+  const canvas = _liveSpecEl(id, 'spec-canvas');
+  if (!canvas) return;
+  const ctrl = liveSpecReadControls(id);
+  if (!ctrl.centreFreq || !ctrl.span || ctrl.span <= 0) return;
+  try { localStorage.setItem('live_spec_' + id,
+    JSON.stringify(ctrl)); } catch (e) {}
+  const signals = (_liveSpecData[id] || {}).signals || [];
+  drawSpectrumChart(canvas, signals, ctrl.centreFreq, ctrl.span, ctrl.guardLeft, ctrl.guardRight, ctrl.view);
+}
+
+function liveSpecClearGuards(id) {
+  const gl = _liveSpecEl(id, 'spec-guard-left');
+  const gr = _liveSpecEl(id, 'spec-guard-right');
+  if (gl) gl.value = '';
+  if (gr) gr.value = '';
+  liveSpecRedraw(id);
+}
+
+function liveSpecFetch(id) {
+  fetch('/status/spectrum-signals')
+    .then(r => r.json())
+    .then(data => {
+      _liveSpecData[id] = { signals: data.signals || [] };
+      const ctrl = liveSpecReadControls(id);
+      if (!ctrl.centreFreq) {
+        const auto = specAutoSettings(data.signals || []);
+        const cf = _liveSpecEl(id, 'spec-centre');
+        const sp = _liveSpecEl(id, 'spec-span');
+        if (cf && !cf.value) cf.value = auto.centreFreq;
+        if (sp && !sp.value) sp.value = auto.span;
+      }
+      liveSpecRedraw(id);
+    })
+    .catch(() => {});
+}
+
+function liveSpecInit(id) {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem('live_spec_' + id) || 'null'); } catch (e) {}
+  if (saved) {
+    const cf = _liveSpecEl(id, 'spec-centre');
+    const sp = _liveSpecEl(id, 'spec-span');
+    const gl = _liveSpecEl(id, 'spec-guard-left');
+    const gr = _liveSpecEl(id, 'spec-guard-right');
+    const vw = _liveSpecEl(id, 'spec-view');
+    if (cf) cf.value = saved.centreFreq ?? '';
+    if (sp) sp.value = saved.span ?? '';
+    if (gl && saved.guardLeft !== null && saved.guardLeft !== undefined) gl.value = saved.guardLeft;
+    if (gr && saved.guardRight !== null && saved.guardRight !== undefined) gr.value = saved.guardRight;
+    if (vw && saved.view) vw.value = saved.view;
+  }
+  liveSpecFetch(id);
+  if ((_liveSpecData[id] || {}).intervalId) clearInterval(_liveSpecData[id].intervalId);
+  const intervalId = setInterval(() => liveSpecFetch(id), 30000);
+  _liveSpecData[id] = Object.assign(_liveSpecData[id] || {}, { intervalId });
+  window.addEventListener('resize', () => liveSpecRedraw(id));
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   {% if toast %}showToast({{ toast | tojson }}, 'success');{% endif %}

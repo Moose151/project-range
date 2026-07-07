@@ -1321,3 +1321,164 @@ document.addEventListener('keydown', event => {
     openCommandPalette();
   }
 });
+
+// ── Shared Spectrum Chart ─────────────────────────────────────────────────────
+function specToMHz(val, unit) {
+  if (val === null || val === undefined) return null;
+  return unit === 'GHz' ? val * 1000 : val;
+}
+
+function specFreqStep(span) {
+  if (span > 5000) return 1000;
+  if (span > 2000) return 500;
+  if (span > 1000) return 200;
+  if (span > 500) return 100;
+  if (span > 200) return 50;
+  if (span > 100) return 20;
+  if (span > 50) return 10;
+  if (span > 20) return 5;
+  return 1;
+}
+
+function specAutoSettings(signals) {
+  const freqs = [];
+  (signals || []).forEach(s => {
+    const tx = specToMHz(s.txRf, s.freqUnit), rx = specToMHz(s.rxRf, s.freqUnit);
+    if (tx) freqs.push(tx);
+    if (rx) freqs.push(rx);
+  });
+  if (!freqs.length) return { centreFreq: 1000, span: 500 };
+  freqs.sort((a, b) => a - b);
+  const lo = freqs[0], hi = freqs[freqs.length - 1], mid = (lo + hi) / 2;
+  return {
+    centreFreq: Math.round(mid * 10) / 10,
+    span: Math.round(Math.max(hi - lo, 50) * 1.6 * 10) / 10,
+  };
+}
+
+// signals: [{name, txRf, rxRf, freqUnit, symbolRate, power, dimmed?}]
+// view: 'both' | 'tx' | 'rx'
+function drawSpectrumChart(canvas, signals, centreFreq, span, guardLeft, guardRight, view) {
+  if (!canvas || !signals) return;
+  const ROLLOFF = 0.25;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const w = rect.width || canvas.offsetWidth || 600;
+  const h = rect.height || canvas.offsetHeight || 280;
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const padL = 68, padR = 20, padT = 32, padB = 50;
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+  const minFreq = centreFreq - span / 2, maxFreq = centreFreq + span / 2;
+  const minPow = -120, maxPow = 10;
+
+  function fToX(f) { return padL + (f - minFreq) / (maxFreq - minFreq) * plotW; }
+  function pToY(p) { return padT + (1 - (p - minPow) / (maxPow - minPow)) * plotH; }
+
+  const bg = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+  bg.addColorStop(0, '#090d12'); bg.addColorStop(1, '#111820');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h); ctx.fillRect(padL, padT, plotW, plotH);
+
+  const freqStep = specFreqStep(span);
+  const startF = Math.ceil(minFreq / freqStep) * freqStep;
+  ctx.font = '10px monospace';
+  for (let f = startF; f <= maxFreq + 0.001; f = Math.round((f + freqStep) * 1000) / 1000) {
+    const x = fToX(f);
+    if (x < padL || x > padL + plotW) continue;
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#777'; ctx.textAlign = 'center';
+    const lbl = f >= 1000 ? (f / 1000).toFixed(3).replace(/\.?0+$/, '') + ' GHz' : f + ' MHz';
+    ctx.fillText(lbl, x, padT + plotH + 16);
+  }
+
+  ctx.textAlign = 'right';
+  for (let p = -120; p <= 10; p += 20) {
+    const y = pToY(p);
+    if (y < padT || y > padT + plotH) continue;
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#777'; ctx.font = '10px monospace';
+    ctx.fillText(p + ' dBm', padL - 5, y + 3);
+  }
+
+  ctx.save();
+  ctx.translate(11, padT + plotH / 2); ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('Power (dBm)', 0, 0);
+  ctx.restore();
+  ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('Frequency', padL + plotW / 2, padT + plotH + 42);
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(padL, padT, plotW, plotH); ctx.clip();
+
+  if (guardLeft !== null || guardRight !== null) {
+    const gl = guardLeft !== null ? fToX(guardLeft) : padL;
+    const gr = guardRight !== null ? fToX(guardRight) : padL + plotW;
+    ctx.fillStyle = 'rgba(200,40,40,0.13)';
+    if (guardLeft !== null) ctx.fillRect(padL, padT, Math.max(0, gl - padL), plotH);
+    if (guardRight !== null) ctx.fillRect(Math.min(gr, padL + plotW), padT, Math.max(0, padL + plotW - gr), plotH);
+    if (guardLeft !== null && guardRight !== null) {
+      ctx.fillStyle = 'rgba(25,135,84,0.07)';
+      ctx.fillRect(Math.max(gl, padL), padT, Math.min(gr, padL + plotW) - Math.max(gl, padL), plotH);
+    }
+  }
+
+  [[guardLeft, 'left'], [guardRight, 'right']].forEach(([gf, side]) => {
+    if (gf === null || gf === undefined) return;
+    const x = fToX(gf);
+    ctx.strokeStyle = '#ffc107'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#ffc107'; ctx.font = 'bold 10px monospace';
+    ctx.textAlign = side === 'left' ? 'left' : 'right';
+    const lbl = gf >= 1000 ? (gf / 1000).toFixed(3) + ' GHz' : gf + ' MHz';
+    ctx.fillText((side === 'left' ? '◀ ' : '▶ ') + lbl, x + (side === 'left' ? 4 : -4), padT + 14);
+  });
+
+  signals.forEach(sig => {
+    const sr = parseFloat(sig.symbolRate);
+    if (!sr || sr <= 0) return;
+    const bwMHz = sr * (1 + ROLLOFF) / 1000;
+    const pow = (sig.power !== null && sig.power !== undefined) ? sig.power : -60;
+    const alpha = sig.dimmed ? '22' : '44';
+
+    [[sig.txRf, true], [sig.rxRf, false]].forEach(([freq, isTx]) => {
+      if (freq === null || freq === undefined) return;
+      if (view === 'tx' && !isTx) return;
+      if (view === 'rx' && isTx) return;
+      const fMHz = specToMHz(freq, sig.freqUnit);
+      if (fMHz === null) return;
+      const lo = fMHz - bwMHz / 2, hi = fMHz + bwMHz / 2;
+      if (hi < minFreq || lo > maxFreq) return;
+      const x1 = fToX(Math.max(lo, minFreq)), x2 = fToX(Math.min(hi, maxFreq));
+      const yTop = pToY(pow), yBot = pToY(minPow);
+      const colour = isTx ? '#0d6efd' : '#198754';
+      ctx.fillStyle = colour + alpha;
+      ctx.fillRect(x1, yTop, x2 - x1, yBot - yTop);
+      ctx.strokeStyle = colour; ctx.lineWidth = 2; ctx.setLineDash([]);
+      ctx.strokeRect(x1, yTop, x2 - x1, yBot - yTop);
+      if (x2 - x1 > 12) {
+        ctx.fillStyle = sig.dimmed ? '#888' : '#ddd';
+        ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(sig.name + (isTx ? ' TX' : ' RX'), (x1 + x2) / 2, Math.max(yTop - 5, padT + 12));
+      }
+    });
+  });
+
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1; ctx.setLineDash([]);
+  ctx.strokeRect(padL, padT, plotW, plotH);
+  const cx = fToX(centreFreq);
+  if (cx >= padL && cx <= padL + plotW) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
+    ctx.beginPath(); ctx.moveTo(cx, padT); ctx.lineTo(cx, padT + plotH); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}

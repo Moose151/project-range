@@ -828,6 +828,41 @@ async def active_count_raw(
     return HTMLResponse(str(up))
 
 
+@router.get("/status/spectrum-signals")
+async def spectrum_signals_json(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return currently Up signals for the live spectrum dashboard widget."""
+    testing = is_testing_state(db)
+    open_serials = db.query(Serial).filter(
+        Serial.is_testing == testing,
+        Serial.closed_at == None,
+    ).all()
+    result = []
+    seen: set[str] = set()
+    for serial in open_serials:
+        latest = _latest_signal_status(db, serial_id=serial.id)
+        for log in latest:
+            key = f"{serial.id}:{log.signal_name}"
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append({
+                "name": log.signal_name,
+                "serialName": serial.title,
+                "txRf": log.tx_rf,
+                "rxRf": log.rx_rf,
+                "freqUnit": log.freq_unit,
+                "symbolRate": log.symbol_rate,
+                "power": log.power,
+                "modulation": log.modulation,
+                "isUp": log.signal_status == "Up",
+                "dimmed": log.signal_status != "Up",
+            })
+    return JSONResponse({"signals": result})
+
+
 @router.get("/status/buzzer", response_class=HTMLResponse)
 async def buzzer_fragment(
     request: Request,

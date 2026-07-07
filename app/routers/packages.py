@@ -707,6 +707,7 @@ async def package_detail(
         "package": pkg,
         "packages_for_duplicate": [],
         "toast": request.query_params.get("toast", ""),
+        "error": request.query_params.get("error", ""),
         "page": "packages",
         **_dropdown_lists(db),
     })
@@ -778,6 +779,8 @@ async def package_signal_add(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if not symbol_rate.strip():
+        return RedirectResponse(f"/packages/{pkg_id}?error=Symbol+rate+is+required", status_code=302)
     testing = is_testing_state(db)
     pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id, SignalPackage.is_testing == testing).first()
     if not pkg:
@@ -839,6 +842,8 @@ async def package_signal_update(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if not symbol_rate.strip():
+        return RedirectResponse(f"/packages/{pkg_id}?error=Symbol+rate+is+required", status_code=302)
     testing = is_testing_state(db)
     pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id, SignalPackage.is_testing == testing).first()
     source_name = source.strip()
