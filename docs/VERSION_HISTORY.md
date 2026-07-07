@@ -1,9 +1,20 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.23.0**
+Current version: **0.24.0**
 
 ---
+
+## 0.24.0 — Activities / Exercises
+
+- **Activities:** A new top-level grouping concept sits above serials. An **Activity** has a name, an admin-configured type label (Exercise, Training, Maintenance, etc.), and an optional description. Multiple serials can be assigned to one activity; a serial can also remain standalone with no activity.
+- **Admin-configurable activity types:** Administrators manage the type list under **Admin → Config → Activity Types** — add, rename, enable/disable, delete (blocked if in use), and drag-reorder, exactly like modulation types or duty roles.
+- **Activity list (`/activities`):** Shows all activities for the current workspace grouped by status — **Active** (has at least one open serial), **Planned** (no serials started yet), **Completed** (all serials closed). Each entry shows the type badge, date range (derived from serials — no separate date fields to maintain), serial count, and CSV/XLSX export buttons.
+- **Activity detail page:** Groups assigned serials into Pending / Active / Completed sections with links to their history. Inline edit panel for name, type, and description. Assign any unassigned serial in the current workspace via a dropdown; unassign with a single button.
+- **Activity export:** Download all signal logs across every serial in the activity as a single **CSV** or **XLSX** file. Logs include a **Serial** column so rows from different serials are distinguishable. Individual serial exports remain available from the history page.
+- **Serial create form** now has an optional **Activity** picker (after the Notes field). Pending and active serial cards show an activity badge/link when one is assigned.
+- **History filter:** The history list has an **Activity** dropdown filter to show only serials belonging to a specific activity. The serial history detail page shows a breadcrumb back to the parent activity.
+- **Activities link** added to the Operations section of the left sidebar.
 
 ## 0.23.0 — Eb/No Dashboard Live Update, Eb/No Log Toggle, CEASE Permissions
 

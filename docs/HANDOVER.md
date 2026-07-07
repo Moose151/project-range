@@ -13,13 +13,23 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.23.0` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.24.0` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
 **DB:** SQLite at `/app/data/range.db` (named volume). `init_db.py` runs automatically on container start and is idempotent (migrations + new tables auto-create).
 
 ### Shipped (all on `main`, in order)
+- **0.24.0 — Activities / Exercises:**
+  - **`ActivityType` model** (`activity_types` table) — admin-configurable list managed under Admin → Config → Activity Types. Same pattern as `AntennaType` / `ModulationType`. Seeded defaults: Exercise, Training, Activity, Maintenance. Full CRUD + drag-reorder in `config.py`; tab in `config.html`.
+  - **`Activity` model** (`activities` table) — `name`, `activity_type_id` (nullable FK), `description`, `is_testing` (workspace-scoped via `before_flush` hook), `created_by_id`. `started_at`, `closed_at`, and `status` (Planned/Active/Completed) are `@property` values derived from assigned serials — no separate date columns to maintain.
+  - **`Serial.activity_id`** — nullable FK added via `ALTER TABLE serials ADD COLUMN activity_id INTEGER REFERENCES activities(id)`. Existing serials are unaffected (default NULL = standalone).
+  - **`app/routers/activities.py`** — new router at `/activities`: list, create, detail, edit, assign-serial, unassign-serial, export/csv, export/xlsx. Write endpoints check `current_user.role != 'observer'`.
+  - **`app/templates/activities.html`** — list grouped Active/Planned/Completed with export buttons per activity.
+  - **`app/templates/activity_detail.html`** — serial groupings (Pending/Active/Completed), edit panel, assign/unassign picker, CSV+XLSX export (all logs with a Serial column).
+  - **Serials integration:** `serials_list` passes `activities` to template; `serial_create` accepts `activity_id` form field; serial cards show activity badge.
+  - **History integration:** `history_list` accepts `activity_id` query param filter, passes `activities` to template for the dropdown. `history_detail.html` shows breadcrumb back to parent activity.
+  - **Sidebar:** Activities link added in Operations section of `base.html`.
 - **0.23.0 — Eb/No live dashboard update, Eb/No log toggle, CEASE dismiss restricted:**
   - **Eb/No always reflects live modem reading:** `cbm_sync.py` now separates the "should create new log row" check from "should update in-place". When only Eb/No changed but stays within the threshold (or Eb/No logging is disabled), the existing `SignalLog.eb_no` field is updated in-place (`latest.eb_no = values.get("eb_no")`). The dashboard always shows the live modem Eb/No without generating log spam.
   - **`cbm_ebno_log_enabled` AppSetting:** New boolean setting (key `cbm_ebno_log_enabled`, default `True`). Exposed in **Admin → Config → System** as a toggle switch "Record Eb/No changes in log". When off, Eb/No changes never create new log entries (still update dashboard in-place). Stored in `AppSetting` via `app/settings.py`; read by `cbm_sync.py` each sync cycle; saved by `config.py POST /config/system`.
