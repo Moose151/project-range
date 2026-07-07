@@ -13,13 +13,20 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.24.1` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.25.0` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
 **DB:** SQLite at `/app/data/range.db` (named volume). `init_db.py` runs automatically on container start and is idempotent (migrations + new tables auto-create).
 
 ### Shipped (all on `main`, in order)
+- **0.25.0 — Symbol rate enforcement + spectrum occupancy chart (3 views):**
+  - **Symbol rate now required** on all `SignalPackageEntry` rows. `package_edit.html` adds `required` attribute + asterisk label. `packages.py` `package_signal_add` and `package_signal_update` validate and redirect with `?error=Symbol+rate+is+required` if empty. Existing rows missing a symbol rate show a warning badge in the signal table.
+  - **Shared `drawSpectrumChart(canvas, signals, centreFreq, span, guardLeft, guardRight, view)` function** added to `app/static/js/app.js` (v=29) along with `specToMHz`, `specFreqStep`, `specAutoSettings`. Reused by all three spectrum views.
+  - **Package edit page** — collapsible **Spectrum Plan** card below the signals table (`{% if package and package.signals %}`). Canvas chart: signal blocks centred on TX/RX RF freq, width = symbol_rate × (1 + 0.25 rolloff) / 1000 MHz, height = power (dBm). Controls: Centre (MHz), Span (MHz), Guard Left/Right (MHz), TX+RX/TX/RX view. Guard bands draw amber dashed lines and shade restricted zones red. Settings persisted per-package in `localStorage` key `spectrum_pkg_{id}`.
+  - **Serial history detail page** (`history_detail.html`) — same collapsible Spectrum Plan card for serials with assigned packages. Data serialized inline via Jinja from `serial.package_links[].package.signals`. Settings persisted per-serial (`hspec_serial_{id}`). Inline `<script>` block with `hspecRender`/`hspecInit`/`hspecClearGuards`.
+  - **Dashboard Live Spectrum widget** — new utility widget type `live-spectrum` in `dashboard.html`. Polls `GET /status/spectrum-signals` every 30 seconds. Up signals solid, others dimmed. Same centre/span/guard controls. Settings per-widget in `localStorage` (`live_spec_{id}`). `liveSpecInit`, `liveSpecFetch`, `liveSpecRedraw`, `liveSpecClearGuards` functions added before `DOMContentLoaded` block. Widget menu entry, TITLES, ICONS all updated.
+  - **`GET /status/spectrum-signals` endpoint** added to `dashboard.py` — returns JSON `{"signals": [...]}` for all active serials. Each signal item: `name`, `serialName`, `txRf`, `rxRf`, `freqUnit`, `symbolRate`, `power`, `modulation`, `isUp`, `dimmed`.
 - **0.24.1 — Navigation restructure + activity badge:**
   - **Sidebar restructured** into four sections: Planning (Activities, Serials, Signal Packages), Operations (Signal Logs, CDA, Incidents, Handover), Records (History, Documentation), Tools (Devices, RF Calculator, Power Converter, EIRP, Basic Calculator). Edit in `base.html` sidebar-nav block only — no router changes.
   - **Activities above Serials** as requested. Signal Packages moved from Resources to Planning.
@@ -361,7 +368,7 @@
 - **`Role` enum has THREE stored values:** `administrator`, `user`, `observer` (read-only). Old aliases `SUPERVISOR`, `OPERATOR`, and `SAFETY_SUPERVISOR` still map to the new values for compatibility with existing internal checks. Read-only is enforced in `main.py` `security_middleware` (blocks non-safe methods; allow-list `SAFETY_SUPERVISOR_ALLOWED_WRITES`). `SessionMiddleware` must stay **added last** (outermost) or `request.session` is empty in that check.
 - **New models since 0.11.0:** `CDATable`, `CDAWindow`, `SerialCDATable` (CDA); `CeaseEvent` (CEASE); `DutyRole` + `User.duty_role`/`User.duty_role_color` (duty tags). All tables auto-create via `create_all`; the two `users` columns are additive migrations in `init_db.py`.
 - **New routers:** `cda.py`, `cease.py` (both registered in `main.py`). Duty-role CRUD lives in `config.py`; duty-role self-set in `preferences.py`.
-- **Static cache-busting is mandatory:** `base.html` references `app.css?v=N` and `app.js?v=N` (both currently **27**). **Bump N on every CSS/JS change** — without it, browsers serve a stale file and new JS handlers silently break (this exact bug hit the 0.13.0 sidebar/span buttons).
+- **Static cache-busting is mandatory:** `base.html` references `app.css?v=N` and `app.js?v=N` (currently `app.css?v=31`, `app.js?v=29`). **Bump N on every CSS/JS change** — without it, browsers serve a stale file and new JS handlers silently break (this exact bug hit the 0.13.0 sidebar/span buttons).
 - **`partials/dashboard_summary.html` is now dead code** (the hardcoded summary row was removed in 0.13.0). Safe to delete; left in place for now.
 - **Settings area** — now reached via the sidebar (user footer → Preferences/Password; administrator → Admin → App Config). The old Settings dropdown is gone.
 - **`DeviceLink` and `RFDevice` new columns are fully implemented** — `device_model`, `has_web_gui`, and the `device_links` table are all in place. Device type list now includes `antenna`. No further migration needed for those.

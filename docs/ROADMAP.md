@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.24.1` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.25.0` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -224,7 +224,7 @@ device-routing, audit-retention, and archive work.
 
 ---
 
-## Spectrum occupancy / signal plan view (future)
+## Spectrum occupancy / signal plan view ✅ (shipped 0.25.0)
 
 A visual frequency-plan chart showing signals as blocks on a spectrum plot — matching the paper signal-plan format already in use on the range. Rendered with **HTML5 Canvas** (no external charting library; keeps the offline/LAN requirement).
 
@@ -234,28 +234,27 @@ Each signal block is drawn using its existing logged/planned parameters:
 
 | Axis | Source field | Notes |
 |---|---|---|
-| X position (centre) | `tx_rf` / `rx_rf` (MHz) | Separate Tx and Rx views |
-| X width (occupied BW) | Symbol rate × (1 + rolloff) | Rolloff by modulation type: DVB-S2 ≈ 0.2, legacy QPSK ≈ 0.35, default 0.25 |
-| Y height | Power (dBm) | Y axis is a dBm scale with configurable reference level |
-| Label | Signal name | Shown above the bar; red dot at centre frequency |
+| X position (centre) | `tx_rf` / `rx_rf` (MHz) | Separate Tx and Rx views via view toggle |
+| X width (occupied BW) | Symbol rate × (1 + 0.25 rolloff) / 1000 | Fixed rolloff 0.25; symbol rate now required on all package entries |
+| Y height | Power (dBm) | Y axis −120 to +10 dBm |
+| Label | Signal name | Shown above the bar |
 
-Signals without a symbol rate or power value are shown as a thin marker line rather than a block.
+Signals without a symbol rate show a "Missing" badge and are excluded from the chart.
 
-### Planned views
+### Views shipped
 
-- [ ] **Package spectrum page** — static signal plan on the signal package detail page. Shows all signals in the package as they'd appear if all transmitting simultaneously. Tx and Rx panes (tabbed). Useful for pre-exercise planning and briefing.
-- [ ] **Dashboard — Package Plan widget** — add from the widget picker; select a signal package; shows its full spectrum plan. Updates only when the widget is added or refreshed.
-- [ ] **Dashboard — Live Spectrum widget** — shows signals from the active serial using the most recent signal log values. Signals currently **Up** are shown in solid colour; **Down** signals are shown greyed/outlined. Refreshes on the existing 5-second HTMX poll. Clicking a signal block navigates to its log entry.
-- [ ] **Tx / Rx toggle** — tab or button on each widget/view to switch between the uplink (Tx RF) and downlink (Rx RF) spectrum plan.
-- [ ] **Guard-band / frequency limit overlays** — optional red boundary lines (like the image) marking frequency limits or exclusion zones configured per-package or per-activity.
+- [x] **Package spectrum page** — collapsible **Spectrum Plan** card on the signal package edit page. Shows all signals in the package. Centre (MHz), Span (MHz), TX+RX/TX/RX view toggle. Settings saved per-package in localStorage.
+- [x] **Serial history detail** — same Spectrum Plan card on the serial history detail page, combining all signals from all packages assigned to that serial. Settings saved per-serial in localStorage.
+- [x] **Dashboard — Live Spectrum widget** — utility widget (**Widgets → Live Spectrum**). Polls `/status/spectrum-signals` every 30 seconds. Signals currently **Up** are solid; other statuses are dimmed. Same centre/span controls per widget instance.
+- [x] **Guard-band / frequency limit overlays** — left and right guard frequency markers, configurable per session from the spectrum controls. Amber dashed boundary lines; red-tinted restricted zones outside the guard band; green-tinted permitted zone within.
+- [x] **Tx / Rx toggle** — TX + RX / TX only / RX only selector on every spectrum view.
 
-### Implementation notes
+### Remaining enhancements (not yet built)
 
-- Canvas rendering fits the existing pattern planned for Signal Hound sweep display.
-- Occupied bandwidth formula: `BW_MHz = (symbol_rate_Msps) × (1 + rolloff)`. Rolloff mapped from modulation type string; unknown modulations use 0.25.
-- Power-to-height scale: normalised so the highest-power signal fills ~80% of the canvas height. Y-axis labels in dBm; reference level adjustable per widget.
-- No new models or migrations needed — all data is already in `SignalPackageEntry` and `SignalLog`.
-- Live widget endpoint can reuse or extend the existing `/dashboard/fragment/{serial_id}` poll.
+- [ ] **Dashboard — Package Plan widget** — add from the widget picker; select a specific signal package; shows its full spectrum plan without opening the package edit page.
+- [ ] **Click-to-navigate** — clicking a signal block on the live widget navigates to that signal's log entry.
+- [ ] **Per-modulation rolloff** — currently fixed at 0.25; could be tuned per modulation type (DVB-S2 ≈ 0.20, legacy QPSK ≈ 0.35).
+- [ ] **Guard-band persistence** — currently session-local (localStorage); could be saved per-package or per-activity on the server for shared team reference.
 
 ---
 

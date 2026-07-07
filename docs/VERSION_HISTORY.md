@@ -1,9 +1,16 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.24.1**
+Current version: **0.25.0**
 
 ---
+
+## 0.25.0 — Symbol Rate Enforcement + Spectrum Occupancy Chart
+
+- **Symbol rate is now required on all signal package entries.** The Add / Edit Signal form marks the field with a required asterisk and will not submit without a value. Server-side validation on both add and update endpoints rejects empty symbol rates with a clear error message. Existing signals that were created without a symbol rate show a **Missing** warning badge in the signal table so operators know which entries need to be updated.
+- **Spectrum Plan on signal package page:** A collapsible **Spectrum Plan** section appears on the package edit page whenever the package has signals. It renders a canvas chart showing each signal as an occupied-bandwidth block — centred on its TX or RX RF frequency, width determined by `symbol rate × (1 + rolloff 0.25) / 1000 MHz`, and height by power (dBm). Controls: **Centre (MHz)** to pan, **Span (MHz)** to zoom, **Guard Left / Guard Right** frequency markers, and a **TX + RX / TX only / RX only** view selector. Guard band boundaries draw amber dashed lines and shade areas outside the permitted range in red. All settings are saved per-package in the browser.
+- **Spectrum Plan on serial history page:** The same collapsible chart appears on the serial history detail page for any serial with signal packages assigned. It combines all signals from all packages assigned to that serial in one view. Settings are saved per-serial in the browser.
+- **Live Spectrum dashboard widget:** A new optional dashboard widget (**Widgets → Live Spectrum**) polls `/status/spectrum-signals` every 30 seconds and draws a live spectrum of all signals from currently open serials. Signals currently **Up** are rendered solid; other statuses are dimmed. The same centre freq, span, and guard band controls are available per widget instance.
 
 ## 0.24.1 — Navigation Restructure + Activity Badge on Dashboard
 
