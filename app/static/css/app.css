@@ -351,6 +351,112 @@ code {
   font-size: 0.82rem;
 }
 
+/* ── Activity hub ───────────────────────────────────────────── */
+.activity-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.activity-summary-item,
+.activity-hub-panel {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  background: var(--bs-tertiary-bg);
+}
+.activity-summary-item {
+  padding: 0.85rem;
+}
+.activity-hub-panel {
+  overflow: hidden;
+}
+.activity-hub-heading,
+.activity-hub-subheading {
+  color: var(--bs-secondary-color);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.activity-hub-heading {
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+.activity-hub-subheading {
+  margin-bottom: 0.45rem;
+}
+.activity-serial,
+.activity-package,
+.activity-signal-row {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.45rem;
+  background: var(--bs-body-bg);
+  margin: 0.45rem;
+  overflow: hidden;
+}
+.activity-package,
+.activity-signal-row {
+  margin-left: 0;
+  margin-right: 0;
+}
+.activity-serial-summary,
+.activity-package-summary,
+.activity-signal-summary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  color: var(--bs-body-color);
+  background: transparent;
+  border: 0;
+  text-align: left;
+}
+.activity-serial-summary:hover,
+.activity-package-summary:hover,
+.activity-signal-summary:hover {
+  background: rgba(var(--range-accent-rgb), 0.08);
+}
+.activity-serial-body,
+.activity-package-body,
+.activity-inline-editor {
+  border-top: 1px solid var(--bs-border-color);
+  padding: 0.85rem;
+}
+.activity-package-body,
+.activity-inline-editor {
+  background: rgba(var(--bs-tertiary-bg-rgb), 0.45);
+}
+.activity-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.activity-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 999px;
+  padding: 0.12rem 0.45rem;
+  font-size: 0.8rem;
+}
+@media (max-width: 991.98px) {
+  .activity-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 575.98px) {
+  .activity-summary-grid {
+    grid-template-columns: 1fr;
+  }
+  .activity-serial-summary,
+  .activity-package-summary,
+  .activity-signal-summary {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
 /* ── Instant chat dock ─────────────────────────────────────── */
 .chat-dock {
   position: fixed;

@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.25.1` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.25.2` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -19,7 +19,7 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.25.1)
+## ✅ Already delivered (through 0.25.2)
 
 Core of the MVP scope is in place:
 
@@ -72,6 +72,7 @@ Core of the MVP scope is in place:
 - Chat panel tidy-up: clearer Unread/Conversations/People-online sections, online count + ephemeral-message note, labelled New group button and tidier group creator, friendlier empty states and composer
 - Handover now has an Open Issues section, serials show readiness badges, and package cards show health/assignment badges
 - Documentation wiki home/page layouts are cleaner, with category counts, an Uncategorised filter, calmer result rows, and a less cluttered page toolbar
+- Activity detail pages now provide an inline planning hub for serial notes, CDA assignment, package assignment, and package signal edits
 - **0.6.0:** TxLO/RxLO naming, version badge, fully offline (LAN) styling, Docker deploy on port 7474
 
 ---

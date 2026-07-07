@@ -2,32 +2,36 @@
 {% block title %}{{ activity.name }}{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+<div class="d-flex align-items-start mb-3 gap-2 flex-wrap">
   <div>
-    <h4 class="mb-0">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-1">
+        <li class="breadcrumb-item"><a href="/activities">Activities</a></li>
+        <li class="breadcrumb-item active">{{ activity.name }}</li>
+      </ol>
+    </nav>
+    <h4 class="mb-1">
       <i class="bi bi-calendar3-range me-2"></i>{{ activity.name }}
-      {% if activity.activity_type %}
-      <span class="badge bg-secondary ms-2" style="font-size:.75rem">{{ activity.activity_type.name }}</span>
-      {% endif %}
+      {% if activity.activity_type %}<span class="badge bg-secondary ms-2" style="font-size:.75rem">{{ activity.activity_type.name }}</span>{% endif %}
       {% if activity.status == 'Active' %}
       <span class="badge bg-success ms-1">Active</span>
       {% elif activity.status == 'Completed' %}
-      <span class="badge bg-secondary text-muted ms-1">Completed</span>
+      <span class="badge bg-secondary ms-1">Completed</span>
       {% else %}
       <span class="badge bg-secondary ms-1">Planned</span>
       {% endif %}
     </h4>
-    <div class="text-muted small mt-1">
+    <div class="text-muted small">
       {% if activity.started_at %}
       {{ activity.started_at.strftime('%d/%m/%Y %H:%M') }}
       {% if activity.closed_at %} → {{ activity.closed_at.strftime('%d/%m/%Y %H:%M') }}{% else %} — ongoing{% endif %}
       {% else %}
       Not started
       {% endif %}
-      &nbsp;·&nbsp; {{ activity.serials | length }} serial{{ 's' if activity.serials | length != 1 }}
+      · {{ activity.serials | length }} serial{{ 's' if activity.serials | length != 1 }}
     </div>
   </div>
-  <div class="ms-auto d-flex gap-2">
+  <div class="ms-auto d-flex gap-2 flex-wrap">
     <a href="/activities/{{ activity.id }}/export/csv" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-filetype-csv me-1"></i>CSV
     </a>
@@ -35,8 +39,8 @@
       <i class="bi bi-file-earmark-spreadsheet me-1"></i>XLSX
     </a>
     {% if user.role != 'observer' %}
-    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#editActivityPanel">
-      <i class="bi bi-pencil me-1"></i>Edit
+    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#editActivityPanel">
+      <i class="bi bi-pencil me-1"></i>Edit Activity
     </button>
     {% endif %}
     <a href="/activities" class="btn btn-sm btn-outline-secondary">
@@ -48,48 +52,64 @@
 {% if toast %}
 <div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
 {% endif %}
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show py-2"><i class="bi bi-exclamation-triangle me-2"></i>{{ error }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
+{% if user.role == 'observer' %}
+<div class="alert alert-info py-2"><i class="bi bi-eye me-2"></i>Observer accounts can inspect activity details but cannot edit assignments or package settings.</div>
+{% endif %}
+
+<div class="activity-summary-grid mb-3">
+  <div class="activity-summary-item">
+    <div class="text-muted small">Pending</div>
+    <div class="fs-5 fw-semibold">{{ activity.serials | selectattr('is_started', 'equalto', false) | list | length }}</div>
+  </div>
+  <div class="activity-summary-item">
+    <div class="text-muted small">Active</div>
+    <div class="fs-5 fw-semibold">{{ activity.serials | selectattr('is_started', 'equalto', true) | rejectattr('closed_at') | list | length }}</div>
+  </div>
+  <div class="activity-summary-item">
+    <div class="text-muted small">Completed</div>
+    <div class="fs-5 fw-semibold">{{ activity.serials | selectattr('is_started', 'equalto', true) | selectattr('closed_at') | list | length }}</div>
+  </div>
+  <div class="activity-summary-item">
+    <div class="text-muted small">Packages</div>
+    <div class="fs-5 fw-semibold">{{ activity.serials | map(attribute='package_links') | map('length') | sum }}</div>
+  </div>
+</div>
 
 {% if activity.description %}
 <div class="alert alert-secondary py-2 small mb-3">{{ activity.description }}</div>
 {% endif %}
 
 {% if user.role != 'observer' %}
-<div id="editActivityPanel" class="collapse mb-4">
-  <div class="card border-secondary">
-    <div class="card-header d-flex align-items-center">
-      <span><i class="bi bi-pencil me-1"></i>Edit Activity</span>
-      <button type="button" class="btn btn-sm btn-link link-secondary p-0 ms-auto" data-bs-toggle="collapse" data-bs-target="#editActivityPanel">
-        <i class="bi bi-x-lg"></i>
-      </button>
-    </div>
-    <div class="card-body">
-      <form method="post" action="/activities/{{ activity.id }}/edit">
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label">Name <span class="text-danger">*</span></label>
-            <input type="text" class="form-control" name="name" value="{{ activity.name }}" required>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Type</label>
-            <select class="form-select" name="activity_type_id">
-              <option value="0">— None —</option>
-              {% for at in activity_types %}
-              <option value="{{ at.id }}" {% if activity.activity_type_id == at.id %}selected{% endif %}>{{ at.name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="col-12">
-            <label class="form-label">Description <span class="text-muted small">(optional)</span></label>
-            <textarea class="form-control" name="description" rows="2">{{ activity.description or '' }}</textarea>
-          </div>
-          <div class="col-auto">
-            <button type="submit" class="btn btn-primary btn-sm">
-              <i class="bi bi-check2 me-1"></i>Save Changes
-            </button>
-          </div>
+<div id="editActivityPanel" class="collapse mb-3">
+  <div class="activity-hub-panel">
+    <div class="activity-hub-heading"><i class="bi bi-pencil me-1"></i>Edit Activity</div>
+    <form method="post" action="/activities/{{ activity.id }}/edit" class="p-3">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-5">
+          <label class="form-label">Name <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" name="name" value="{{ activity.name }}" required>
         </div>
-      </form>
-    </div>
+        <div class="col-md-3">
+          <label class="form-label">Type</label>
+          <select class="form-select" name="activity_type_id">
+            <option value="0">— None —</option>
+            {% for at in activity_types %}
+            <option value="{{ at.id }}" {% if activity.activity_type_id == at.id %}selected{% endif %}>{{ at.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Description</label>
+          <textarea class="form-control" name="description" rows="1">{{ activity.description or '' }}</textarea>
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check2 me-1"></i>Save Activity</button>
+        </div>
+      </div>
+    </form>
   </div>
 </div>
 {% endif %}
@@ -98,80 +118,345 @@
 {% set active_serials = activity.serials | selectattr('is_started', 'equalto', true) | rejectattr('closed_at') | list %}
 {% set completed_serials = activity.serials | selectattr('is_started', 'equalto', true) | selectattr('closed_at') | list %}
 
-{% macro serial_card(serial, show_history) %}
-<div class="card border-secondary mb-2">
-  <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
-    <div class="flex-grow-1">
-      <span class="fw-semibold">{{ serial.title }}</span>
-      {% if serial.package_links %}
-      <div class="text-muted small mt-1">
-        <i class="bi bi-box-seam me-1"></i>
-        {% for sp in serial.package_links %}{{ sp.package.name }}{% if not loop.last %}, {% endif %}{% endfor %}
-      </div>
-      {% endif %}
-      <div class="text-muted small">
-        {% if serial.opened_at and serial.is_started %}Started {{ serial.opened_at.strftime('%d/%m/%y %H:%M') }}{% endif %}
-        {% if serial.closed_at %} → {{ serial.closed_at.strftime('%H:%M') }}{% endif %}
-      </div>
-    </div>
-    <div class="d-flex gap-1">
-      {% if show_history %}
-      <a href="/history/{{ serial.id }}" class="btn btn-sm btn-outline-primary py-0 px-2">
-        <i class="bi bi-clock-history me-1"></i>History
-      </a>
-      {% endif %}
-      {% if user.role != 'observer' %}
-      <form method="post" action="/activities/{{ activity.id }}/unassign-serial/{{ serial.id }}"
-            onsubmit="return confirm('Unassign this serial from the activity?')">
-        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Unassign">
-          <i class="bi bi-x-lg"></i>
-        </button>
+{% macro signal_editor(serial, package, entry) %}
+<div class="activity-signal-row">
+  <button class="activity-signal-summary" type="button" data-bs-toggle="collapse"
+          data-bs-target="#sig_{{ serial.id }}_{{ package.id }}_{{ entry.id }}">
+    <span class="fw-semibold">{{ entry.signal_name }}</span>
+    <span class="badge bg-body-secondary border border-secondary text-body-secondary">{{ entry.modulation or 'No mod' }}{% if entry.fec %} / {{ entry.fec }}{% endif %}</span>
+    {% if entry.symbol_rate %}<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">{{ entry.symbol_rate }}</span>{% else %}<span class="badge bg-danger">Missing SR</span>{% endif %}
+    {% if entry.source %}<span class="badge bg-secondary">{{ entry.source }}</span>{% else %}<span class="badge bg-warning text-dark">No source</span>{% endif %}
+    <i class="bi bi-chevron-down ms-auto"></i>
+  </button>
+  <div class="collapse" id="sig_{{ serial.id }}_{{ package.id }}_{{ entry.id }}">
+    <div class="activity-inline-editor">
+      {% if user.role != 'observer' and not serial.closed_at %}
+      <form method="post" action="/activities/{{ activity.id }}/packages/{{ package.id }}/signals/{{ entry.id }}/update">
+        <div class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label small">Signal</label>
+            <input type="text" class="form-control form-control-sm" name="signal_name" value="{{ entry.signal_name }}" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small">Description</label>
+            <input type="text" class="form-control form-control-sm" name="description" value="{{ entry.description or '' }}">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small">Band</label>
+            <select class="form-select form-select-sm" name="band">
+              <option value="">—</option>
+              {% for b in bands %}<option value="{{ b }}" {% if entry.band == b %}selected{% endif %}>{{ b }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small">Unit</label>
+            <select class="form-select form-select-sm" name="freq_unit">
+              {% for u in freq_units %}<option value="{{ u }}" {% if entry.freq_unit == u %}selected{% endif %}>{{ u }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">TxIF</label>
+            <input type="number" class="form-control form-control-sm" name="tx_if" step="any" value="{{ entry.tx_if if entry.tx_if is not none else '' }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">TxRF</label>
+            <input type="number" class="form-control form-control-sm" name="tx_rf" step="any" value="{{ entry.tx_rf if entry.tx_rf is not none else '' }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">RxRF</label>
+            <input type="number" class="form-control form-control-sm" name="rx_rf" step="any" value="{{ entry.rx_rf if entry.rx_rf is not none else '' }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">RxIF</label>
+            <input type="number" class="form-control form-control-sm" name="rx_if" step="any" value="{{ entry.rx_if if entry.rx_if is not none else '' }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">Modulation</label>
+            <select class="form-select form-select-sm" name="modulation">
+              <option value="">—</option>
+              {% if entry.modulation and entry.modulation not in mod_types %}<option value="{{ entry.modulation }}" selected>{{ entry.modulation }}</option>{% endif %}
+              {% for m in mod_types %}<option value="{{ m }}" {% if entry.modulation == m %}selected{% endif %}>{{ m }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small">FEC</label>
+            <select class="form-select form-select-sm" name="fec">
+              <option value="">—</option>
+              {% if entry.fec and entry.fec not in fec_types %}<option value="{{ entry.fec }}" selected>{{ entry.fec }}</option>{% endif %}
+              {% for f in fec_types %}<option value="{{ f }}" {% if entry.fec == f %}selected{% endif %}>{{ f }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small">Inner Code</label>
+            <input type="text" class="form-control form-control-sm" name="inner_code" value="{{ entry.inner_code or '' }}">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small">Symbol Rate <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" name="symbol_rate" value="{{ entry.symbol_rate or '' }}" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">Source</label>
+            <select class="form-select form-select-sm" name="source">
+              <option value="">No modem assigned</option>
+              {% if entry.source and entry.source not in signal_sources %}<option value="{{ entry.source }}" selected>{{ entry.source }}</option>{% endif %}
+              {% for s in signal_sources %}<option value="{{ s }}" {% if entry.source == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small">CBM Path</label>
+            <select class="form-select form-select-sm" name="cbm_path">
+              {% for value, label in cbm_paths %}<option value="{{ value }}" {% if (entry.cbm_path or '') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">Antenna</label>
+            <select class="form-select form-select-sm" name="antenna">
+              <option value="">—</option>
+              {% if entry.antenna and entry.antenna not in antenna_types %}<option value="{{ entry.antenna }}" selected>{{ entry.antenna }}</option>{% endif %}
+              {% for a in antenna_types %}<option value="{{ a }}" {% if entry.antenna == a %}selected{% endif %}>{{ a }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small">Power</label>
+            <input type="number" class="form-control form-control-sm" name="power" step="any" value="{{ entry.power if entry.power is not none else '' }}">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small">Power Unit</label>
+            <select class="form-select form-select-sm" name="power_unit">
+              {% for u in power_units %}<option value="{{ u }}" {% if entry.power_unit == u %}selected{% endif %}>{{ u }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label small">Notes</label>
+            <input type="text" class="form-control form-control-sm" name="notes" value="{{ entry.notes or '' }}">
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <button type="submit" class="btn btn-sm btn-primary w-100">
+              <i class="bi bi-check2 me-1"></i>Save Signal
+            </button>
+          </div>
+        </div>
       </form>
+      {% else %}
+      <div class="row g-2 small">
+        <div class="col-md-3"><span class="text-muted">TxIF</span><br>{{ entry.tx_if or '—' }}</div>
+        <div class="col-md-3"><span class="text-muted">TxRF</span><br>{{ entry.tx_rf or '—' }}</div>
+        <div class="col-md-3"><span class="text-muted">RxRF</span><br>{{ entry.rx_rf or '—' }}</div>
+        <div class="col-md-3"><span class="text-muted">RxIF</span><br>{{ entry.rx_if or '—' }}</div>
+        <div class="col-md-3"><span class="text-muted">Power</span><br>{% if entry.power is not none %}{{ entry.power }} {{ entry.power_unit }}{% else %}—{% endif %}</div>
+        <div class="col-md-3"><span class="text-muted">Antenna</span><br>{{ entry.antenna or package.antenna or '—' }}</div>
+        <div class="col-md-6"><span class="text-muted">Notes</span><br>{{ entry.notes or '—' }}</div>
+      </div>
       {% endif %}
     </div>
   </div>
 </div>
 {% endmacro %}
 
-{% if pending_serials %}
-<h6 class="text-muted text-uppercase small mb-2"><i class="bi bi-hourglass me-1"></i>Pending Serials</h6>
-{% for s in pending_serials %}{{ serial_card(s, false) }}{% endfor %}
-{% endif %}
+{% macro package_panel(serial, link) %}
+{% set package = link.package %}
+<div class="activity-package">
+  <button class="activity-package-summary" type="button" data-bs-toggle="collapse" data-bs-target="#pkg_{{ serial.id }}_{{ package.id }}">
+    <i class="bi bi-box-seam text-primary"></i>
+    <span class="fw-semibold">{{ package.name }}</span>
+    <span class="badge bg-secondary">{{ package.signals | length }} signal{{ 's' if package.signals | length != 1 }}</span>
+    {% if package.is_closed_loop %}<span class="badge bg-info text-dark">Closed loop</span>{% else %}<span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle">Live</span>{% endif %}
+    {% for badge in package_health.get(package.id, []) %}
+    {% if badge.severity in ['warning', 'danger'] %}
+    <span class="badge text-bg-{{ badge.severity }}">{{ badge.label }}</span>
+    {% endif %}
+    {% endfor %}
+    <i class="bi bi-chevron-down ms-auto"></i>
+  </button>
+  <div class="collapse" id="pkg_{{ serial.id }}_{{ package.id }}">
+    <div class="activity-package-body">
+      <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+        <div class="small text-muted">
+          {% if package.description %}{{ package.description }} · {% endif %}
+          Edits here update the shared package used by any serial assigned to it.
+        </div>
+        <a href="/packages/{{ package.id }}" class="btn btn-sm btn-outline-secondary py-0 px-2 ms-auto">
+          <i class="bi bi-box-arrow-up-right me-1"></i>Open Package
+        </a>
+        {% if user.role != 'observer' and not serial.closed_at %}
+        <form method="post" action="/activities/{{ activity.id }}/serials/{{ serial.id }}/packages/{{ package.id }}/remove"
+              onsubmit="return confirm('Remove package {{ package.name | e }} from {{ serial.title | e }}?')">
+          <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">
+            <i class="bi bi-x-lg me-1"></i>Remove
+          </button>
+        </form>
+        {% endif %}
+      </div>
+      {% if package.signals %}
+      {% for entry in package.signals %}
+      {{ signal_editor(serial, package, entry) }}
+      {% endfor %}
+      {% else %}
+      <div class="text-muted small fst-italic py-2">No signals in this package.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endmacro %}
 
-{% if active_serials %}
-<h6 class="text-muted text-uppercase small mb-2 mt-3"><i class="bi bi-broadcast-pin me-1"></i>Active Serials</h6>
-{% for s in active_serials %}{{ serial_card(s, false) }}{% endfor %}
-{% endif %}
+{% macro serial_panel(serial) %}
+{% set readiness = serial_readiness.get(serial.id, []) %}
+<div class="activity-serial">
+  <button class="activity-serial-summary" type="button" data-bs-toggle="collapse" data-bs-target="#serial_{{ serial.id }}">
+    <i class="bi {% if serial.closed_at %}bi-check-circle text-secondary{% elif serial.is_started %}bi-broadcast-pin text-success{% else %}bi-hourglass text-warning{% endif %}"></i>
+    <span class="fw-semibold">{{ serial.title }}</span>
+    {% if serial.closed_at %}<span class="badge bg-secondary">Completed</span>{% elif serial.is_started %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-warning text-dark">Pending</span>{% endif %}
+    {% if serial.is_closed_loop %}<span class="badge bg-info text-dark">Closed loop</span>{% endif %}
+    {% for badge in readiness %}
+    <span class="badge text-bg-{{ badge.severity }}">{{ badge.label }}</span>
+    {% endfor %}
+    <i class="bi bi-chevron-down ms-auto"></i>
+  </button>
+  <div class="collapse" id="serial_{{ serial.id }}">
+    <div class="activity-serial-body">
+      <div class="row g-3">
+        <div class="col-xl-4">
+          <div class="activity-hub-subheading">Serial Details</div>
+          {% if user.role != 'observer' and not serial.closed_at %}
+          <form method="post" action="/activities/{{ activity.id }}/serials/{{ serial.id }}/edit">
+            <div class="mb-2">
+              <label class="form-label small">Title</label>
+              <input type="text" class="form-control form-control-sm" name="title" value="{{ serial.title }}" required>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small">Notes</label>
+              <textarea class="form-control form-control-sm" name="notes" rows="3">{{ serial.notes or '' }}</textarea>
+            </div>
+            <button type="submit" class="btn btn-sm btn-outline-primary"><i class="bi bi-check2 me-1"></i>Save Serial</button>
+          </form>
+          {% else %}
+          <div class="small text-muted">{{ serial.notes or 'No notes.' }}</div>
+          {% endif %}
+          <div class="small text-muted mt-2">
+            {% if serial.opened_at and serial.is_started %}Started {{ serial.opened_at.strftime('%d/%m/%y %H:%M') }}{% else %}Not started{% endif %}
+            {% if serial.closed_at %}<br>Closed {{ serial.closed_at.strftime('%d/%m/%y %H:%M') }}{% endif %}
+          </div>
+          <div class="d-flex gap-2 flex-wrap mt-2">
+            {% if serial.closed_at %}
+            <a href="/history/{{ serial.id }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-clock-history me-1"></i>History</a>
+            {% elif not serial.is_started and user.role != 'observer' %}
+            <a href="/serials/{{ serial.id }}/start" class="btn btn-sm btn-success"><i class="bi bi-play-circle me-1"></i>Start</a>
+            {% endif %}
+            {% if user.role != 'observer' %}
+            <form method="post" action="/activities/{{ activity.id }}/unassign-serial/{{ serial.id }}"
+                  onsubmit="return confirm('Unassign this serial from the activity?')">
+              <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg me-1"></i>Unassign</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+        <div class="col-xl-4">
+          <div class="activity-hub-subheading">CDA Tables</div>
+          {% if serial.cda_links %}
+          <div class="activity-chip-list mb-2">
+            {% for link in serial.cda_links %}
+            <span class="activity-chip">
+              <i class="bi bi-shield-exclamation text-warning"></i>{{ link.cda_table.name }}
+              {% if link.cda_table.windows %}<span class="text-muted">({{ link.cda_table.windows | length }})</span>{% endif %}
+              {% if user.role != 'observer' and not serial.closed_at %}
+              <form method="post" action="/activities/{{ activity.id }}/serials/{{ serial.id }}/cda/{{ link.cda_table_id }}/remove"
+                    onsubmit="return confirm('Remove CDA {{ link.cda_table.name | e }}?')">
+                <button type="submit" class="btn btn-sm p-0 border-0 bg-transparent text-danger" title="Remove CDA"><i class="bi bi-x"></i></button>
+              </form>
+              {% endif %}
+            </span>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="text-muted small fst-italic mb-2">No CDA tables assigned.</div>
+          {% endif %}
+          {% if user.role != 'observer' and not serial.closed_at %}
+          <form method="post" action="/activities/{{ activity.id }}/serials/{{ serial.id }}/cda/assign" class="d-flex gap-2">
+            <select class="form-select form-select-sm" name="cda_table_id" {% if not cda_tables %}disabled{% endif %}>
+              {% for table in cda_tables %}<option value="{{ table.id }}">{{ table.name }}</option>{% else %}<option>No CDA tables available</option>{% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-outline-warning text-nowrap" {% if not cda_tables %}disabled{% endif %}><i class="bi bi-plus me-1"></i>Add</button>
+          </form>
+          {% endif %}
+        </div>
+        <div class="col-xl-4">
+          <div class="activity-hub-subheading">Add Package</div>
+          {% if user.role != 'observer' and not serial.closed_at %}
+          <form method="post" action="/activities/{{ activity.id }}/serials/{{ serial.id }}/packages/add" class="d-flex gap-2">
+            <select class="form-select form-select-sm" name="package_id" {% if not packages %}disabled{% endif %}>
+              {% for package in packages %}
+              <option value="{{ package.id }}">{{ package.name }} — {% if package.is_closed_loop %}Closed loop{% else %}Live{% endif %}</option>
+              {% else %}
+              <option>No packages available</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap" {% if not packages %}disabled{% endif %}><i class="bi bi-plus me-1"></i>Add</button>
+          </form>
+          {% else %}
+          <div class="text-muted small">Package assignment is locked for this serial.</div>
+          {% endif %}
+        </div>
+      </div>
 
-{% if completed_serials %}
-<h6 class="text-muted text-uppercase small mb-2 mt-3"><i class="bi bi-check-circle me-1"></i>Completed Serials</h6>
-{% for s in completed_serials %}{{ serial_card(s, true) }}{% endfor %}
-{% endif %}
+      <div class="activity-hub-subheading mt-3">Signal Packages</div>
+      {% if serial.package_links %}
+      {% for link in serial.package_links %}
+      {{ package_panel(serial, link) }}
+      {% endfor %}
+      {% else %}
+      <div class="text-muted small fst-italic py-2">No signal packages assigned.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endmacro %}
 
-{% if not activity.serials %}
-<div class="text-muted small fst-italic py-2">No serials assigned to this activity yet.</div>
-{% endif %}
+<div class="activity-hub-panel">
+  <div class="activity-hub-heading d-flex align-items-center justify-content-between">
+    <span><i class="bi bi-collection-play me-1"></i>Serials, Packages, Signals, and CDA</span>
+    <span class="text-muted small">Expand each serial to work in place</span>
+  </div>
+  <div class="p-2">
+    {% if pending_serials %}
+    <div class="activity-hub-subheading px-2 mt-1">Pending</div>
+    {% for s in pending_serials %}{{ serial_panel(s) }}{% endfor %}
+    {% endif %}
+    {% if active_serials %}
+    <div class="activity-hub-subheading px-2 mt-2">Active</div>
+    {% for s in active_serials %}{{ serial_panel(s) }}{% endfor %}
+    {% endif %}
+    {% if completed_serials %}
+    <div class="activity-hub-subheading px-2 mt-2">Completed</div>
+    {% for s in completed_serials %}{{ serial_panel(s) }}{% endfor %}
+    {% endif %}
+    {% if not activity.serials %}
+    <div class="text-muted small fst-italic p-3">No serials assigned to this activity yet.</div>
+    {% endif %}
+  </div>
+</div>
 
 {% if user.role != 'observer' %}
-<div class="mt-4">
-  <h6 class="text-muted text-uppercase small mb-2"><i class="bi bi-link-45deg me-1"></i>Assign Serial</h6>
-  {% if unassigned_serials %}
-  <form method="post" action="/activities/{{ activity.id }}/assign-serial" class="d-flex gap-2 align-items-center">
-    <select class="form-select form-select-sm" name="serial_id" style="max-width:400px">
-      {% for s in unassigned_serials %}
-      <option value="{{ s.id }}">
-        {{ s.title }}
-        {% if s.is_started and not s.closed_at %} [Active]{% elif s.closed_at %} [Closed]{% else %} [Pending]{% endif %}
-      </option>
-      {% endfor %}
-    </select>
-    <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">
-      <i class="bi bi-link-45deg me-1"></i>Assign
-    </button>
-  </form>
-  {% else %}
-  <div class="text-muted small fst-italic">No unassigned serials available in this workspace.</div>
-  {% endif %}
+<div class="activity-hub-panel mt-3">
+  <div class="activity-hub-heading"><i class="bi bi-link-45deg me-1"></i>Assign Existing Serial</div>
+  <div class="p-3">
+    {% if unassigned_serials %}
+    <form method="post" action="/activities/{{ activity.id }}/assign-serial" class="d-flex gap-2 align-items-center flex-wrap">
+      <select class="form-select form-select-sm" name="serial_id" style="max-width:460px">
+        {% for s in unassigned_serials %}
+        <option value="{{ s.id }}">
+          {{ s.title }}
+          {% if s.is_started and not s.closed_at %} [Active]{% elif s.closed_at %} [Closed]{% else %} [Pending]{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">
+        <i class="bi bi-link-45deg me-1"></i>Assign Serial
+      </button>
+    </form>
+    {% else %}
+    <div class="text-muted small fst-italic">No unassigned serials available in this workspace.</div>
+    {% endif %}
+  </div>
 </div>
 {% endif %}
 {% endblock %}

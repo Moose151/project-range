@@ -13,13 +13,18 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.25.1` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.25.2` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
 **DB:** SQLite at `/app/data/range.db` (named volume). `init_db.py` runs automatically on container start and is idempotent (migrations + new tables auto-create).
 
 ### Shipped (all on `main`, in order)
+- **0.25.2 — Activity detail hub:**
+  - `activity_detail.html` now provides an expandable planning hub for serials assigned to an activity: pending/active/completed groupings, readiness badges, serial details, CDA tables, assigned signal packages, and package signal rows.
+  - `activities.py` adds activity-scoped write routes for editing open serial title/notes, assigning/removing serial packages, assigning/removing CDA tables, and updating package signal entries from the activity page. Observers and closed serials remain read-only.
+  - Inline signal edits reuse package dropdown lists and CBM source mapping, keep symbol rate required, and only allow package edits when the package is attached to at least one open serial in the activity.
+  - CSS cache key bumped to `app.css?v=33`.
 - **0.25.1 — Handover open issues + readiness badges:**
   - **Shared `app/ops_health.py` helper** now centralises lightweight operator-facing health checks for packages, serials, CDA windows, and handover issue surfacing.
   - **Handover Open Issues** added to `/handover`, `/handover/print`, and `/handover/report.xlsx`. It lists faulted latest active signals, open/investigating incidents, active or soon-due CDA windows, package readiness warnings for packages assigned to active serials, and recent CBM/SNMP sync issue audit entries. If none are found, the handover page shows a clear no-open-issues message.

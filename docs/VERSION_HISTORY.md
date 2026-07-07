@@ -1,7 +1,16 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.25.1**
+Current version: **0.25.2**
+
+---
+
+## 0.25.2 — Activity Detail Hub
+
+- **Activity detail hub:** Activity detail pages now act as an operational workspace for assigned serials. Operators can expand pending, active, and completed serials to inspect readiness badges, serial notes, CDA tables, assigned packages, and package signals in one place.
+- **Inline serial setup:** Non-observer users can edit open serial titles/notes, assign or remove CDA tables, and assign or remove signal packages directly from the activity page. Closed serials remain read-only.
+- **Inline package signal edits:** Signals inside packages assigned to open activity serials can be edited from the activity page using the same package fields and dropdowns as the package editor, including required symbol-rate validation and CBM source mapping.
+- **Activity breadcrumbs and summary counts:** The activity detail header now includes a breadcrumb back to Activities plus compact counts for pending, active, completed, and assigned package links.
 
 ---
 
