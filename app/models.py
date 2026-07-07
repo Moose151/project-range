@@ -204,8 +204,11 @@ class Serial(Base):
     is_started: Mapped[bool] = mapped_column(Boolean, default=False)
     is_testing: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    activity_id: Mapped[int | None] = mapped_column(ForeignKey("activities.id"), nullable=True)
+
     opened_by: Mapped[User] = relationship("User", foreign_keys="Serial.opened_by_id")
     closed_by: Mapped[User | None] = relationship("User", foreign_keys="Serial.closed_by_id")
+    activity: Mapped["Activity | None"] = relationship("Activity", back_populates="serials", foreign_keys="Serial.activity_id")
     package_links: Mapped[list["SerialPackage"]] = relationship(
         "SerialPackage", back_populates="serial", cascade="all, delete-orphan",
     )
@@ -511,6 +514,52 @@ class AppSetting(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, onupdate=func.now())
 
 
+class ActivityType(Base):
+    __tablename__ = "activity_types"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    display_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class Activity(Base):
+    __tablename__ = "activities"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(256), nullable=False)
+    activity_type_id: Mapped[int | None] = mapped_column(ForeignKey("activity_types.id"), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_testing: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    activity_type: Mapped["ActivityType | None"] = relationship("ActivityType")
+    created_by: Mapped["User"] = relationship("User", foreign_keys="Activity.created_by_id")
+    serials: Mapped[list["Serial"]] = relationship("Serial", back_populates="activity", foreign_keys="Serial.activity_id")
+
+    @property
+    def started_at(self):
+        dates = [s.opened_at for s in self.serials if s.opened_at and s.is_started]
+        return min(dates) if dates else None
+
+    @property
+    def closed_at(self):
+        all_closed = all(s.closed_at is not None for s in self.serials if s.is_started)
+        if not self.serials or not all_closed:
+            return None
+        dates = [s.closed_at for s in self.serials if s.closed_at]
+        return max(dates) if dates else None
+
+    @property
+    def status(self) -> str:
+        started = [s for s in self.serials if s.is_started]
+        if not started:
+            return "Planned"
+        if any(s.closed_at is None for s in started):
+            return "Active"
+        return "Completed"
+
+
 class RFDevice(Base):
     """A range device (modem, splitter, combiner, spectrum analyser, ...).
 
@@ -776,7 +825,7 @@ def _session_testing_state(session: SASession) -> bool:
 def _mark_testing_scoped_rows(session: SASession, flush_context, instances) -> None:
     scoped_models = (
         SignalPackage, Serial, SignalLog, AuditLog, RFDevice, DeviceLink,
-        CDATable, Incident, CeaseEvent,
+        CDATable, Incident, CeaseEvent, Activity,
     )
     new_scoped = [obj for obj in session.new if isinstance(obj, scoped_models)]
     if not new_scoped:

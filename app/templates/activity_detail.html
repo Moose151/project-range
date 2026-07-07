@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}{{ activity.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <div>
+    <h4 class="mb-0">
+      <i class="bi bi-calendar3-range me-2"></i>{{ activity.name }}
+      {% if activity.activity_type %}
+      <span class="badge bg-secondary ms-2" style="font-size:.75rem">{{ activity.activity_type.name }}</span>
+      {% endif %}
+      {% if activity.status == 'Active' %}
+      <span class="badge bg-success ms-1">Active</span>
+      {% elif activity.status == 'Completed' %}
+      <span class="badge bg-secondary text-muted ms-1">Completed</span>
+      {% else %}
+      <span class="badge bg-secondary ms-1">Planned</span>
+      {% endif %}
+    </h4>
+    <div class="text-muted small mt-1">
+      {% if activity.started_at %}
+      {{ activity.started_at.strftime('%d/%m/%Y %H:%M') }}
+      {% if activity.closed_at %} → {{ activity.closed_at.strftime('%d/%m/%Y %H:%M') }}{% else %} — ongoing{% endif %}
+      {% else %}
+      Not started
+      {% endif %}
+      &nbsp;·&nbsp; {{ activity.serials | length }} serial{{ 's' if activity.serials | length != 1 }}
+    </div>
+  </div>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/activities/{{ activity.id }}/export/csv" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-filetype-csv me-1"></i>CSV
+    </a>
+    <a href="/activities/{{ activity.id }}/export/xlsx" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-file-earmark-spreadsheet me-1"></i>XLSX
+    </a>
+    {% if user.role != 'observer' %}
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#editActivityPanel">
+      <i class="bi bi-pencil me-1"></i>Edit
+    </button>
+    {% endif %}
+    <a href="/activities" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Activities
+    </a>
+  </div>
+</div>
+
+{% if toast %}
+<div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
+
+{% if activity.description %}
+<div class="alert alert-secondary py-2 small mb-3">{{ activity.description }}</div>
+{% endif %}
+
+{% if user.role != 'observer' %}
+<div id="editActivityPanel" class="collapse mb-4">
+  <div class="card border-secondary">
+    <div class="card-header d-flex align-items-center">
+      <span><i class="bi bi-pencil me-1"></i>Edit Activity</span>
+      <button type="button" class="btn btn-sm btn-link link-secondary p-0 ms-auto" data-bs-toggle="collapse" data-bs-target="#editActivityPanel">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="card-body">
+      <form method="post" action="/activities/{{ activity.id }}/edit">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="name" value="{{ activity.name }}" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Type</label>
+            <select class="form-select" name="activity_type_id">
+              <option value="0">— None —</option>
+              {% for at in activity_types %}
+              <option value="{{ at.id }}" {% if activity.activity_type_id == at.id %}selected{% endif %}>{{ at.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Description <span class="text-muted small">(optional)</span></label>
+            <textarea class="form-control" name="description" rows="2">{{ activity.description or '' }}</textarea>
+          </div>
+          <div class="col-auto">
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-check2 me-1"></i>Save Changes
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% set pending_serials = activity.serials | selectattr('is_started', 'equalto', false) | list %}
+{% set active_serials = activity.serials | selectattr('is_started', 'equalto', true) | rejectattr('closed_at') | list %}
+{% set completed_serials = activity.serials | selectattr('is_started', 'equalto', true) | selectattr('closed_at') | list %}
+
+{% macro serial_card(serial, show_history) %}
+<div class="card border-secondary mb-2">
+  <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
+    <div class="flex-grow-1">
+      <span class="fw-semibold">{{ serial.title }}</span>
+      {% if serial.package_links %}
+      <div class="text-muted small mt-1">
+        <i class="bi bi-box-seam me-1"></i>
+        {% for sp in serial.package_links %}{{ sp.package.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+      </div>
+      {% endif %}
+      <div class="text-muted small">
+        {% if serial.opened_at and serial.is_started %}Started {{ serial.opened_at.strftime('%d/%m/%y %H:%M') }}{% endif %}
+        {% if serial.closed_at %} → {{ serial.closed_at.strftime('%H:%M') }}{% endif %}
+      </div>
+    </div>
+    <div class="d-flex gap-1">
+      {% if show_history %}
+      <a href="/history/{{ serial.id }}" class="btn btn-sm btn-outline-primary py-0 px-2">
+        <i class="bi bi-clock-history me-1"></i>History
+      </a>
+      {% endif %}
+      {% if user.role != 'observer' %}
+      <form method="post" action="/activities/{{ activity.id }}/unassign-serial/{{ serial.id }}"
+            onsubmit="return confirm('Unassign this serial from the activity?')">
+        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Unassign">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+{% if pending_serials %}
+<h6 class="text-muted text-uppercase small mb-2"><i class="bi bi-hourglass me-1"></i>Pending Serials</h6>
+{% for s in pending_serials %}{{ serial_card(s, false) }}{% endfor %}
+{% endif %}
+
+{% if active_serials %}
+<h6 class="text-muted text-uppercase small mb-2 mt-3"><i class="bi bi-broadcast-pin me-1"></i>Active Serials</h6>
+{% for s in active_serials %}{{ serial_card(s, false) }}{% endfor %}
+{% endif %}
+
+{% if completed_serials %}
+<h6 class="text-muted text-uppercase small mb-2 mt-3"><i class="bi bi-check-circle me-1"></i>Completed Serials</h6>
+{% for s in completed_serials %}{{ serial_card(s, true) }}{% endfor %}
+{% endif %}
+
+{% if not activity.serials %}
+<div class="text-muted small fst-italic py-2">No serials assigned to this activity yet.</div>
+{% endif %}
+
+{% if user.role != 'observer' %}
+<div class="mt-4">
+  <h6 class="text-muted text-uppercase small mb-2"><i class="bi bi-link-45deg me-1"></i>Assign Serial</h6>
+  {% if unassigned_serials %}
+  <form method="post" action="/activities/{{ activity.id }}/assign-serial" class="d-flex gap-2 align-items-center">
+    <select class="form-select form-select-sm" name="serial_id" style="max-width:400px">
+      {% for s in unassigned_serials %}
+      <option value="{{ s.id }}">
+        {{ s.title }}
+        {% if s.is_started and not s.closed_at %} [Active]{% elif s.closed_at %} [Closed]{% else %} [Pending]{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">
+      <i class="bi bi-link-45deg me-1"></i>Assign
+    </button>
+  </form>
+  {% else %}
+  <div class="text-muted small fst-italic">No unassigned serials available in this workspace.</div>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

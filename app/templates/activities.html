@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Activities{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <h4 class="mb-0"><i class="bi bi-calendar3-range me-2"></i>Activities</h4>
+  {% if user.role == 'observer' %}
+  <span class="badge text-bg-secondary">Observer read-only</span>
+  {% endif %}
+  {% if user.role != 'observer' %}
+  <div class="ms-auto">
+    <button type="button" class="btn btn-sm btn-success" data-bs-toggle="collapse" data-bs-target="#newActivityPanel" aria-expanded="false">
+      <i class="bi bi-plus-lg me-1"></i>New Activity
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+{% if toast %}
+<div class="alert alert-success alert-dismissible fade show py-2">{{ toast }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
+
+{% if user.role != 'observer' %}
+<div id="newActivityPanel" class="collapse mb-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-6">
+      <div class="card border-secondary">
+        <div class="card-header d-flex align-items-center">
+          <span><i class="bi bi-plus-circle me-1"></i>New Activity</span>
+          <button type="button" class="btn btn-sm btn-link link-secondary p-0 ms-auto" data-bs-toggle="collapse" data-bs-target="#newActivityPanel">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <div class="card-body">
+          <form method="post" action="/activities/new">
+            <div class="mb-3">
+              <label class="form-label">Name <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="name" placeholder="e.g. Exercise Bright Star" required>
+            </div>
+            {% if activity_types %}
+            <div class="mb-3">
+              <label class="form-label">Type <span class="text-muted small">(optional)</span></label>
+              <select class="form-select" name="activity_type_id">
+                <option value="0">— None —</option>
+                {% for at in activity_types %}
+                <option value="{{ at.id }}">{{ at.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            <div class="mb-3">
+              <label class="form-label">Description <span class="text-muted small">(optional)</span></label>
+              <textarea class="form-control" name="description" rows="2" placeholder="Objectives, crew, context…"></textarea>
+            </div>
+            <button type="submit" class="btn btn-success">
+              <i class="bi bi-plus-lg me-1"></i>Create Activity
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% set active_acts = activities | selectattr('status', 'equalto', 'Active') | list %}
+{% set planned_acts = activities | selectattr('status', 'equalto', 'Planned') | list %}
+{% set completed_acts = activities | selectattr('status', 'equalto', 'Completed') | list %}
+
+{% if activities %}
+
+{% macro activity_row(act) %}
+<div class="card border-secondary mb-2">
+  <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
+    <div class="flex-grow-1">
+      {% if act.activity_type %}
+      <span class="badge bg-secondary me-1" style="font-size:.7rem">{{ act.activity_type.name }}</span>
+      {% endif %}
+      <a href="/activities/{{ act.id }}" class="fw-semibold text-decoration-none">{{ act.name }}</a>
+      {% if act.status == 'Active' %}
+      <span class="badge bg-success ms-2">Active</span>
+      {% elif act.status == 'Completed' %}
+      <span class="badge bg-secondary text-muted ms-2">Completed</span>
+      {% else %}
+      <span class="badge bg-secondary ms-2">Planned</span>
+      {% endif %}
+      <div class="text-muted small mt-1">
+        {% if act.started_at %}
+        {{ act.started_at.strftime('%d/%m/%y %H:%M') }}
+        {% if act.closed_at %} → {{ act.closed_at.strftime('%d/%m/%y %H:%M') }}{% else %} — ongoing{% endif %}
+        {% else %}
+        Not started
+        {% endif %}
+        &nbsp;·&nbsp; {{ act.serials | length }} serial{{ 's' if act.serials | length != 1 }}
+      </div>
+    </div>
+    <div class="d-flex gap-1">
+      <a href="/activities/{{ act.id }}/export/csv" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Export CSV">
+        <i class="bi bi-filetype-csv"></i>
+      </a>
+      <a href="/activities/{{ act.id }}/export/xlsx" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Export XLSX">
+        <i class="bi bi-file-earmark-spreadsheet"></i>
+      </a>
+      <a href="/activities/{{ act.id }}" class="btn btn-sm btn-outline-primary py-0 px-2">
+        <i class="bi bi-eye me-1"></i>View
+      </a>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+{% if active_acts %}
+<h6 class="text-muted text-uppercase small mb-2"><i class="bi bi-broadcast-pin me-1"></i>Active</h6>
+{% for act in active_acts %}{{ activity_row(act) }}{% endfor %}
+{% endif %}
+
+{% if planned_acts %}
+<h6 class="text-muted text-uppercase small mb-2 mt-3"><i class="bi bi-hourglass me-1"></i>Planned</h6>
+{% for act in planned_acts %}{{ activity_row(act) }}{% endfor %}
+{% endif %}
+
+{% if completed_acts %}
+<h6 class="text-muted text-uppercase small mb-2 mt-3"><i class="bi bi-check-circle me-1"></i>Completed</h6>
+{% for act in completed_acts %}{{ activity_row(act) }}{% endfor %}
+{% endif %}
+
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-calendar3-range display-4 d-block mb-3"></i>
+  No activities yet.
+  {% if user.role != 'observer' %}Use <strong>New Activity</strong> to create one.{% endif %}
+</div>
+{% endif %}
+{% endblock %}

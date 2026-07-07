@@ -18,7 +18,7 @@ from app import chat_state
 from app.routers import (
     auth, dashboard, calculator, logs, range_state, users, config, audit, sessions,
     packages, serials, history, docs, handover, preferences, devices, account, incidents, cda,
-    cease, chat, search,
+    cease, chat, search, activities,
 )
 
 app = FastAPI(title="SEW Range", version=APP_VERSION, docs_url=None, redoc_url=None)
@@ -134,6 +134,7 @@ app.include_router(cda.router)
 app.include_router(cease.router)
 app.include_router(chat.router)
 app.include_router(search.router)
+app.include_router(activities.router)
 
 
 def _cbm_sync_actor_id(db) -> int | None:

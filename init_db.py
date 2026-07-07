@@ -14,6 +14,7 @@ from app.models import (
     LogSession, SignalPackage, SignalPackageEntry, Serial, SerialPackage,
     DocPage, DocVersion, DocLink, DocAlias, AppSetting, RFDevice, DevicePort, DeviceLink,
     CDATable, CDAWindow, SerialCDATable, Incident, CeaseEvent, DutyRole, RoutingPreset,
+    ActivityType, Activity,
 )
 from app.auth import hash_password
 from sqlalchemy.orm import Session
@@ -150,6 +151,7 @@ def _migrate(conn):
         "ALTER TABLE rf_devices ADD COLUMN cbm_sync_state_json TEXT",
         "ALTER TABLE device_ports ADD COLUMN observed_routed_from INTEGER",
         "ALTER TABLE device_ports ADD COLUMN observed_label VARCHAR(128)",
+        "ALTER TABLE serials ADD COLUMN activity_id INTEGER REFERENCES activities(id)",
     ]
     for sql in migrations:
         try:
@@ -657,6 +659,12 @@ def main():
             print(f"Seeded {len(DEFAULT_FEC_TYPES)} FEC types.")
         else:
             print("FEC types already seeded — skipping.")
+
+        if not db.query(ActivityType).first():
+            for i, name in enumerate(["Exercise", "Training", "Activity", "Maintenance"]):
+                db.add(ActivityType(name=name, display_order=i))
+            db.commit()
+            print("Seeded default activity types.")
 
         # Seed duty-role tags if table is empty
         if not db.query(DutyRole).first():

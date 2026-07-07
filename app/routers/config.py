@@ -9,7 +9,7 @@ from app.database import get_db
 from app.deps import require_supervisor, get_current_range_state, is_testing_state
 from app.config import AUDIT_ARCHIVE_DIR, DATABASE_URL, SERIAL_ARCHIVE_DIR
 from app.file_security import permission_status
-from app.models import AuditLog, ModulationType, FecType, SignalSource, AntennaType, Signal, FrequencyTemplate, User, DutyRole, RFDevice
+from app.models import AuditLog, ModulationType, FecType, SignalSource, AntennaType, Signal, FrequencyTemplate, User, DutyRole, RFDevice, ActivityType, Activity
 from app.settings import (
     AUDIT_LIVE_RECORD_LIMIT_KEY,
     MAX_AUDIT_LIVE_RECORD_LIMIT,
@@ -89,6 +89,7 @@ async def config_page(
     groups = sorted(set(s.exclusivity_group for s in signals if s.exclusivity_group))
     freq_templates = db.query(FrequencyTemplate).order_by(FrequencyTemplate.name).all()
     duty_roles = db.query(DutyRole).order_by(DutyRole.display_order, DutyRole.name).all()
+    activity_types = db.query(ActivityType).order_by(ActivityType.display_order, ActivityType.name).all()
     db_path = _sqlite_db_path()
     db_permissions = permission_status(db_path) if db_path else {"mode": "n/a", "secure": None, "note": "Non-SQLite database."}
     audit_dir_permissions = permission_status(AUDIT_ARCHIVE_DIR, directory=True)
@@ -106,6 +107,7 @@ async def config_page(
         "groups": groups,
         "freq_templates": freq_templates,
         "duty_roles": duty_roles,
+        "activity_types": activity_types,
         "bands": ["C", "X", "Ku", "Ka", "Other"],
         "time_zones": TIME_ZONES,
         "local_timezone": get_local_timezone(db),
@@ -702,3 +704,81 @@ async def freq_template_delete(
         db.delete(tmpl)
         db.commit()
     return RedirectResponse("/config?toast=Template+deleted", status_code=302)
+
+
+# ── Activity types ───────────────────────────────────────────────────────────────
+
+@router.post("/activity-type/add")
+async def activity_type_add(
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    name = name.strip()
+    if name and not db.query(ActivityType).filter(ActivityType.name == name).first():
+        max_order = db.query(ActivityType).count()
+        db.add(ActivityType(name=name, display_order=max_order))
+        db.commit()
+    return RedirectResponse("/config?toast=Activity+type+added#cfg-activity-types", status_code=302)
+
+
+@router.post("/activity-type/{type_id}/edit")
+async def activity_type_edit(
+    type_id: int,
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    at = db.query(ActivityType).filter(ActivityType.id == type_id).first()
+    if at:
+        at.name = name.strip() or at.name
+        db.commit()
+    return RedirectResponse("/config?toast=Activity+type+updated#cfg-activity-types", status_code=302)
+
+
+@router.post("/activity-type/{type_id}/toggle")
+async def activity_type_toggle(
+    type_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    at = db.query(ActivityType).filter(ActivityType.id == type_id).first()
+    if at:
+        at.is_active = not at.is_active
+        db.commit()
+    return RedirectResponse("/config#cfg-activity-types", status_code=302)
+
+
+@router.post("/activity-type/{type_id}/delete")
+async def activity_type_delete(
+    type_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    at = db.query(ActivityType).filter(ActivityType.id == type_id).first()
+    if at:
+        in_use = db.query(Activity).filter(Activity.activity_type_id == type_id).first()
+        if not in_use:
+            db.delete(at)
+            db.commit()
+    return RedirectResponse("/config?toast=Activity+type+deleted#cfg-activity-types", status_code=302)
+
+
+@router.post("/activity-types/order")
+async def activity_type_reorder(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    form = await request.form()
+    for key, val in form.items():
+        if key.startswith("order_"):
+            type_id = int(key.split("_")[1])
+            at = db.query(ActivityType).filter(ActivityType.id == type_id).first()
+            if at:
+                try:
+                    at.display_order = int(val)
+                except ValueError:
+                    pass
+    db.commit()
+    return RedirectResponse("/config?toast=Order+saved#cfg-activity-types", status_code=302)

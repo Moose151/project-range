@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, is_testing_state, require_supervisor
-from app.models import User, Serial, SignalLog
+from app.models import User, Serial, SignalLog, Activity
 from app.serial_archive import archive_closed_serial
 from app.log_changes import annotate_log_changes
 from app.settings import annotate_local_times, get_local_timezone
@@ -24,6 +24,7 @@ async def history_list(
     request: Request,
     search: str = "",
     page: int = Query(default=1, ge=1),
+    activity_id: int = Query(default=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -31,9 +32,17 @@ async def history_list(
     q = db.query(Serial).filter(Serial.closed_at != None, Serial.is_testing == testing)
     if search:
         q = q.filter(Serial.title.ilike(f"%{search}%"))
+    if activity_id > 0:
+        q = q.filter(Serial.activity_id == activity_id)
     total = q.count()
     serials = q.order_by(Serial.opened_at.desc()).offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE).all()
     total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    activities = (
+        db.query(Activity)
+        .filter(Activity.is_testing == testing)
+        .order_by(Activity.created_at.desc())
+        .all()
+    )
 
     return templates.TemplateResponse(request, "history.html", {
         "user": current_user,
@@ -43,6 +52,8 @@ async def history_list(
         "total": total,
         "page": page,
         "total_pages": total_pages,
+        "activities": activities,
+        "selected_activity_id": activity_id,
         "toast": request.query_params.get("toast", ""),
         "page_name": "history",
     })

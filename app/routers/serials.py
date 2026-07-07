@@ -8,7 +8,7 @@ from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials, is_testing_state
 from app.models import (
     User, Serial, SerialPackage, SignalPackage, SignalLog, AuditLog,
-    CDATable, SerialCDATable,
+    CDATable, SerialCDATable, Activity,
 )
 from app.rf_config import serial_package_rf_config
 
@@ -31,6 +31,12 @@ async def serials_list(
     ).order_by(Serial.opened_at.desc()).all()
     packages = db.query(SignalPackage).filter(SignalPackage.is_testing == testing).order_by(SignalPackage.name).all()
     cda_tables = db.query(CDATable).filter(CDATable.is_testing == testing).order_by(CDATable.name).all()
+    activities = (
+        db.query(Activity)
+        .filter(Activity.is_testing == testing)
+        .order_by(Activity.created_at.desc())
+        .all()
+    )
     return templates.TemplateResponse(request, "serials.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
@@ -38,6 +44,7 @@ async def serials_list(
         "pending_serials": pending,
         "packages": packages,
         "cda_tables": cda_tables,
+        "activities": activities,
         "toast": request.query_params.get("toast", ""),
         "page": "serials",
     })
@@ -50,6 +57,7 @@ async def serial_create(
     notes: str = Form(""),
     package_ids: list[int] = Form(default=[]),
     action: str = Form("start"),
+    activity_id: int = Form(0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -62,6 +70,11 @@ async def serial_create(
     )
     db.add(serial)
     db.flush()
+
+    if activity_id > 0:
+        act = db.query(Activity).filter(Activity.id == activity_id, Activity.is_testing == testing).first()
+        if act:
+            serial.activity_id = act.id
 
     for pid in package_ids:
         pkg = db.query(SignalPackage).filter(SignalPackage.id == pid, SignalPackage.is_testing == testing).first()

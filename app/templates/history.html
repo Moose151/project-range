@@ -16,11 +16,25 @@
 <!-- Search -->
 <form method="get" action="/history" class="card border-secondary mb-3">
   <div class="card-body py-2">
-    <div class="input-group input-group-sm">
-      <input type="text" class="form-control" name="search" value="{{ search }}"
-             placeholder="Search by serial title…">
-      <button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i>Search</button>
-      {% if search %}<a href="/history" class="btn btn-outline-secondary">Clear</a>{% endif %}
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+      <div class="input-group input-group-sm" style="max-width:340px">
+        <input type="text" class="form-control" name="search" value="{{ search }}"
+               placeholder="Search by serial title…">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i>Search</button>
+      </div>
+      {% if activities %}
+      <select class="form-select form-select-sm" name="activity_id" style="max-width:240px" onchange="this.form.submit()">
+        <option value="0">All activities</option>
+        {% for act in activities %}
+        <option value="{{ act.id }}" {% if selected_activity_id == act.id %}selected{% endif %}>
+          {{ act.name }}
+        </option>
+        {% endfor %}
+      </select>
+      {% endif %}
+      {% if search or selected_activity_id %}
+      <a href="/history" class="btn btn-sm btn-outline-secondary">Clear</a>
+      {% endif %}
     </div>
   </div>
 </form>

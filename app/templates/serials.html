@@ -43,6 +43,11 @@
             <span class="fw-semibold">{{ serial.title }}</span>
             <span class="badge bg-warning text-dark ms-2 small">Pending</span>
             {% if serial.is_closed_loop %}<span class="badge bg-info text-dark ms-1 small"><i class="bi bi-arrow-repeat me-1"></i>Closed loop</span>{% endif %}
+            {% if serial.activity %}
+            <a href="/activities/{{ serial.activity.id }}" class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle ms-1 small text-decoration-none">
+              <i class="bi bi-calendar3-range me-1"></i>{{ serial.activity.name }}
+            </a>
+            {% endif %}
             {% if serial.package_links %}
             <div class="text-muted small mt-1">
               <i class="bi bi-box-seam me-1"></i>
@@ -89,6 +94,11 @@
         <span class="badge bg-info text-dark" title="Closed loop — IF only"><i class="bi bi-arrow-repeat me-1"></i>Closed loop</span>
         {% endif %}
         <span class="fw-semibold">{{ serial.title }}</span>
+        {% if serial.activity %}
+        <a href="/activities/{{ serial.activity.id }}" class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle text-decoration-none" style="font-size:.7rem">
+          <i class="bi bi-calendar3-range me-1"></i>{{ serial.activity.name }}
+        </a>
+        {% endif %}
         <span class="text-muted small ms-auto">Started {{ serial.opened_at.strftime('%d/%m/%y %H:%M') }}</span>
       </div>
       <div class="card-body py-2">
@@ -241,6 +251,18 @@
             <label class="form-label">Notes <span class="text-muted small">(optional)</span></label>
             <textarea class="form-control" name="notes" rows="2" placeholder="Crew, objectives, or other context…"></textarea>
           </div>
+
+          {% if activities %}
+          <div class="mb-3">
+            <label class="form-label">Activity <span class="text-muted small">(optional)</span></label>
+            <select class="form-select" name="activity_id">
+              <option value="">— None —</option>
+              {% for act in activities %}
+              <option value="{{ act.id }}">{{ act.activity_type.name if act.activity_type else 'Activity' }} — {{ act.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
 
           <div class="d-flex gap-2">
             <button type="submit" name="action" value="save" class="btn btn-outline-secondary flex-fill">
