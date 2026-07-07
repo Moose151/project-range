@@ -11,6 +11,7 @@ from app.models import (
     CDATable, SerialCDATable, Activity,
 )
 from app.rf_config import serial_package_rf_config
+from app.ops_health import serial_readiness_badges
 
 router = APIRouter(prefix="/serials")
 from app.templating import templates
@@ -42,6 +43,10 @@ async def serials_list(
         "range_state": get_current_range_state(db),
         "active_serials": active,
         "pending_serials": pending,
+        "serial_readiness": {
+            serial.id: serial_readiness_badges(serial)
+            for serial in [*pending, *active]
+        },
         "packages": packages,
         "cda_tables": cda_tables,
         "activities": activities,

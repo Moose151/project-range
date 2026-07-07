@@ -20,6 +20,7 @@ from app.upload_validation import (
     validate_upload_file,
     validate_zip_member_count,
 )
+from app.ops_health import package_health_badges
 
 router = APIRouter(prefix="/packages")
 from app.templating import templates
@@ -621,6 +622,7 @@ async def packages_list(
         "user": current_user,
         "range_state": get_current_range_state(db),
         "packages": packages,
+        "package_health": {pkg.id: package_health_badges(pkg) for pkg in packages},
         "toast": request.query_params.get("toast", ""),
         "error": request.query_params.get("error", ""),
         "page": "packages",

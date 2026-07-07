@@ -322,6 +322,18 @@ def _doc_categories(db: Session, published_only: bool = False, current_user: Use
     return [row[0] for row in q.distinct().order_by(DocPage.category).all()]
 
 
+def _doc_category_counts(db: Session, current_user: User) -> list[dict]:
+    pages = _visible_docs_query(db, current_user).all()
+    counts: dict[str, int] = {}
+    for page in pages:
+        label = page.category or "Uncategorised"
+        counts[label] = counts.get(label, 0) + 1
+    return [
+        {"name": name, "count": count, "value": "__uncategorized" if name == "Uncategorised" else name}
+        for name, count in sorted(counts.items(), key=lambda item: (item[0] == "Uncategorised", item[0].lower()))
+    ]
+
+
 # ── List / Home ────────────────────────────────────────────────────────────────
 
 @router.get("", response_class=HTMLResponse)
@@ -335,7 +347,9 @@ async def docs_home(
     _ensure_doc_link_index(db)
     query = _visible_docs_query(db, current_user)
     categories = _doc_categories(db, published_only=True, current_user=current_user)
-    if category:
+    if category == "__uncategorized":
+        query = query.filter(or_(DocPage.category == None, DocPage.category == ""))
+    elif category:
         query = query.filter(DocPage.category == category)
     if q:
         q_lower = f"%{q.lower()}%"
@@ -365,6 +379,15 @@ async def docs_home(
         .filter(or_(DocPage.category == None, DocPage.category == ""))
         .count()
     )
+    category_counts = _doc_category_counts(db, current_user)
+    wanted_count = (
+        db.query(DocLink.target_title)
+        .join(DocPage, DocPage.id == DocLink.from_page_id)
+        .filter(DocPage.is_published == True, DocLink.is_missing == True)
+        .filter(_visibility_filter(current_user))
+        .group_by(DocLink.target_title)
+        .count()
+    )
 
     pending_count = 0
     if current_user.role == "administrator":
@@ -377,10 +400,12 @@ async def docs_home(
         "all_pages": all_pages,
         "recent_pages": recent_pages,
         "wanted_links": wanted_links,
+        "wanted_count": wanted_count,
         "uncategorized_count": uncategorized_count,
         "q": q,
         "category": category,
         "categories": categories,
+        "category_counts": category_counts,
         "visibility_labels": DOC_VISIBILITY_LABELS,
         "pending_count": pending_count,
         "page": "docs",

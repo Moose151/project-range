@@ -89,6 +89,16 @@
         {% else %}
         <span class="text-muted small fst-italic">No signals yet{% if user.role != 'observer' %} — <a href="/packages/{{ pkg.id }}">add signals</a>{% endif %}</span>
         {% endif %}
+        {% set health_badges = package_health.get(pkg.id, []) if package_health is defined else [] %}
+        {% if health_badges %}
+        <div class="d-flex flex-wrap gap-1 mt-2">
+          {% for badge in health_badges %}
+          <span class="badge text-bg-{{ badge.severity }}" title="{{ badge.detail }}">
+            <i class="bi {{ badge.icon }} me-1"></i>{{ badge.label }}
+          </span>
+          {% endfor %}
+        </div>
+        {% endif %}
       </div>
       <div class="card-footer text-muted small d-flex justify-content-between">
         <span>Created {{ pkg.created_at.strftime('%d/%m/%Y') }} by {{ pkg.created_by.display_name }}</span>

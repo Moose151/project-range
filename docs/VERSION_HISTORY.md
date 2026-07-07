@@ -1,7 +1,17 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.25.0**
+Current version: **0.25.1**
+
+---
+
+## 0.25.1 — Handover Open Issues + Readiness Badges
+
+- **Handover Open Issues:** `/handover`, print/PDF, and XLSX export now include an **Open Issues** section that surfaces faulted active signals, open/investigating incidents, CDA windows currently active or due soon, package readiness warnings for active serial packages, and recent CBM/SNMP sync issue audit entries. If nothing needs attention, the handover page shows a clear all-good message.
+- **Serial readiness badges:** Pending and active serial cards now show compact readiness badges for assigned packages, CDA assignment, symbol-rate completeness, source/modem assignment, and spectrum readiness. This makes it easier to see whether a prepared serial is ready to start.
+- **Package health badges:** Signal package cards now show operational health badges such as **No signals**, **Missing symbol rate**, **No modem/source**, **Incomplete CBM map**, **Used by active serial**, **History only**, or **Not assigned**.
+- **Documentation wiki layout polish:** The wiki home page has been reorganised into a cleaner search-and-browse layout with category counts, a real **Uncategorised** filter, calmer page result rows, recent/wanted side panels, and less visually noisy shortcuts. Documentation page actions are less cluttered, with administrator history/delete actions tucked into a compact menu and page side panels restyled for easier scanning.
+- **Shared operational health helper:** Added `app/ops_health.py` so package, serial, and handover readiness checks use the same rules instead of duplicating template logic.
 
 ---
 

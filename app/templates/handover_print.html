@@ -18,6 +18,7 @@
     .up { color: #1a7d1a; font-weight: bold; }
     .faulted { color: #c00; font-weight: bold; }
     .alert { color: #c00; font-weight: bold; }
+    .warning { color: #9a6700; font-weight: bold; }
     .sign { margin-top: 2.5em; font-size: 9pt; }
     .sign-row { margin-top: 1.6em; }
     .sign-line { display: inline-block; border-bottom: 1px solid #000; width: 220px; }
@@ -38,6 +39,32 @@
       <td><div class="label">Active Serials</div><div class="value">{{ serial_data | length }}</div></td>
     </tr>
   </table>
+
+  <h2>Open Issues</h2>
+  {% if open_issues and (open_issues.faulted_signals or open_issues.open_incidents or open_issues.cda_alerts or open_issues.package_warnings or open_issues.recent_sync) %}
+  <table>
+    <thead><tr><th>Type</th><th>Item</th><th>Detail</th></tr></thead>
+    <tbody>
+      {% for log in open_issues.faulted_signals %}
+      <tr><td class="alert">Faulted signal</td><td>{{ log.signal_name }}</td><td>{{ log.serial.title if log.serial else 'Active serial' }} · {{ log.timestamp.strftime('%H:%M %d/%m') }}</td></tr>
+      {% endfor %}
+      {% for incident in open_issues.open_incidents %}
+      <tr><td class="alert">Incident</td><td>{{ incident.title }}</td><td>{{ incident.severity | title }} · {{ incident.status | title }}{% if incident.affected %} · {{ incident.affected }}{% endif %}</td></tr>
+      {% endfor %}
+      {% for alert in open_issues.cda_alerts %}
+      <tr><td class="{% if alert.severity == 'danger' %}alert{% else %}warning{% endif %}">CDA</td><td>{{ alert.title }}</td><td>{{ alert.detail }}</td></tr>
+      {% endfor %}
+      {% for item in open_issues.package_warnings %}
+      <tr><td class="{% if item.badge.severity == 'danger' %}alert{% else %}warning{% endif %}">Package</td><td>{{ item.package.name }}</td><td>{{ item.badge.label }}{% if item.badge.detail %} · {{ item.badge.detail }}{% endif %}</td></tr>
+      {% endfor %}
+      {% for audit in open_issues.recent_sync %}
+      <tr><td class="warning">Sync</td><td>{{ audit.action_type }}</td><td>{{ (audit.comment or audit.new_value or '') | truncate(180) }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#1a7d1a;font-weight:bold">No open handover issues detected.</p>
+  {% endif %}
 
   {% if serial_data %}
   {% for sd in serial_data %}

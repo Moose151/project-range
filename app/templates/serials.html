@@ -54,6 +54,16 @@
               {% for sp in serial.package_links %}{{ sp.package.name }}{% if not loop.last %}, {% endif %}{% endfor %}
             </div>
             {% endif %}
+            {% set readiness = serial_readiness.get(serial.id, []) if serial_readiness is defined else [] %}
+            {% if readiness %}
+            <div class="d-flex flex-wrap gap-1 mt-2">
+              {% for badge in readiness %}
+              <span class="badge text-bg-{{ badge.severity }}" title="{{ badge.detail }}">
+                <i class="bi {{ badge.icon }} me-1"></i>{{ badge.label }}
+              </span>
+              {% endfor %}
+            </div>
+            {% endif %}
           </div>
           {% if user.role != 'observer' %}
           <div class="d-flex gap-2">
@@ -110,6 +120,16 @@
           <i class="bi bi-box-seam me-1"></i>Packages:
           {% for sp in serial.package_links %}
           <a href="/packages/{{ sp.package_id }}" class="text-decoration-none ms-1">{{ sp.package.name }}</a>{% if not loop.last %},{% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% set readiness = serial_readiness.get(serial.id, []) if serial_readiness is defined else [] %}
+        {% if readiness %}
+        <div class="d-flex flex-wrap gap-1 mb-2">
+          {% for badge in readiness %}
+          <span class="badge text-bg-{{ badge.severity }}" title="{{ badge.detail }}">
+            <i class="bi {{ badge.icon }} me-1"></i>{{ badge.label }}
+          </span>
           {% endfor %}
         </div>
         {% endif %}

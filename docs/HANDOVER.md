@@ -13,13 +13,19 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.25.0` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.25.1` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
 **DB:** SQLite at `/app/data/range.db` (named volume). `init_db.py` runs automatically on container start and is idempotent (migrations + new tables auto-create).
 
 ### Shipped (all on `main`, in order)
+- **0.25.1 — Handover open issues + readiness badges:**
+  - **Shared `app/ops_health.py` helper** now centralises lightweight operator-facing health checks for packages, serials, CDA windows, and handover issue surfacing.
+  - **Handover Open Issues** added to `/handover`, `/handover/print`, and `/handover/report.xlsx`. It lists faulted latest active signals, open/investigating incidents, active or soon-due CDA windows, package readiness warnings for packages assigned to active serials, and recent CBM/SNMP sync issue audit entries. If none are found, the handover page shows a clear no-open-issues message.
+  - **Serial readiness badges** added to pending and active serial cards in `serials.html`: package count/no-package warning, CDA assignment, symbol-rate completeness, source/modem assignment, and spectrum readiness.
+  - **Package health badges** added to package cards in `packages.html`: no signals, missing symbol rate, no modem/source, incomplete CBM mapping, used by active serial, history only, or not assigned.
+  - **Documentation wiki usability refresh:** `docs_home.html` is now a cleaner search/browse surface with category counts, an actual Uncategorised filter (`category=__uncategorized`), compact page rows, recent/wanted side panels, and calmer shortcut navigation. `docs_page.html` has a cleaner header, category breadcrumb, compact admin action menu, and lighter side panels. CSS cache key bumped to `app.css?v=32`.
 - **0.25.0 — Symbol rate enforcement + spectrum occupancy chart (3 views):**
   - **Symbol rate now required** on all `SignalPackageEntry` rows. `package_edit.html` adds `required` attribute + asterisk label. `packages.py` `package_signal_add` and `package_signal_update` validate and redirect with `?error=Symbol+rate+is+required` if empty. Existing rows missing a symbol rate show a warning badge in the signal table.
   - **Shared `drawSpectrumChart(canvas, signals, centreFreq, span, guardLeft, guardRight, view, freqMode)` function** added to `app/static/js/app.js` (v=32) along with `specToMHz`, `specModRate`, `specOccupiedBandwidthMHz`, `specFreqStep`, `specAutoSettings`. Reused by all three spectrum views.

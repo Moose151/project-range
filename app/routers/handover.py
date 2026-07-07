@@ -10,8 +10,9 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user, get_current_range_state, get_active_serials
+from app.deps import get_current_user, get_current_range_state, get_active_serials, is_testing_state
 from app.models import User, SignalLog, RangeStateLog
+from app.ops_health import handover_open_issues
 from app.routers.dashboard import _latest_signal_status, _buzzer_active
 
 router = APIRouter(prefix="/handover")
@@ -57,6 +58,7 @@ def _handover_ctx(db: Session) -> dict:
         "any_buzzer": any_buzzer,
         "recent_state_changes": recent_state_changes,
         "recent_notes": recent_notes,
+        "open_issues": handover_open_issues(db, active_serials, is_testing_state(db)),
         "generated_at": datetime.utcnow(),
     }
 
@@ -146,6 +148,23 @@ async def handover_report_xlsx(
     for note in ctx["recent_notes"]:
         ws.append([_fmt(note.timestamp), note.notes,
                    note.operator.display_name if note.operator else ""])
+
+    # Open issues
+    ws = wb.create_sheet("Open Issues")
+    ws.append(["Type", "Item", "Detail", "Severity"])
+    for c in ws[1]:
+        c.font = bold
+    issues = ctx["open_issues"]
+    for log in issues["faulted_signals"]:
+        ws.append(["Faulted signal", log.signal_name, log.serial.title if log.serial else "", "danger"])
+    for incident in issues["open_incidents"]:
+        ws.append(["Incident", incident.title, incident.status, incident.severity])
+    for alert in issues["cda_alerts"]:
+        ws.append(["CDA", alert["title"], alert["detail"], alert["severity"]])
+    for item in issues["package_warnings"]:
+        ws.append(["Package", item["package"].name, item["badge"]["label"], item["badge"]["severity"]])
+    for audit in issues["recent_sync"]:
+        ws.append(["Sync", audit.action_type, audit.comment or audit.new_value or "", "warning"])
 
     buf = io.BytesIO()
     wb.save(buf)

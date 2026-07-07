@@ -258,6 +258,98 @@ code {
 .wiki-article .doc-content {
   min-height: 22rem;
 }
+.docs-search {
+  max-width: 980px;
+}
+.docs-side-panel {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  background: var(--bs-tertiary-bg);
+  overflow: hidden;
+}
+.docs-side-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--bs-border-color);
+  color: var(--bs-secondary-color);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.docs-category-list .list-group-item {
+  border-color: var(--bs-border-color);
+  background: transparent;
+  color: var(--bs-body-color);
+}
+.docs-category-list .list-group-item:hover {
+  background: rgba(var(--range-accent-rgb), 0.10);
+}
+.docs-category-list .list-group-item.active {
+  border-color: rgba(var(--range-accent-rgb), 0.50);
+  background: rgba(var(--range-accent-rgb), 0.18);
+  color: var(--bs-body-color);
+}
+.docs-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.55rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.docs-page-list {
+  display: grid;
+  gap: 0.55rem;
+}
+.docs-page-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  background: var(--bs-tertiary-bg);
+  color: var(--bs-body-color);
+  text-decoration: none;
+}
+.docs-page-row:hover {
+  border-color: rgba(var(--range-accent-rgb), 0.70);
+  background: rgba(var(--range-accent-rgb), 0.08);
+  color: var(--bs-body-color);
+}
+.docs-page-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.4rem;
+  background: rgba(var(--range-accent-rgb), 0.14);
+  color: var(--range-accent);
+  flex: 0 0 auto;
+}
+.docs-tag-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.docs-tag-line span {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 999px;
+  padding: 0.08rem 0.45rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.76rem;
+}
+.docs-page-header .breadcrumb {
+  font-size: 0.82rem;
+}
 
 /* ── Instant chat dock ─────────────────────────────────────── */
 .chat-dock {
@@ -1382,4 +1474,3 @@ body.sidebar-collapsed .cease-btn { letter-spacing: 0; padding-left: 0; padding-
 .ebem-led-green  { background-color: #28a745; box-shadow: 0 0 4px #28a745aa; }
 .ebem-led-red    { background-color: #dc3545; box-shadow: 0 0 4px #dc3545aa; }
 .ebem-led-grey   { background-color: #6c757d; }
-

@@ -46,6 +46,71 @@
   </div>
 </div>
 
+<!-- Open issues -->
+{% if open_issues and (open_issues.faulted_signals or open_issues.open_incidents or open_issues.cda_alerts or open_issues.package_warnings or open_issues.recent_sync) %}
+<div class="card border-warning mb-4">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-exclamation-triangle text-warning"></i>
+    <span class="fw-semibold">Open Issues</span>
+    <span class="text-muted small">Items worth calling out before shift change</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="list-group list-group-flush">
+      {% for log in open_issues.faulted_signals %}
+      <a href="/logs?serial_id={{ log.serial_id }}&signal_name={{ log.signal_name | urlencode }}" class="list-group-item list-group-item-action d-flex align-items-start gap-2">
+        <i class="bi bi-broadcast-pin text-danger mt-1"></i>
+        <div>
+          <div class="fw-semibold">Faulted signal — {{ log.signal_name }}</div>
+          <div class="text-muted small">{{ log.serial.title if log.serial else 'Active serial' }} · last updated {{ log.timestamp.strftime('%H:%M %d/%m') }}</div>
+        </div>
+      </a>
+      {% endfor %}
+      {% for incident in open_issues.open_incidents %}
+      <a href="/incidents" class="list-group-item list-group-item-action d-flex align-items-start gap-2">
+        <i class="bi bi-exclamation-octagon text-danger mt-1"></i>
+        <div>
+          <div class="fw-semibold">{{ incident.severity | title }} incident — {{ incident.title }}</div>
+          <div class="text-muted small">{{ incident.status | title }}{% if incident.affected %} · {{ incident.affected }}{% endif %}</div>
+        </div>
+      </a>
+      {% endfor %}
+      {% for alert in open_issues.cda_alerts %}
+      <a href="/cda" class="list-group-item list-group-item-action d-flex align-items-start gap-2">
+        <i class="bi {{ alert.icon }} text-{{ alert.severity }} mt-1"></i>
+        <div>
+          <div class="fw-semibold">{{ alert.title }}</div>
+          <div class="text-muted small">{{ alert.detail }}</div>
+        </div>
+      </a>
+      {% endfor %}
+      {% for item in open_issues.package_warnings %}
+      <a href="/packages/{{ item.package.id }}" class="list-group-item list-group-item-action d-flex align-items-start gap-2">
+        <i class="bi {{ item.badge.icon }} text-{{ item.badge.severity }} mt-1"></i>
+        <div>
+          <div class="fw-semibold">Package warning — {{ item.package.name }}</div>
+          <div class="text-muted small">{{ item.badge.label }}{% if item.badge.detail %} · {{ item.badge.detail }}{% endif %}</div>
+        </div>
+      </a>
+      {% endfor %}
+      {% for audit in open_issues.recent_sync %}
+      <a href="/audit?action={{ audit.action_type }}" class="list-group-item list-group-item-action d-flex align-items-start gap-2">
+        <i class="bi bi-arrow-repeat text-warning mt-1"></i>
+        <div>
+          <div class="fw-semibold">Recent sync issue — {{ audit.action_type }}</div>
+          <div class="text-muted small">{{ (audit.comment or audit.new_value or '') | truncate(180) }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-4">
+  <i class="bi bi-check-circle"></i>
+  <span>No open handover issues detected from current serials, incidents, CDA windows, package readiness, or recent sync audits.</span>
+</div>
+{% endif %}
+
 <!-- Active serials -->
 {% if serial_data %}
 {% for sd in serial_data %}
