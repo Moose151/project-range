@@ -946,6 +946,81 @@ async def package_duplicate(
     return RedirectResponse(f"/packages/{copy.id}?toast=Package+duplicated", status_code=302)
 
 
+def _copy_package_to_workspace(
+    db: Session, pkg: "SignalPackage", target_testing: bool, actor_id: int
+) -> "SignalPackage":
+    """Copy a package and all its signals into the target workspace (is_testing).
+
+    cbm_device_id is cleared on the copy — CBM devices are workspace-specific and
+    the operator should re-assign the Source in the target workspace.
+    """
+    copy = SignalPackage(
+        name=pkg.name,
+        description=pkg.description,
+        band=pkg.band,
+        antenna=pkg.antenna,
+        tx_lo=pkg.tx_lo,
+        rx_lo=pkg.rx_lo,
+        ttf=pkg.ttf,
+        ttf_direction=pkg.ttf_direction,
+        freq_unit=pkg.freq_unit,
+        loop_mode=pkg.loop_mode,
+        is_testing=target_testing,
+        created_by_id=actor_id,
+    )
+    db.add(copy)
+    db.flush()
+    for entry in pkg.signals:
+        db.add(SignalPackageEntry(
+            package_id=copy.id,
+            display_order=entry.display_order,
+            signal_name=entry.signal_name,
+            description=entry.description,
+            band=entry.band,
+            tx_if=entry.tx_if, tx_rf=entry.tx_rf,
+            rx_rf=entry.rx_rf, rx_if=entry.rx_if,
+            freq_unit=entry.freq_unit,
+            modulation=entry.modulation,
+            fec=entry.fec,
+            inner_code=entry.inner_code,
+            symbol_rate=entry.symbol_rate,
+            power=entry.power, power_unit=entry.power_unit,
+            eb_no=None,
+            source=entry.source,
+            antenna=entry.antenna,
+            cbm_device_id=None,   # device IDs are workspace-specific
+            cbm_path=entry.cbm_path,
+            notes=entry.notes,
+        ))
+    return copy
+
+
+@router.post("/{pkg_id:int}/copy-to-other")
+async def package_copy_to_other(
+    pkg_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Copy a package into the other workspace (Live ↔ Sandbox)."""
+    testing = is_testing_state(db)
+    orig = db.query(SignalPackage).filter(
+        SignalPackage.id == pkg_id, SignalPackage.is_testing == testing,
+    ).first()
+    if not orig:
+        return RedirectResponse("/packages", status_code=302)
+    target = not testing
+    copy = _copy_package_to_workspace(db, orig, target, current_user.id)
+    dest = "Sandbox" if target else "Live"
+    db.add(AuditLog(
+        user_id=current_user.id, action_type="PACKAGE_COPY_WORKSPACE",
+        entity_type="SignalPackage", entity_id=copy.id,
+        new_value=f"Copied '{orig.name}' from {'Sandbox' if testing else 'Live'} to {dest}",
+    ))
+    db.commit()
+    msg = f'Package "{orig.name}" copied to {dest}'
+    return RedirectResponse(f"/packages?toast={quote_plus(msg)}", status_code=302)
+
+
 @router.post("/{pkg_id:int}/signals/reorder")
 async def package_signals_reorder(
     pkg_id: int,

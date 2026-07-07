@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -86,6 +87,32 @@ def _is_negative_state(value: str | None) -> bool:
         "OFF", "DISABLE", "DISABLED", "INACTIVE", "DISENGAGED", "IDLE",
         "LINK_DOWN", "NOLOCK", "NO_LOCK", "NOSYNC", "NO_SYNC", "DOWN",
         "RED", "FALSE", "0",
+    }
+
+
+def _led_state(value: str | None) -> bool | None:
+    """Convert a raw modem status string to a tri-state LED value."""
+    if _is_positive_state(value):
+        return True
+    if _is_negative_state(value):
+        return False
+    return None
+
+
+def sync_states_from_snapshot(snapshot: "CBMSnapshot") -> dict:
+    """Extract the three EBEM LED states from a snapshot for dashboard display.
+
+    Returns a dict suitable for JSON storage on RFDevice.cbm_sync_state_json:
+      ebem_sync    — ESYNC_STAT (Embedded Channel Sync)
+      carrier_lock — ACQ_STATE  (Carrier / acquisition lock)
+      bit_sync     — BSYNC_STAT (Bit sync)
+    Values are True (green), False (red), or None (grey / no data).
+    """
+    s = snapshot.status
+    return {
+        "ebem_sync": _led_state(s.get("ESYNC_STAT")),
+        "carrier_lock": _led_state(s.get("ACQ_STATE")),
+        "bit_sync": _led_state(s.get("BSYNC_STAT")),
     }
 
 
@@ -227,6 +254,9 @@ def sync_active_cbms(db: Session, actor_id: int | None, audit_when_noop: bool = 
                 device.cbm_last_sync_at = datetime.utcnow()
                 device.cbm_last_sync_status = "ok"
                 device.cbm_last_sync_error = None
+                device.cbm_sync_state_json = json.dumps(
+                    sync_states_from_snapshot(snapshots[device_id])
+                )
             except CBMError as exc:
                 device.cbm_last_sync_at = datetime.utcnow()
                 device.cbm_last_sync_status = "error"

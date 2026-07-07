@@ -323,3 +323,69 @@ async def serial_rf_config(
                              "ttf_direction": "+", "freq_unit": "MHz",
                              "band": None, "antenna": None})
     return JSONResponse(config)
+
+
+@router.post("/{serial_id}/copy-to-other")
+async def serial_copy_to_other(
+    serial_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Copy a serial (as Pending) into the other workspace (Live ↔ Sandbox).
+
+    Packages are also carried across: for each package assigned to the serial, if a
+    package with the same name already exists in the target workspace it is reused;
+    otherwise it is copied. Signal logs and CDA assignments are not copied — the serial
+    arrives in the target workspace as a fresh Pending serial ready to start.
+    """
+    from urllib.parse import quote_plus
+    from app.routers.packages import _copy_package_to_workspace
+
+    testing = is_testing_state(db)
+    orig = db.query(Serial).filter(
+        Serial.id == serial_id, Serial.is_testing == testing,
+    ).first()
+    if not orig:
+        return RedirectResponse("/serials", status_code=302)
+
+    target = not testing
+    dest = "Sandbox" if target else "Live"
+
+    # Resolve or copy packages into the target workspace.
+    target_pkg_ids: list[int] = []
+    for link in orig.package_links:
+        pkg = link.package
+        if pkg is None:
+            continue
+        existing = db.query(SignalPackage).filter(
+            SignalPackage.name == pkg.name,
+            SignalPackage.is_testing == target,
+        ).first()
+        if existing:
+            target_pkg_ids.append(existing.id)
+        else:
+            copy_pkg = _copy_package_to_workspace(db, pkg, target, current_user.id)
+            db.flush()
+            target_pkg_ids.append(copy_pkg.id)
+
+    # Create the serial in the target workspace (Pending, not started).
+    new_serial = Serial(
+        title=orig.title,
+        notes=orig.notes,
+        opened_by_id=current_user.id,
+        is_testing=target,
+    )
+    db.add(new_serial)
+    db.flush()
+
+    for pkg_id in target_pkg_ids:
+        db.add(SerialPackage(serial_id=new_serial.id, package_id=pkg_id))
+
+    db.add(AuditLog(
+        user_id=current_user.id, action_type="SERIAL_COPY_WORKSPACE",
+        entity_type="Serial", entity_id=new_serial.id,
+        new_value=f"Copied '{orig.title}' from {'Sandbox' if testing else 'Live'} to {dest}",
+    ))
+    db.commit()
+    msg = f'Serial "{orig.title}" copied to {dest} as Pending'
+    return RedirectResponse(f"/serials?toast={quote_plus(msg)}", status_code=302)

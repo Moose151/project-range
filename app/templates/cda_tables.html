@@ -17,8 +17,8 @@
     {% if cda_tables %}
     <div class="list-group">
       {% for t in cda_tables %}
-      <a href="/cda/{{ t.id }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3">
-        <div class="flex-grow-1">
+      <div class="list-group-item d-flex align-items-center gap-3">
+        <a href="/cda/{{ t.id }}" class="flex-grow-1 text-decoration-none text-body">
           <div class="fw-semibold">{{ t.name }}</div>
           {% if t.description %}
           <div class="text-muted small">{{ t.description }}</div>
@@ -28,9 +28,17 @@
             &nbsp;·&nbsp;
             <i class="bi bi-collection-play me-1"></i>{{ t.serial_links | length }} serial{{ 's' if t.serial_links | length != 1 else '' }} assigned
           </div>
-        </div>
-        <span class="text-muted"><i class="bi bi-chevron-right"></i></span>
-      </a>
+        </a>
+        {% if user.role != 'observer' %}
+        <form method="post" action="/cda/{{ t.id }}/copy-to-other" class="d-flex align-items-center">
+          <button type="submit" class="btn btn-sm btn-outline-info"
+                  title="Copy to {% if range_state == 'Testing' %}Live{% else %}Sandbox{% endif %}">
+            <i class="bi bi-box-arrow-in-right me-1"></i>{% if range_state == 'Testing' %}→ Live{% else %}→ Sandbox{% endif %}
+          </button>
+        </form>
+        {% endif %}
+        <a href="/cda/{{ t.id }}" class="text-muted"><i class="bi bi-chevron-right"></i></a>
+      </div>
       {% endfor %}
     </div>
     {% else %}

@@ -55,6 +55,12 @@
             <a href="/serials/{{ serial.id }}/start" class="btn btn-sm btn-success">
               <i class="bi bi-play-circle me-1"></i>Start
             </a>
+            <form method="post" action="/serials/{{ serial.id }}/copy-to-other"
+                  title="Copy to {% if range_state == 'Testing' %}Live{% else %}Sandbox{% endif %}">
+              <button type="submit" class="btn btn-sm btn-outline-info">
+                <i class="bi bi-box-arrow-in-right me-1"></i>→ {% if range_state == 'Testing' %}Live{% else %}Sandbox{% endif %}
+              </button>
+            </form>
             <form method="post" action="/serials/{{ serial.id }}/delete"
                   onsubmit="return confirm('Discard pending serial {{ serial.title | e }}?')">
               <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -154,6 +160,12 @@
           <i class="bi bi-speedometer2 me-1"></i>Dashboard
         </a>
         {% if user.role != 'observer' %}
+        <form method="post" action="/serials/{{ serial.id }}/copy-to-other"
+              title="Copy serial to {% if range_state == 'Testing' %}Live{% else %}Sandbox{% endif %} as Pending">
+          <button type="submit" class="btn btn-sm btn-outline-info">
+            <i class="bi bi-box-arrow-in-right me-1"></i>→ {% if range_state == 'Testing' %}Live{% else %}Sandbox{% endif %}
+          </button>
+        </form>
         <form method="post" action="/serials/{{ serial.id }}/end" class="ms-auto"
               onsubmit="return confirm('End serial {{ serial.title | e }}? It will be moved to history.')">
           <button type="submit" class="btn btn-sm btn-danger">

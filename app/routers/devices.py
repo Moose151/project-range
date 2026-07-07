@@ -22,7 +22,7 @@ from app.snmp_sync import (
     poll_active_snmp_devices, poll_snmp_device, ignored_module_idxs, _device_credentials,
 )
 from app.crypto import decrypt_secret, encrypt_secret
-from app.models import RFDevice, DevicePort, DeviceLink, AuditLog, User
+from app.models import RFDevice, DevicePort, DeviceLink, AuditLog, User, RoutingPreset
 from app.templating import templates
 
 router = APIRouter(prefix="/devices")
@@ -575,6 +575,14 @@ async def device_routing_page(
         for p in (inputs if routing_mode == "input_to_output" else outputs)
     )
 
+    presets = db.query(RoutingPreset).filter(RoutingPreset.device_id == dev_id).order_by(RoutingPreset.range_state).all()
+    presets_by_state: dict[str, RoutingPreset | None] = {}
+    for p in presets:
+        presets_by_state[p.range_state] = p
+
+    from app.models import RangeState as _RS
+    preset_states = [s.value for s in _RS if s != _RS.TESTING]
+
     return templates.TemplateResponse(request, "device_routing.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
@@ -592,6 +600,8 @@ async def device_routing_page(
         "snmp_modules": _load_snmp_modules(dev),
         "ignored_modules": ignored_module_idxs(dev),
         "has_observed_routing": has_observed_routing,
+        "presets_by_state": presets_by_state,
+        "preset_states": preset_states,
         "toast": request.query_params.get("toast", ""),
         "page": "devices",
     })
@@ -624,6 +634,72 @@ async def device_routing_save(
                     entity_type="RFDevice", entity_id=dev.id, new_value=dev.name))
     db.commit()
     return RedirectResponse(f"/devices/{dev_id}/routing?toast=Routing+saved", status_code=302)
+
+
+@router.post("/{dev_id}/routing-presets/save")
+async def routing_preset_save(
+    dev_id: int,
+    preset_range_state: str = Form(...),
+    preset_name: str = Form(""),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Save the currently observed SNMP routing as a preset for a given range state."""
+    dev = db.query(RFDevice).filter(RFDevice.id == dev_id, RFDevice.is_testing == is_testing_state(db)).first()
+    if not dev:
+        return RedirectResponse("/devices", status_code=302)
+
+    routing_mode = "input_to_output" if dev.device_type == "combiner" else "output_to_input"
+    routes: dict[str, int] = {}
+    if routing_mode == "input_to_output":
+        for p in dev.ports:
+            if p.direction == "in" and p.observed_routed_from is not None:
+                routes[str(p.idx)] = p.observed_routed_from
+    else:
+        for p in dev.ports:
+            if p.direction == "out" and p.observed_routed_from is not None:
+                routes[str(p.idx)] = p.observed_routed_from
+
+    existing = db.query(RoutingPreset).filter(
+        RoutingPreset.device_id == dev_id,
+        RoutingPreset.range_state == preset_range_state,
+    ).first()
+    if existing:
+        existing.routes_json = json.dumps(routes)
+        existing.name = preset_name.strip() or None
+        existing.created_by_id = current_user.id
+        existing.created_at = datetime.utcnow()
+    else:
+        db.add(RoutingPreset(
+            device_id=dev_id,
+            range_state=preset_range_state,
+            name=preset_name.strip() or None,
+            routes_json=json.dumps(routes),
+            created_by_id=current_user.id,
+        ))
+    db.add(AuditLog(user_id=current_user.id, action_type="ROUTING_PRESET_SAVE",
+                    entity_type="RFDevice", entity_id=dev.id,
+                    new_value=f"{dev.name} → {preset_range_state}"))
+    db.commit()
+    msg = f"Routing preset saved for {preset_range_state}"
+    return RedirectResponse(f"/devices/{dev_id}/routing?toast={quote_plus(msg)}", status_code=302)
+
+
+@router.post("/{dev_id}/routing-presets/{preset_id}/delete")
+async def routing_preset_delete(
+    dev_id: int,
+    preset_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    preset = db.query(RoutingPreset).filter(
+        RoutingPreset.id == preset_id,
+        RoutingPreset.device_id == dev_id,
+    ).first()
+    if preset:
+        db.delete(preset)
+        db.commit()
+    return RedirectResponse(f"/devices/{dev_id}/routing?toast=Routing+preset+deleted", status_code=302)
 
 
 # ── Topology ──────────────────────────────────────────────────────────────────

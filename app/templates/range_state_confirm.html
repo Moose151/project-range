@@ -74,8 +74,77 @@
           <div class="mb-3">
             <label class="form-label">Reason / Comment <span class="text-danger">*</span></label>
             <textarea class="form-control" name="reason" rows="3"
-                      placeholder="e.g. Starting live trial with customer X" required></textarea>
+                      placeholder="e.g. Starting live trial with customer X"
+                      required>{{ reason_value or '' }}</textarea>
           </div>
+
+          {# ── Routing mismatch warning (shown after first submit if presets exist) ── #}
+          {% if routing_mismatches %}
+          <div class="alert alert-warning mb-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-diagram-3-fill fs-5"></i>
+              <strong>Routing check — action required before confirming</strong>
+            </div>
+            <p class="small mb-2">
+              The following devices have routing presets for <strong>{{ target_state }}</strong>.
+              The observed routing does not fully match. Adjust the physical hardware before proceeding,
+              or tick the box below to proceed anyway and update routing manually.
+            </p>
+            {% for m in routing_mismatches %}
+            <div class="border border-warning rounded p-2 mb-2">
+              <div class="fw-semibold small mb-1">
+                <i class="bi bi-hdd-rack me-1"></i>{{ m.device }}
+                <a href="/devices/{{ m.device_id }}/routing" class="ms-2 text-warning small" target="_blank" rel="noopener">
+                  <i class="bi bi-box-arrow-up-right"></i> View routing
+                </a>
+              </div>
+              {% if m.changes %}
+              <table class="table table-sm table-dark mb-1" style="font-size:0.8rem">
+                <thead><tr>
+                  <th>Port</th>
+                  <th>Required for {{ target_state }}</th>
+                  <th>Currently observed</th>
+                </tr></thead>
+                <tbody>
+                  {% for c in m.changes %}
+                  <tr>
+                    <td class="fw-semibold">{{ c.port }}</td>
+                    <td class="text-success">{{ c.required }}</td>
+                    <td class="text-danger">{{ c.current }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              {% endif %}
+              {% if m.unverified %}
+              <div class="small text-warning mt-1">
+                <i class="bi bi-question-circle me-1"></i>
+                Unverified (no SNMP data):
+                {% for u in m.unverified %}
+                <span class="badge bg-secondary">{{ u.port }} → {{ u.required }}</span>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+            {% endfor %}
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" name="routing_confirmed" value="1"
+                     id="routingConfirmedChk" {% if routing_confirmed %}checked{% endif %}
+                     required>
+              <label class="form-check-label small" for="routingConfirmedChk">
+                I have reviewed the routing requirements and understand the routing may not match the preset.
+                I will adjust the hardware manually or accept the current routing.
+              </label>
+            </div>
+          </div>
+          {% else %}
+          <input type="hidden" name="routing_confirmed" value="1">
+          {% endif %}
+
+          {# Carry acknowledge through second-submit when routing mismatch warning is shown #}
+          {% if acknowledge_value %}
+          <input type="hidden" name="acknowledge" value="{{ acknowledge_value }}">
+          {% endif %}
 
           <div class="d-flex gap-2">
             <button type="submit" class="btn btn-warning flex-grow-1">

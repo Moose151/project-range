@@ -550,6 +550,9 @@ class RFDevice(Base):
     # and a JSON cache of the last-polled module table for the health panel + mute UI.
     snmp_ignored_modules: Mapped[str | None] = mapped_column(Text, nullable=True)
     snmp_modules_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # JSON cache of the last-polled EBEM sync LED states (for dashboard display).
+    # Format: {"ebem_sync": true|false|null, "carrier_lock": true|false|null, "bit_sync": true|false|null}
+    cbm_sync_state_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     location: Mapped[str | None] = mapped_column(String(128), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     num_inputs: Mapped[int] = mapped_column(Integer, default=16)
@@ -731,6 +734,31 @@ class CeaseEvent(Base):
     @property
     def is_active(self) -> bool:
         return self.dismissed_at is None
+
+
+class RoutingPreset(Base):
+    """Desired routing configuration for a splitter/combiner matrix at a given range state.
+
+    routes_json stores the target routing as a JSON dict keyed by the primary port index
+    (str) → the port it routes from/to (int).
+      - Splitters (output_to_input): key = output port idx, value = input port idx to route from.
+      - Combiners  (input_to_output): key = input port idx, value = output port idx to route to.
+    Only ports that should have a specific route need to be listed; unspecified ports are ignored
+    in the comparison. This lets admins define a partial preset (e.g. "only these outputs must
+    route from these inputs") without specifying every port.
+    """
+    __tablename__ = "routing_presets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    device_id: Mapped[int] = mapped_column(ForeignKey("rf_devices.id"), nullable=False, index=True)
+    range_state: Mapped[str] = mapped_column(String(32), nullable=False)  # "Live", "Closed Loop", etc.
+    name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    routes_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    device: Mapped["RFDevice"] = relationship("RFDevice")
+    created_by: Mapped["User"] = relationship("User", foreign_keys=[created_by_id])
 
 
 def _session_testing_state(session: SASession) -> bool:

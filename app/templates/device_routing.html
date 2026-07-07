@@ -195,7 +195,7 @@
 
 {# ── Planned routing & port labels (manual — collapsible) ── #}
 {% if user.role == 'administrator' %}
-<details class="card border-secondary" {% if not device.snmp_enabled %}open{% endif %}>
+<details class="card border-secondary mb-3" {% if not device.snmp_enabled %}open{% endif %}>
   <summary class="card-header d-flex align-items-center" style="cursor:pointer;list-style:none">
     <i class="bi bi-pencil-square me-2"></i>Planned routing &amp; port labels
     <span class="text-muted small ms-2">— your intended wiring, compared against the live state above</span>
@@ -254,6 +254,96 @@
       <button type="submit" class="btn btn-primary mt-3"><i class="bi bi-check2 me-1"></i>Save planned routing</button>
       <span class="text-muted small ms-2">Labels here override the device names; leave blank to use the device's own names.</span>
     </form>
+  </div>
+</details>
+
+{# ── Routing presets (per range state) ── #}
+<details class="card border-secondary" {% if presets_by_state %}open{% endif %}>
+  <summary class="card-header d-flex align-items-center" style="cursor:pointer;list-style:none">
+    <i class="bi bi-bookmark-star me-2"></i>Routing presets
+    <span class="text-muted small ms-2">— snapshot the live SNMP routing to use as the expected config for each range state</span>
+    <i class="bi bi-chevron-down ms-auto"></i>
+  </summary>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Configure the hardware to the correct routing, poll SNMP, then click <strong>Save current</strong> for that state.
+      When the operator changes range state, any mismatches against these presets will be highlighted as a warning before they confirm.
+    </p>
+    {% if not has_observed_routing %}
+    <div class="alert alert-warning py-2 small mb-3">
+      <i class="bi bi-exclamation-triangle me-1"></i>
+      No live routing data yet — SNMP poll this device first so there is a routing snapshot to save.
+    </div>
+    {% endif %}
+    <div class="row g-3">
+      {% for state in preset_states %}
+      {% set preset = presets_by_state.get(state) %}
+      <div class="col-lg-4">
+        <div class="card border-{% if preset %}success{% else %}secondary{% endif %} h-100">
+          <div class="card-header py-2 d-flex align-items-center gap-2">
+            <span class="fw-semibold small">{{ state }}</span>
+            {% if preset %}
+            <span class="badge bg-success ms-auto">Preset saved</span>
+            {% else %}
+            <span class="badge bg-secondary ms-auto">Not set</span>
+            {% endif %}
+          </div>
+          <div class="card-body py-2">
+            {% if preset %}
+            {# Show what the preset specifies #}
+            {% set routes = preset.routes_json | from_json %}
+            {% if routes %}
+            <table class="table table-dark table-sm align-middle mb-2" style="font-size:0.8rem">
+              <tbody>
+                {% for port_key, src_idx in routes.items() %}
+                {% set pidx = port_key | int %}
+                {% if routing_mode == 'output_to_input' %}
+                <tr>
+                  <td class="text-warning text-nowrap">O{{ pidx }}</td>
+                  <td class="text-muted px-1">←</td>
+                  <td class="text-info">I{{ src_idx }} · {{ in_name.get(src_idx, 'Input ' ~ src_idx) }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td class="text-info text-nowrap">I{{ pidx }}</td>
+                  <td class="text-muted px-1">→</td>
+                  <td class="text-warning">O{{ src_idx }} · {{ out_name.get(src_idx, 'Output ' ~ src_idx) }}</td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <div class="text-muted small fst-italic mb-2">No routes recorded (all unrouted).</div>
+            {% endif %}
+            <div class="text-muted" style="font-size:0.75rem">
+              Saved {{ preset.created_at.strftime('%d %b %Y %H:%M') }} by {{ preset.created_by.display_name }}
+            </div>
+            {% else %}
+            <div class="text-muted small fst-italic">No preset configured for this state.</div>
+            {% endif %}
+          </div>
+          <div class="card-footer py-2 d-flex gap-2">
+            <form method="post" action="/devices/{{ device.id }}/routing-presets/save">
+              <input type="hidden" name="preset_range_state" value="{{ state }}">
+              <button type="submit" class="btn btn-sm {% if preset %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                      {% if not has_observed_routing %}disabled title="No observed routing to save"{% endif %}>
+                <i class="bi bi-floppy me-1"></i>{% if preset %}Update{% else %}Save current{% endif %}
+              </button>
+            </form>
+            {% if preset %}
+            <form method="post" action="/devices/{{ device.id }}/routing-presets/{{ preset.id }}/delete"
+                  onsubmit="return confirm('Delete the routing preset for {{ state | e }}?')">
+              <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete preset">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
   </div>
 </details>
 {% endif %}

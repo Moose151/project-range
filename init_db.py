@@ -13,7 +13,7 @@ from app.models import (
     User, RangeStateLog, Signal, ModulationType, FecType, SignalSource, AntennaType,
     LogSession, SignalPackage, SignalPackageEntry, Serial, SerialPackage,
     DocPage, DocVersion, DocLink, DocAlias, AppSetting, RFDevice, DevicePort, DeviceLink,
-    CDATable, CDAWindow, SerialCDATable, Incident, CeaseEvent, DutyRole,
+    CDATable, CDAWindow, SerialCDATable, Incident, CeaseEvent, DutyRole, RoutingPreset,
 )
 from app.auth import hash_password
 from sqlalchemy.orm import Session
@@ -147,6 +147,7 @@ def _migrate(conn):
         "ALTER TABLE rf_devices ADD COLUMN snmp_system_alarm VARCHAR(16)",
         "ALTER TABLE rf_devices ADD COLUMN snmp_ignored_modules TEXT",
         "ALTER TABLE rf_devices ADD COLUMN snmp_modules_json TEXT",
+        "ALTER TABLE rf_devices ADD COLUMN cbm_sync_state_json TEXT",
         "ALTER TABLE device_ports ADD COLUMN observed_routed_from INTEGER",
         "ALTER TABLE device_ports ADD COLUMN observed_label VARCHAR(128)",
     ]

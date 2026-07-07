@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -6,7 +8,7 @@ from app.database import get_db
 from app.deps import get_current_user, get_current_range_state
 from app.models import (
     User, RangeStateLog, AuditLog, RangeState, Role,
-    RFDevice, DevicePort, DeviceLink, CDATable, CDAWindow,
+    RFDevice, DevicePort, DeviceLink, CDATable, CDAWindow, RoutingPreset,
 )
 from app.auth import verify_password
 
@@ -14,6 +16,88 @@ router = APIRouter(prefix="/range-state")
 from app.templating import templates
 
 VALID_STATES = [s.value for s in RangeState]
+
+
+def _routing_mismatches(db: Session, target_state: str) -> list[dict]:
+    """Return per-device lists of routing changes required to match the preset for target_state.
+
+    Only includes devices that have SNMP polling enabled and have been polled at least once
+    (i.e. have observed_routed_from data). A device with a preset but no observed data is
+    flagged separately so the operator knows the check couldn't be performed.
+    """
+    presets = db.query(RoutingPreset).filter(RoutingPreset.range_state == target_state).all()
+    result: list[dict] = []
+    for preset in presets:
+        try:
+            routes: dict[str, int] = json.loads(preset.routes_json or "{}")
+        except (ValueError, TypeError):
+            continue
+        if not routes:
+            continue
+        dev = preset.device
+        if not dev:
+            continue
+
+        routing_mode = "input_to_output" if dev.device_type == "combiner" else "output_to_input"
+
+        # Map port idx → observed routing value
+        observed: dict[str, int | None] = {}
+        if routing_mode == "input_to_output":
+            for p in dev.ports:
+                if p.direction == "in" and p.idx is not None:
+                    observed[str(p.idx)] = p.observed_routed_from
+        else:
+            for p in dev.ports:
+                if p.direction == "out" and p.idx is not None:
+                    observed[str(p.idx)] = p.observed_routed_from
+
+        # Has the device been polled at all?
+        has_observed = any(v is not None for v in observed.values())
+
+        # Build port label maps for readable output
+        in_name: dict[int, str] = {}
+        out_name: dict[int, str] = {}
+        for p in dev.ports:
+            if p.direction == "in":
+                in_name[p.idx] = p.observed_label or p.label or f"Input {p.idx}"
+            else:
+                out_name[p.idx] = p.observed_label or p.label or f"Output {p.idx}"
+
+        changes: list[dict] = []
+        unverified: list[dict] = []
+
+        for port_key, target_from in routes.items():
+            port_idx = int(port_key)
+            current_from = observed.get(port_key)
+
+            if routing_mode == "output_to_input":
+                port_label = out_name.get(port_idx, f"Output {port_idx}")
+                required_label = in_name.get(target_from, f"Input {target_from}")
+                current_label = in_name.get(current_from, f"Input {current_from}") if current_from else "not routed"
+            else:
+                port_label = in_name.get(port_idx, f"Input {port_idx}")
+                required_label = out_name.get(target_from, f"Output {target_from}")
+                current_label = out_name.get(current_from, f"Output {current_from}") if current_from else "not routed"
+
+            if not has_observed or port_key not in observed:
+                unverified.append({"port": port_label, "required": required_label})
+            elif current_from != target_from:
+                changes.append({
+                    "port": port_label,
+                    "required": required_label,
+                    "current": current_label,
+                })
+
+        if changes or unverified:
+            result.append({
+                "device": dev.name,
+                "device_id": dev.id,
+                "changes": changes,
+                "unverified": unverified,
+                "polled": has_observed,
+            })
+
+    return result
 
 
 def _state_payload(db: Session) -> dict:
@@ -110,14 +194,17 @@ def _ensure_testing_workspace(db: Session, current_user: User) -> None:
                 ))
 
 
-def _render_change(request, db, current_user, current, error):
+def _render_change(request, db, current_user, current, error,
+                   target_state="", routing_mismatches=None, routing_confirmed=False):
     return templates.TemplateResponse(request, "range_state_confirm.html", {
         "user": current_user,
         "current_state": current,
-        "target_state": "Live",
+        "target_state": target_state or "Live",
         "valid_states": _available_states(current, current_user),
         "range_state": current,
         "error": error,
+        "routing_mismatches": routing_mismatches or [],
+        "routing_confirmed": routing_confirmed,
         "page": "range_state",
     }, status_code=400)
 
@@ -130,12 +217,15 @@ async def change_state_page(
     current_user: User = Depends(get_current_user),
 ):
     current = get_current_range_state(db)
+    mismatches = _routing_mismatches(db, target) if target else []
     return templates.TemplateResponse(request, "range_state_confirm.html", {
         "user": current_user,
         "current_state": current,
         "target_state": target,
         "valid_states": _available_states(current, current_user),
         "range_state": current,
+        "routing_mismatches": mismatches,
+        "routing_confirmed": False,
         "page": "range_state",
     })
 
@@ -156,6 +246,7 @@ async def change_state_submit(
     acknowledge: str = Form(""),
     supervisor_username: str = Form(""),
     supervisor_password: str = Form(""),
+    routing_confirmed: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -167,19 +258,41 @@ async def change_state_submit(
         return RedirectResponse("/", status_code=302)
     if current == RangeState.TESTING.value and current_user.role != Role.SUPERVISOR:
         return _render_change(request, db, current_user, current,
-                              "Only an administrator can change the range out of Testing.")
+                              "Only an administrator can change the range out of Testing.",
+                              target_state=new_state)
     if new_state == RangeState.TESTING.value and current_user.role != Role.SUPERVISOR:
         return _render_change(request, db, current_user, current,
-                              "Only an administrator can place the range into Testing.")
+                              "Only an administrator can place the range into Testing.",
+                              target_state=new_state)
 
     reason = reason.strip()
     approver = current_user  # who authorised the change
+
+    # Routing preset check — show before Live auth so supervisor creds aren't needed twice.
+    # Advisory only: operator can proceed by confirming they've reviewed the routing.
+    if routing_confirmed != "1":
+        mismatches = _routing_mismatches(db, new_state)
+        if mismatches:
+            return templates.TemplateResponse(request, "range_state_confirm.html", {
+                "user": current_user,
+                "current_state": current,
+                "target_state": new_state,
+                "valid_states": _available_states(current, current_user),
+                "range_state": current,
+                "error": None,
+                "routing_mismatches": mismatches,
+                "routing_confirmed": False,
+                "acknowledge_value": acknowledge,
+                "reason_value": reason,
+                "page": "range_state",
+            }, status_code=200)
 
     # Going Live requires a safety acknowledgment and administrator authorisation.
     if new_state == "Live":
         if acknowledge != "1":
             return _render_change(request, db, current_user, current,
-                                  "You must confirm the safety acknowledgment before going Live.")
+                                  "You must confirm the safety acknowledgment before going Live.",
+                                  target_state=new_state)
         if current_user.role != Role.SUPERVISOR:
             sup = db.query(User).filter(
                 User.username == supervisor_username.strip().lower(),
@@ -189,7 +302,8 @@ async def change_state_submit(
             ).first()
             if not sup or not verify_password(supervisor_password, sup.password_hash):
                 return _render_change(request, db, current_user, current,
-                                      "A valid administrator username and password are required to go Live.")
+                                      "A valid administrator username and password are required to go Live.",
+                                      target_state=new_state)
             approver = sup
             reason = f"{reason} [Authorised by {sup.display_name}; initiated by {current_user.display_name}]"
 

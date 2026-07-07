@@ -1,3 +1,4 @@
+import json
 from typing import Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, Form, Request
@@ -196,6 +197,35 @@ def _get_antennas(db: Session) -> list[str]:
     ]
 
 
+def _cbm_status_by_source(db: Session, testing: bool) -> dict[str, dict | None]:
+    """Return {device_name: sync_states_dict} for all CBM/EBEM-enabled modems.
+
+    Callers use this to show the EBEM LED column on the dashboard: signals whose
+    source matches a device name in this dict are EBEM signals; others show N/A.
+    sync_states_dict has keys: ebem_sync, carrier_lock, bit_sync (True/False/None).
+    """
+    devices = (
+        db.query(RFDevice)
+        .filter(
+            RFDevice.is_active == True,
+            RFDevice.device_type == "modem",
+            RFDevice.cbm_sync_enabled == True,
+            RFDevice.is_testing == testing,
+        )
+        .all()
+    )
+    result: dict[str, dict | None] = {}
+    for device in devices:
+        if device.cbm_sync_state_json:
+            try:
+                result[device.name] = json.loads(device.cbm_sync_state_json)
+            except (ValueError, TypeError):
+                result[device.name] = None
+        else:
+            result[device.name] = None
+    return result
+
+
 def _get_exclusivity_map(db: Session) -> dict[str, list[str]]:
     """Return {signal_name: [sibling_names]} for signals in exclusivity groups."""
     sigs = db.query(Signal).filter(
@@ -279,9 +309,11 @@ def _dashboard_ctx(db: Session) -> dict:
             cda_by_serial[serial.id] = tables
 
     global_signals = [s for sd in serial_data for s in sd["signals"]]
+    testing = is_testing_state(db)
     return {
         "serial_data": serial_data,
         "active_serials": active_serials,
+        "cbm_status_by_source": _cbm_status_by_source(db, testing),
         # Flat signals list kept for the OOB buzzer swap (any signal across all serials)
         "signals": global_signals,
         # Global aggregates for the summary cards (kept fresh on every poll via OOB)

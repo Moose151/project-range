@@ -404,3 +404,44 @@ async def cda_window_edit(
     ))
     db.commit()
     return RedirectResponse(f"/cda/{table_id}?toast=Window+updated", status_code=302)
+
+
+@router.post("/{table_id}/copy-to-other")
+async def cda_copy_to_other(
+    table_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Copy a CDA table and all its windows into the other workspace (Live ↔ Sandbox)."""
+    testing = is_testing_state(db)
+    orig = db.query(CDATable).filter(
+        CDATable.id == table_id, CDATable.is_testing == testing,
+    ).first()
+    if not orig:
+        return RedirectResponse("/cda", status_code=302)
+    target = not testing
+    copy = CDATable(
+        name=orig.name,
+        description=orig.description,
+        created_by_id=current_user.id,
+        is_testing=target,
+    )
+    db.add(copy)
+    db.flush()
+    for window in orig.windows:
+        db.add(CDAWindow(
+            cda_table_id=copy.id,
+            label=window.label,
+            start_zulu=window.start_zulu,
+            end_zulu=window.end_zulu,
+            max_power_dbm=window.max_power_dbm,
+        ))
+    dest = "Sandbox" if target else "Live"
+    db.add(AuditLog(
+        user_id=current_user.id, action_type="CDA_COPY_WORKSPACE",
+        entity_type="CDATable", entity_id=copy.id,
+        new_value=f"Copied '{orig.name}' from {'Sandbox' if testing else 'Live'} to {dest}",
+    ))
+    db.commit()
+    msg = f'CDA table "{orig.name}" copied to {dest}'
+    return RedirectResponse(f"/cda?toast={quote_plus(msg)}", status_code=302)

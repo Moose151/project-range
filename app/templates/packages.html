@@ -60,6 +60,12 @@
             <i class="bi {% if user.role == 'observer' %}bi-eye{% else %}bi-pencil{% endif %}"></i>
           </a>
           {% if user.role != 'observer' %}
+          <form method="post" action="/packages/{{ pkg.id }}/copy-to-other" class="d-inline"
+                title="Copy this package to {% if range_state == 'Testing' %}Live{% else %}Sandbox{% endif %}">
+            <button type="submit" class="btn btn-sm btn-outline-info py-0 px-2">
+              <i class="bi bi-box-arrow-in-right"></i>
+            </button>
+          </form>
           <form method="post" action="/packages/{{ pkg.id }}/delete" class="d-inline"
                 onsubmit="return confirm('Delete package {{ pkg.name | e }}? This cannot be undone.')">
             <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2"><i class="bi bi-trash"></i></button>

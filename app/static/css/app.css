@@ -1369,3 +1369,17 @@ body.sidebar-collapsed .cease-btn { letter-spacing: 0; padding-left: 0; padding-
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
   font-weight: 600;
 }
+
+/* ── EBEM sync LED indicators ───────────────────────────────── */
+.ebem-led {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+.ebem-led-green  { background-color: #28a745; box-shadow: 0 0 4px #28a745aa; }
+.ebem-led-red    { background-color: #dc3545; box-shadow: 0 0 4px #dc3545aa; }
+.ebem-led-grey   { background-color: #6c757d; }
+
