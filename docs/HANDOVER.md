@@ -13,13 +13,18 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.24.0` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.24.1` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
 **DB:** SQLite at `/app/data/range.db` (named volume). `init_db.py` runs automatically on container start and is idempotent (migrations + new tables auto-create).
 
 ### Shipped (all on `main`, in order)
+- **0.24.1 — Navigation restructure + activity badge:**
+  - **Sidebar restructured** into four sections: Planning (Activities, Serials, Signal Packages), Operations (Signal Logs, CDA, Incidents, Handover), Records (History, Documentation), Tools (Devices, RF Calculator, Power Converter, EIRP, Basic Calculator). Edit in `base.html` sidebar-nav block only — no router changes.
+  - **Activities above Serials** as requested. Signal Packages moved from Resources to Planning.
+  - **Version History** removed as a standalone sidebar link (still accessible at `/docs/version-history` via Documentation); the `page == 'version_history'` active check folded into the Documentation link condition.
+  - **Activity badge on dashboard widget:** `dashboard.html` — after the serial tab button, renders `<a href="/activities/{id}" class="badge bg-secondary ...">` when `serial.activity` is set. SQLAlchemy lazy-loads the relationship; no router change needed.
 - **0.24.0 — Activities / Exercises:**
   - **`ActivityType` model** (`activity_types` table) — admin-configurable list managed under Admin → Config → Activity Types. Same pattern as `AntennaType` / `ModulationType`. Seeded defaults: Exercise, Training, Activity, Maintenance. Full CRUD + drag-reorder in `config.py`; tab in `config.html`.
   - **`Activity` model** (`activities` table) — `name`, `activity_type_id` (nullable FK), `description`, `is_testing` (workspace-scoped via `before_flush` hook), `created_by_id`. `started_at`, `closed_at`, and `status` (Planned/Active/Completed) are `@property` values derived from assigned serials — no separate date columns to maintain.

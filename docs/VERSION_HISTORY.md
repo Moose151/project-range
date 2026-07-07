@@ -1,9 +1,20 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.24.0**
+Current version: **0.24.1**
 
 ---
+
+## 0.24.1 — Navigation Restructure + Activity Badge on Dashboard
+
+- **Sidebar navigation restructured into four logical sections** matching the operational workflow:
+  - **Planning** — Activities → Serials → Signal Packages (prep order: plan the exercise, create serials, configure signal packages)
+  - **Operations** — Signal Logs, CDA, Incidents, Handover (day-to-day range running)
+  - **Records** — History, Documentation (post-operational reference; Version History removed as a separate sidebar link — accessible via Documentation)
+  - **Tools** — Devices, RF Calculator, Power Converter, EIRP, Basic Calculator (support tools grouped together)
+- **Activities now appears above Serials** in the sidebar as the parent planning concept.
+- **Signal Packages moved** from the old "Resources" section into Planning, so the package → serial → activity preparation flow is contiguous in the nav.
+- **Activity badge on dashboard serial widget:** When a serial is assigned to an activity, a small linked badge (calendar icon + activity name) appears in the widget header. Clicking it navigates directly to the activity detail page.
 
 ## 0.24.0 — Activities / Exercises
 
