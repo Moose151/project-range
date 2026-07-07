@@ -224,6 +224,36 @@ device-routing, audit-retention, and archive work.
 
 ---
 
+## Signal Hound instrument integration (future)
+
+Signal Hound devices in use on the range: **SM435C** (real-time spectrum analyser, 100 Hz–43.5 GHz), **BB60D** (USB spectrum analyser, 9 kHz–6 GHz), **VSG60A** (vector signal generator, up to 6 GHz). Their SDKs are C libraries with Python ctypes bindings (`smapi`, `bbapi`, `vsgapi`).
+
+### Deployment model
+
+**Option A — Direct (preferred if hardware is on the app server):**
+The Signal Hound devices plug directly into the server running the range app. The FastAPI app loads the SDK libraries and drives the hardware from a background task (same pattern as CBM SSH sync and SNMP polling). No bridge or extra service needed. Tradeoff: spectrum analysis is CPU/memory intensive — sweep rate should be throttled to leave headroom for the rest of the app.
+
+**Option B — Bridge service (if hardware is on a separate beefy PC):**
+A lightweight FastAPI bridge service runs on the instrument PC, loads the SDK, and exposes REST/WebSocket endpoints over the LAN (`GET /sweep`, `GET /status`, `POST /configure`). The main range app polls or streams from the bridge. The BB60D and VSG60A are USB-only so they must stay on the machine they're plugged into; the SM435C has 10GbE which reduces (but doesn't eliminate) the need for a bridge.
+
+### Planned feature scope
+
+- [ ] **Spectrum dashboard widget** — live frequency-vs-power trace rendered on a Canvas element. Polled from the app backend (or bridge) at a configurable rate (e.g. every 500 ms–2 s). Widget header shows centre freq, span, RBW, reference level, and peak marker.
+- [ ] **Device status in the Devices registry** — SM435C/BB60D/VSG60A appear as device entries with live connectivity state (SDK loaded, hardware found, sweep active).
+- [ ] **Sweep configuration** — administrators can set centre frequency, span, RBW, and reference level from the dashboard. Changes POST to the backend/bridge and take effect on the next sweep.
+- [ ] **VSG60A control** — set output frequency, power level, and enable/disable RF output from the dashboard. Audited.
+- [ ] **Marker / threshold annotation** — overlay expected signal frequencies (from active serial signal packages) on the spectrum trace so operators can quickly see whether a signal is present.
+- [ ] **Capture trigger** — administrator can trigger a timed IQ or sweep capture stored server-side; file listed for download in the device detail page.
+- [ ] **IQ streaming** — lower priority; high data rate makes the browser an unsuitable direct sink. Would require a separate capture workflow rather than live display.
+
+### Prerequisites
+
+- Signal Hound SDK installed on the host (`.so` on Linux, `.dll` on Windows).
+- USB access from the app process (udev rules / Docker `--device` flag for containerised deployments).
+- For Option B: bridge service repo, LAN reachability, and configured bridge URL in app settings.
+
+---
+
 ## Security hardening
 
 This system will run on a **sensitive range server**, so security is treated as a
