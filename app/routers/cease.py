@@ -79,7 +79,9 @@ async def cease_dismiss(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Dismiss the active CEASE. Any logged-in user may do this."""
+    """Dismiss the active CEASE. Observers may raise CEASE but cannot dismiss it."""
+    if current_user.role == "observer":
+        return JSONResponse({"ok": False, "error": "Observers cannot dismiss CEASE."}, status_code=403)
     ev = _active_cease(db)
     if ev:
         ev.dismissed_by_id = current_user.id

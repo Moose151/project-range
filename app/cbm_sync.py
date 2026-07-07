@@ -15,7 +15,7 @@ from app.crypto import decrypt_secret
 from app.deps import get_current_range_state, is_testing_state
 from app.models import AuditLog, RFDevice, Serial, SignalLog, SignalPackageEntry
 from app.rf_config import serial_package_rf_config, recalculate_from_values
-from app.settings import get_cbm_ebno_log_threshold
+from app.settings import get_cbm_ebno_log_threshold, get_cbm_ebno_log_enabled
 from app.signal_warnings import warning_flags_for
 
 
@@ -190,13 +190,13 @@ def _ebno_changed(old, new, threshold: float) -> bool:
         return old != new
 
 
-def _changed(latest: SignalLog | None, values: dict, ebno_threshold: float = 0.0) -> bool:
+_NON_EBNO_FIELDS = ("signal_status", "modulation", "symbol_rate", "fec", "power", "tx_if", "tx_rf", "rx_rf", "rx_if")
+
+
+def _non_ebno_changed(latest: SignalLog | None, values: dict) -> bool:
     if latest is None:
         return True
-    if _ebno_changed(latest.eb_no, values.get("eb_no"), ebno_threshold):
-        return True
-    fields = ("signal_status", "modulation", "symbol_rate", "fec", "power", "tx_if", "tx_rf", "rx_rf", "rx_if")
-    return any(getattr(latest, field) != values.get(field) for field in fields)
+    return any(getattr(latest, f) != values.get(f) for f in _NON_EBNO_FIELDS)
 
 
 def _latest_or_entry_status(latest: SignalLog | None, entry: SignalPackageEntry) -> str:
@@ -208,6 +208,7 @@ def sync_active_cbms(db: Session, actor_id: int | None, audit_when_noop: bool = 
     range_state = get_current_range_state(db)
     testing = is_testing_state(db)
     ebno_threshold = get_cbm_ebno_log_threshold(db)
+    ebno_log_enabled = get_cbm_ebno_log_enabled(db)
     active_serials = db.query(Serial).filter(
         Serial.closed_at == None,
         Serial.is_started == True,
@@ -287,7 +288,18 @@ def sync_active_cbms(db: Session, actor_id: int | None, audit_when_noop: bool = 
             serial_package_rf_config(db, serial.id, entry.signal_name),
             preferred=[field for field in ("tx_if", "rx_if") if values.get(field) is not None],
         ))
-        if not _changed(latest, values, ebno_threshold):
+        other_changed = _non_ebno_changed(latest, values)
+        ebno_significant = _ebno_changed(
+            latest.eb_no if latest else None,
+            values.get("eb_no"),
+            ebno_threshold,
+        )
+        should_log = latest is None or other_changed or (ebno_significant and ebno_log_enabled)
+        if not should_log:
+            # No new row needed. Update Eb/No in-place so the dashboard reflects the
+            # live modem reading even when the change is below the log threshold.
+            if latest is not None and latest.eb_no != values.get("eb_no"):
+                latest.eb_no = values.get("eb_no")
             continue
 
         power = values.get("power") if values.get("power") is not None else (latest.power if latest else None)

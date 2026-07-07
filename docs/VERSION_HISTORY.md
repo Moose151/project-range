@@ -1,9 +1,15 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.22.0**
+Current version: **0.23.0**
 
 ---
+
+## 0.23.0 — Eb/No Dashboard Live Update, Eb/No Log Toggle, CEASE Permissions
+
+- **Eb/No always reflects the live modem reading on the dashboard:** Previously, Eb/No only updated on the dashboard when the change exceeded the ±3 dB log threshold. Now the dashboard always shows the current Eb/No from the modem — even sub-threshold drifts — by updating the existing log row in-place rather than creating a new entry. Log creation still only occurs when the threshold is crossed.
+- **Admin toggle to disable Eb/No log entries:** A new **Record Eb/No changes in log** toggle has been added to **Admin → Config → System**. When turned off, Eb/No changes (even large ones) are never written as new log entries. The dashboard reading still updates in-place. The existing ±3 dB threshold continues to apply when the toggle is on.
+- **CEASE dismiss restricted to users and administrators:** Observers can still raise a range-wide CEASE alert, but only Users and Administrators can dismiss it. The CEASE splash shown to observers omits the Dismiss button and explains that only users/admins can dismiss. The `/cease/dismiss` endpoint returns a 403 for observer accounts.
 
 ## 0.22.0 — EBEM LED Indicators, Cross-Workspace Copy, Routing Presets
 

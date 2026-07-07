@@ -265,6 +265,7 @@
 
 <!-- CEASE splash mount: the full-screen overlay is injected here by app.js when active -->
 <div id="ceaseRoot"></div>
+<script>window.userRole = "{{ user.role }}";</script>
 
 <!-- Global command palette / recently viewed shortcuts -->
 <div class="modal fade" id="commandPaletteModal" tabindex="-1" aria-hidden="true">
@@ -346,7 +347,7 @@
 
 <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="/static/vendor/htmx/htmx.min.js"></script>
-<script src="/static/js/app.js?v=27"></script>
+<script src="/static/js/app.js?v=28"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

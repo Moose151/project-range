@@ -20,6 +20,12 @@ MAX_AUDIT_LIVE_RECORD_LIMIT = 10000
 CBM_EBNO_LOG_THRESHOLD_KEY = "cbm_ebno_log_threshold"
 DEFAULT_CBM_EBNO_LOG_THRESHOLD = 3.0
 
+# Whether Eb/No changes are ever written as new log entries during CBM sync.
+# When False, Eb/No still updates in-place on the existing log row so the dashboard
+# reflects the live modem reading, but no new log rows are created for Eb/No changes.
+CBM_EBNO_LOG_ENABLED_KEY = "cbm_ebno_log_enabled"
+DEFAULT_CBM_EBNO_LOG_ENABLED = True
+
 try:
     TIME_ZONES = ["UTC"] + sorted(tz for tz in available_timezones() if tz != "UTC")
 except Exception:
@@ -61,6 +67,11 @@ def get_audit_live_record_limit(db: Session) -> int:
     return clamp_audit_live_record_limit(
         get_setting(db, AUDIT_LIVE_RECORD_LIMIT_KEY, str(DEFAULT_AUDIT_LIVE_RECORD_LIMIT))
     )
+
+
+def get_cbm_ebno_log_enabled(db: Session) -> bool:
+    raw = get_setting(db, CBM_EBNO_LOG_ENABLED_KEY, "1")
+    return raw.lower() not in ("0", "false", "no", "off")
 
 
 def get_cbm_ebno_log_threshold(db: Session) -> float:

@@ -13,13 +13,17 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.22.0` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.23.0` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
 **DB:** SQLite at `/app/data/range.db` (named volume). `init_db.py` runs automatically on container start and is idempotent (migrations + new tables auto-create).
 
 ### Shipped (all on `main`, in order)
+- **0.23.0 — Eb/No live dashboard update, Eb/No log toggle, CEASE dismiss restricted:**
+  - **Eb/No always reflects live modem reading:** `cbm_sync.py` now separates the "should create new log row" check from "should update in-place". When only Eb/No changed but stays within the threshold (or Eb/No logging is disabled), the existing `SignalLog.eb_no` field is updated in-place (`latest.eb_no = values.get("eb_no")`). The dashboard always shows the live modem Eb/No without generating log spam.
+  - **`cbm_ebno_log_enabled` AppSetting:** New boolean setting (key `cbm_ebno_log_enabled`, default `True`). Exposed in **Admin → Config → System** as a toggle switch "Record Eb/No changes in log". When off, Eb/No changes never create new log entries (still update dashboard in-place). Stored in `AppSetting` via `app/settings.py`; read by `cbm_sync.py` each sync cycle; saved by `config.py POST /config/system`.
+  - **CEASE dismiss restricted to non-Observer:** `app/routers/cease.py` `cease_dismiss` returns HTTP 403 for observer-role accounts. The CEASE splash in `app/static/js/app.js` `showCeaseSplash()` checks `window.userRole` (set by an inline `<script>` in `base.html`) and renders either the Dismiss button (users/admins) or a message explaining they cannot dismiss (observers). Static cache key bumped to `app.js?v=28`.
 - **TxLO/RxLO rename** (was BUC/LO) everywhere incl. DB columns (migration renames in place), calculator, package/log auto-calc, exports (legacy `buc`/`lo` keys still import).
 - **Docker deployment** (`Dockerfile`, `docker-compose.yml`, `docker-entrypoint.sh`, `.dockerignore`, `.env.example`, `docs/DEPLOY.md`); `.gitattributes` keeps shell files LF for Windows.
 - **Offline/LAN fix:** all frontend assets vendored under `app/static/vendor/` (Bootstrap, Icons, HTMX, SortableJS) — **no CDN/internet needed**. Do NOT reintroduce CDN links.

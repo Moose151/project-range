@@ -223,6 +223,12 @@ async function dismissCease() {
 function showCeaseSplash(data) {
   const root = document.getElementById('ceaseRoot');
   if (!root) return;
+  const canDismiss = (window.userRole || '') !== 'observer';
+  const dismissBtn = canDismiss
+    ? `<button type="button" class="btn btn-light btn-lg mt-3 fw-bold" onclick="dismissCease()">
+          <i class="bi bi-check-lg me-1"></i>Dismiss
+        </button>`
+    : `<p class="text-white-50 small mt-3 mb-0">Only users and administrators can dismiss CEASE.</p>`;
   root.innerHTML = `
     <div class="cease-overlay" role="alertdialog" aria-label="CEASE alert">
       <div class="cease-box">
@@ -230,9 +236,7 @@ function showCeaseSplash(data) {
         <div class="cease-word">CEASE</div>
         <div class="cease-meta">Raised by <strong>${escapeHtml(data.raised_by)}</strong>${data.raised_at ? ' at ' + escapeHtml(data.raised_at) : ''}</div>
         <div class="cease-reason">${escapeHtml(data.reason)}</div>
-        <button type="button" class="btn btn-light btn-lg mt-3 fw-bold" onclick="dismissCease()">
-          <i class="bi bi-check-lg me-1"></i>Dismiss
-        </button>
+        ${dismissBtn}
       </div>
     </div>`;
 }
