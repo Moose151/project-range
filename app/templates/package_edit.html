@@ -352,7 +352,7 @@
             <canvas id="spectrumCanvas" style="width:100%;height:100%;display:block;border-radius:4px;"></canvas>
           </div>
           <p class="text-muted small mt-2 mb-0">
-            Occupied BW = symbol rate × (1 + rolloff 0.25) / 1000 MHz &nbsp;·&nbsp;
+            Occupied BW = (symbol rate ÷ modulation rate) × (1 + rolloff 0.25) / 1000 MHz &nbsp;·&nbsp;
             <span style="color:#0d6efd;font-weight:bold">■</span> TX &nbsp;
             <span style="color:#198754;font-weight:bold">■</span> RX &nbsp;·&nbsp;
             <span style="color:#ffc107;font-weight:bold">━</span> Guard band boundary (outside = restricted zone)
@@ -641,7 +641,8 @@ const SPEC_PKG_ID = {{ package.id if package else 0 }};
 const rawSpecSignals = [
 {% for entry in (package.signals if package else []) %}
   { name: {{ entry.signal_name | tojson }}, txRf: {{ entry.tx_rf | tojson }}, rxRf: {{ entry.rx_rf | tojson }},
-    symbolRate: {{ entry.symbol_rate | tojson }}, power: {{ entry.power | tojson }}, freqUnit: {{ entry.freq_unit | tojson }} },
+    symbolRate: {{ entry.symbol_rate | tojson }}, modulation: {{ entry.modulation | tojson }},
+    power: {{ entry.power | tojson }}, freqUnit: {{ entry.freq_unit | tojson }} },
 {% endfor %}
 ];
 

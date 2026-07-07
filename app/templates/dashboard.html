@@ -551,9 +551,8 @@ function utilityBody(id, type, config = {}) {
               <p class="text-muted small mt-1 mb-0">
                 <span style="color:#0d6efd;font-weight:bold">■</span> TX &nbsp;
                 <span style="color:#198754;font-weight:bold">■</span> RX &nbsp;·&nbsp;
-                Dim = not Up &nbsp;·&nbsp;
                 <span style="color:#ffc107;font-weight:bold">━</span> Guard boundary &nbsp;·&nbsp;
-                Auto-refresh 30s
+                Showing transmitted signals only
               </p>
             </div>`;
   }
@@ -1355,7 +1354,7 @@ function updateCDATimers() {
 })();
 
 // ── Live Spectrum Widget ──────────────────────────────────────────────────────
-const _liveSpecData = {};  // id → {signals, intervalId}
+const _liveSpecData = {};  // id → {signals}
 
 function _liveSpecEl(id, cls) {
   return document.querySelector(`#liveSpec-${id} .${cls}`);
@@ -1412,6 +1411,12 @@ function liveSpecFetch(id) {
     .catch(() => {});
 }
 
+function liveSpecFetchAll() {
+  document.querySelectorAll('.live-spectrum-widget[data-spec-id]').forEach(widget => {
+    liveSpecFetch(widget.dataset.specId);
+  });
+}
+
 function liveSpecInit(id) {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem('live_spec_' + id) || 'null'); } catch (e) {}
@@ -1428,11 +1433,14 @@ function liveSpecInit(id) {
     if (vw && saved.view) vw.value = saved.view;
   }
   liveSpecFetch(id);
-  if ((_liveSpecData[id] || {}).intervalId) clearInterval(_liveSpecData[id].intervalId);
-  const intervalId = setInterval(() => liveSpecFetch(id), 30000);
-  _liveSpecData[id] = Object.assign(_liveSpecData[id] || {}, { intervalId });
   window.addEventListener('resize', () => liveSpecRedraw(id));
 }
+
+document.body.addEventListener('htmx:afterSwap', (event) => {
+  if (event.target?.id?.startsWith('signalTableContainer-')) {
+    liveSpecFetchAll();
+  }
+});
 
 document.addEventListener('DOMContentLoaded', () => {
   {% if toast %}showToast({{ toast | tojson }}, 'success');{% endif %}
@@ -1604,6 +1612,7 @@ async function submitAllDirty(btn) {
     container.innerHTML = tmp.innerHTML;
     applyColumnVisibility();
     updateRefreshTime();
+    liveSpecFetchAll();
     showToast(`${updates.length} signal${updates.length > 1 ? 's' : ''} updated`, 'success');
   } catch (_) {
     showToast('Update failed — please try again', 'danger');

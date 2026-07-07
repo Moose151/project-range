@@ -1325,7 +1325,32 @@ document.addEventListener('keydown', event => {
 // ── Shared Spectrum Chart ─────────────────────────────────────────────────────
 function specToMHz(val, unit) {
   if (val === null || val === undefined) return null;
-  return unit === 'GHz' ? val * 1000 : val;
+  const num = parseFloat(val);
+  if (isNaN(num)) return null;
+  return unit === 'GHz' ? num * 1000 : num;
+}
+
+function specModRate(modulation) {
+  const mod = String(modulation || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!mod) return 1;
+  if (mod.includes('BPSK')) return 1;
+  if (mod.includes('QPSK') || mod.includes('OQPSK') || mod.includes('4PSK')) return 2;
+  if (mod.includes('8PSK') || mod.includes('8QAM')) return 3;
+  if (mod.includes('16APSK') || mod.includes('16QAM')) return 4;
+  if (mod.includes('32APSK') || mod.includes('32QAM')) return 5;
+  if (mod.includes('64QAM')) return 6;
+  if (mod.includes('128QAM')) return 7;
+  if (mod.includes('256QAM')) return 8;
+  const explicit = mod.match(/(?:^|[^0-9])([1-9]\d*)\s*(?:ARY|QAM|APSK|PSK)/);
+  if (explicit) return Math.max(1, Math.log2(parseInt(explicit[1], 10)));
+  return 1;
+}
+
+function specOccupiedBandwidthMHz(signal) {
+  const ROLLOFF = 0.25;
+  const sr = parseFloat(signal?.symbolRate);
+  if (!sr || sr <= 0) return 0;
+  return (sr / specModRate(signal?.modulation)) * (1 + ROLLOFF) / 1000;
 }
 
 function specFreqStep(span) {
@@ -1344,8 +1369,9 @@ function specAutoSettings(signals) {
   const freqs = [];
   (signals || []).forEach(s => {
     const tx = specToMHz(s.txRf, s.freqUnit), rx = specToMHz(s.rxRf, s.freqUnit);
-    if (tx) freqs.push(tx);
-    if (rx) freqs.push(rx);
+    const halfBw = specOccupiedBandwidthMHz(s) / 2;
+    if (tx !== null) freqs.push(tx - halfBw, tx + halfBw);
+    if (rx !== null) freqs.push(rx - halfBw, rx + halfBw);
   });
   if (!freqs.length) return { centreFreq: 1000, span: 500 };
   freqs.sort((a, b) => a - b);
@@ -1360,7 +1386,6 @@ function specAutoSettings(signals) {
 // view: 'both' | 'tx' | 'rx'
 function drawSpectrumChart(canvas, signals, centreFreq, span, guardLeft, guardRight, view) {
   if (!canvas || !signals) return;
-  const ROLLOFF = 0.25;
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
   const w = rect.width || canvas.offsetWidth || 600;
@@ -1443,9 +1468,8 @@ function drawSpectrumChart(canvas, signals, centreFreq, span, guardLeft, guardRi
   });
 
   signals.forEach(sig => {
-    const sr = parseFloat(sig.symbolRate);
-    if (!sr || sr <= 0) return;
-    const bwMHz = sr * (1 + ROLLOFF) / 1000;
+    const bwMHz = specOccupiedBandwidthMHz(sig);
+    if (!bwMHz || bwMHz <= 0) return;
     const pow = (sig.power !== null && sig.power !== undefined) ? sig.power : -60;
     const alpha = sig.dimmed ? '22' : '44';
 

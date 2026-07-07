@@ -834,16 +834,14 @@ async def spectrum_signals_json(
     current_user: User = Depends(get_current_user),
 ):
     """Return currently Up signals for the live spectrum dashboard widget."""
-    testing = is_testing_state(db)
-    open_serials = db.query(Serial).filter(
-        Serial.is_testing == testing,
-        Serial.closed_at == None,
-    ).all()
+    open_serials = get_active_serials(db)
     result = []
     seen: set[str] = set()
     for serial in open_serials:
         latest = _latest_signal_status(db, serial_id=serial.id)
         for log in latest:
+            if log.signal_status != "Up":
+                continue
             key = f"{serial.id}:{log.signal_name}"
             if key in seen:
                 continue
@@ -858,7 +856,7 @@ async def spectrum_signals_json(
                 "power": log.power,
                 "modulation": log.modulation,
                 "isUp": log.signal_status == "Up",
-                "dimmed": log.signal_status != "Up",
+                "dimmed": False,
             })
     return JSONResponse({"signals": result})
 
