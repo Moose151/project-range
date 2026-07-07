@@ -261,6 +261,7 @@
           <button type="button" class="serial-tab-btn btn btn-sm btn-primary" data-serial-tab="{{ serial.id }}"
                   draggable="true" onclick="switchTab(this)"
                   title="{{ serial.title }} — drag onto another widget to tab them together">{{ serial.title }}</button>
+          {% if serial.activity %}<a href="/activities/{{ serial.activity.id }}" class="badge bg-secondary text-decoration-none" title="Activity: {{ serial.activity.name }}"><i class="bi bi-calendar3-range me-1"></i>{{ serial.activity.name }}</a>{% endif %}
           {% if serial.is_closed_loop %}<span class="badge bg-info text-dark" title="Closed loop — IF only"><i class="bi bi-arrow-repeat me-1"></i>Closed loop</span>{% endif %}
           {% else %}
           <span class="fw-semibold text-muted">All Signals (no active serial)</span>

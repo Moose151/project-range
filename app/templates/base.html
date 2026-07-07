@@ -43,18 +43,26 @@
         <span class="sidebar-label">Dashboard</span>
       </a>
 
-      <div class="sidebar-section-header">Operations</div>
-      <a href="/logs" class="sidebar-link {% if page == 'logs' %}active{% endif %}">
-        <i class="bi bi-journal-text"></i>
-        <span class="sidebar-label">Signal Logs</span>
+      <!-- Planning: top-down workflow — activities → serials → packages -->
+      <div class="sidebar-section-header">Planning</div>
+      <a href="/activities" class="sidebar-link {% if page == 'activities' %}active{% endif %}">
+        <i class="bi bi-calendar3-range"></i>
+        <span class="sidebar-label">Activities</span>
       </a>
       <a href="/serials" class="sidebar-link {% if page == 'serials' %}active{% endif %}">
         <i class="bi bi-collection-play"></i>
         <span class="sidebar-label">Serials</span>
       </a>
-      <a href="/activities" class="sidebar-link {% if page == 'activities' %}active{% endif %}">
-        <i class="bi bi-calendar3-range"></i>
-        <span class="sidebar-label">Activities</span>
+      <a href="/packages" class="sidebar-link {% if page == 'packages' %}active{% endif %}">
+        <i class="bi bi-box-seam"></i>
+        <span class="sidebar-label">Signal Packages</span>
+      </a>
+
+      <!-- Operations: day-to-day range running -->
+      <div class="sidebar-section-header">Operations</div>
+      <a href="/logs" class="sidebar-link {% if page == 'logs' %}active{% endif %}">
+        <i class="bi bi-journal-text"></i>
+        <span class="sidebar-label">Signal Logs</span>
       </a>
       <a href="/cda" class="sidebar-link {% if page == 'cda' %}active{% endif %}">
         <i class="bi bi-shield-exclamation"></i>
@@ -69,24 +77,26 @@
         <span class="sidebar-label">Handover</span>
       </a>
 
-      <div class="sidebar-section-header">Resources</div>
-      <a href="/packages" class="sidebar-link {% if page == 'packages' %}active{% endif %}">
-        <i class="bi bi-box-seam"></i>
-        <span class="sidebar-label">Signal Packages</span>
+      <!-- Records: post-operational reference -->
+      <div class="sidebar-section-header">Records</div>
+      <a href="/history" class="sidebar-link {% if page == 'history' %}active{% endif %}">
+        <i class="bi bi-clock-history"></i>
+        <span class="sidebar-label">History</span>
       </a>
+      <a href="/docs" class="sidebar-link {% if page == 'docs' or page == 'version_history' %}active{% endif %}">
+        <i class="bi bi-book"></i>
+        <span class="sidebar-label">Documentation</span>
+      </a>
+
+      <!-- Tools: devices and calculators -->
+      <div class="sidebar-section-header">Tools</div>
       <a href="/devices" class="sidebar-link {% if page == 'devices' %}active{% endif %}">
         <i class="bi bi-hdd-network"></i>
         <span class="sidebar-label">Devices</span>
       </a>
-
-      <div class="sidebar-section-header">Calculators</div>
-      <a href="/calculator/basic" class="sidebar-link {% if page == 'calculator' and page_name is defined and page_name == 'basic' %}active{% endif %}">
-        <i class="bi bi-calculator"></i>
-        <span class="sidebar-label">Basic Calculator</span>
-      </a>
       <a href="/calculator/rf" class="sidebar-link {% if page == 'calculator' and (page_name is not defined or page_name == 'rf') %}active{% endif %}">
         <i class="bi bi-broadcast"></i>
-        <span class="sidebar-label">RF Frequency</span>
+        <span class="sidebar-label">RF Calculator</span>
       </a>
       <a href="/calculator/power" class="sidebar-link {% if page == 'calculator' and page_name is defined and page_name == 'power' %}active{% endif %}">
         <i class="bi bi-lightning-charge"></i>
@@ -96,19 +106,9 @@
         <i class="bi bi-reception-4"></i>
         <span class="sidebar-label">EIRP</span>
       </a>
-
-      <div class="sidebar-section-header">Records</div>
-      <a href="/history" class="sidebar-link {% if page == 'history' %}active{% endif %}">
-        <i class="bi bi-clock-history"></i>
-        <span class="sidebar-label">History</span>
-      </a>
-      <a href="/docs" class="sidebar-link {% if page == 'docs' %}active{% endif %}">
-        <i class="bi bi-book"></i>
-        <span class="sidebar-label">Documentation</span>
-      </a>
-      <a href="/docs/version-history" class="sidebar-link {% if page == 'version_history' %}active{% endif %}">
-        <i class="bi bi-clock-history"></i>
-        <span class="sidebar-label">Version History</span>
+      <a href="/calculator/basic" class="sidebar-link {% if page == 'calculator' and page_name is defined and page_name == 'basic' %}active{% endif %}">
+        <i class="bi bi-calculator"></i>
+        <span class="sidebar-label">Basic Calculator</span>
       </a>
 
       {% if user.role == 'administrator' %}
