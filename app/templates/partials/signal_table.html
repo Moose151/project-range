@@ -25,6 +25,7 @@
       <th data-col="call" class="text-nowrap">Effects</th>
       <th data-col="chameleon"></th>
       <th data-col="signal">Signal</th>
+      <th data-col="priority" class="text-nowrap" title="Signal priority (lower = higher priority)">Pri</th>
       <th data-col="source">Source</th>
       <th data-col="status">Status</th>
       <th data-col="engaged">Engaged</th>
@@ -117,6 +118,10 @@
         </form>
       </td>
       <td data-col="signal" class="fw-semibold"><a href="/logs?signal_name={{ log.signal_name }}" class="text-reset text-decoration-none" title="View history for {{ log.signal_name }}">{{ log.signal_name }}</a></td>
+      <td data-col="priority" class="text-center">
+        {% set sig_priority = priority_by_signal.get(log.signal_name) if priority_by_signal is defined else none %}
+        {% if sig_priority is not none %}<span class="badge bg-secondary">{{ sig_priority }}</span>{% else %}<span class="text-muted">—</span>{% endif %}
+      </td>
       <td data-col="source" class="text-muted small">{{ log.source or 'No modem assigned' }}</td>
       <td data-col="status" style="min-width:150px">
         <div class="d-flex align-items-center gap-2">
@@ -193,7 +198,7 @@
 
     <!-- Inline quick-edit row (collapsed by default) -->
     <tr class="collapse" id="{{ row_id }}-edit">
-      <td colspan="22" class="p-0">
+      <td colspan="23" class="p-0">
         <div class="p-2 bg-body-tertiary border-top border-secondary">
           <form data-dashboard-edit-form="{{ row_id }}" onsubmit="event.preventDefault(); submitAllDirty(this);">
             <input type="hidden" name="signal_name" value="{{ log.signal_name }}">

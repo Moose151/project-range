@@ -230,6 +230,7 @@
           <thead class="table-secondary">
             <tr>
               {% if user.role != 'observer' %}<th style="width:28px"></th>{% endif %}
+              <th title="Signal priority (lower = higher priority)">Pri</th>
               <th>Name</th>
               <th>TxIF</th>
               <th class="rf-only">TxRF</th>
@@ -250,6 +251,7 @@
             {% for entry in package.signals %}
             <tr data-id="{{ entry.id }}">
               {% if user.role != 'observer' %}<td class="drag-handle text-muted ps-2" style="cursor:grab"><i class="bi bi-grip-vertical"></i></td>{% endif %}
+              <td class="small text-center">{% if entry.priority is not none %}<span class="badge bg-secondary">{{ entry.priority }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
               <td class="fw-semibold">{{ entry.signal_name }}</td>
               <td>{{ entry.tx_if or '—' }}</td>
               <td class="rf-only">{{ entry.tx_rf or '—' }}</td>
@@ -270,6 +272,7 @@
                           'id': entry.id,
                           'signal_name': entry.signal_name,
                           'description': entry.description or '',
+                          'priority': entry.priority,
                           'tx_if': entry.tx_if,
                           'tx_rf': entry.tx_rf,
                           'rx_rf': entry.rx_rf,
@@ -377,13 +380,17 @@
         <form method="post" id="signalForm" action="/packages/{{ package.id }}/signals/add">
           <input type="hidden" name="_entry_id" id="editEntryId">
           <div class="row g-2">
-            <div class="col-sm-5">
+            <div class="col-sm-4">
               <label class="form-label small">Signal Name <span class="text-danger">*</span></label>
               <input type="text" class="form-control form-control-sm" name="signal_name" id="f_signal_name" required>
             </div>
-            <div class="col-sm-5">
+            <div class="col-sm-4">
               <label class="form-label small">Description</label>
               <input type="text" class="form-control form-control-sm" name="description" id="f_description">
+            </div>
+            <div class="col-sm-2">
+              <label class="form-label small">Priority</label>
+              <input type="number" class="form-control form-control-sm" name="priority" id="f_priority" step="1" min="0" placeholder="e.g. 1" title="Lower = higher priority">
             </div>
             <div class="col-sm-2">
               <label class="form-label small">Freq Unit</label>
@@ -555,6 +562,7 @@ function editSignal(entry) {
   document.getElementById('signalForm').action = '/packages/{{ package.id if package }}/signals/' + entry.id + '/update';
   setVal('f_signal_name', entry.signal_name);
   setVal('f_description', entry.description);
+  setVal('f_priority', entry.priority);
   setVal('f_freq_unit', entry.freq_unit);
   setVal('f_tx_if', entry.tx_if);
   setVal('f_tx_rf', entry.tx_rf);

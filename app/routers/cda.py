@@ -15,6 +15,23 @@ from app.templating import templates
 
 CDA_UPLOAD_EXTENSIONS = {"csv", "txt"}
 
+CDA_POWER_UNITS = ("dBm", "dBW", "W")
+
+
+def _to_dbm(value: Optional[float], unit: str) -> Optional[float]:
+    """Convert an entered power ceiling in dBm/dBW/W to the canonical dBm value."""
+    if value is None:
+        return None
+    unit = (unit or "dBm").strip()
+    if unit == "dBW":
+        return value + 30.0
+    if unit == "W":
+        import math
+        if value <= 0:
+            return None
+        return 10.0 * math.log10(value) + 30.0
+    return value  # dBm (or unknown → treat as dBm)
+
 
 def _parse_zulu_time(t: str) -> str:
     """Accept HHMM, HH:MM, or H:MM (Zulu) → normalise to HH:MM. Raises ValueError."""
@@ -156,6 +173,7 @@ async def cda_window_add(
     start_zulu: str = Form(...),
     end_zulu: str = Form(...),
     max_power_dbm: Optional[float] = Form(None),
+    max_power_unit: str = Form("dBm"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -169,12 +187,14 @@ async def cda_window_add(
     except ValueError as e:
         return RedirectResponse(f"/cda/{table_id}?toast=Invalid+time+format:+{e}", status_code=302)
 
+    unit = max_power_unit if max_power_unit in CDA_POWER_UNITS else "dBm"
     window = CDAWindow(
         cda_table_id=table_id,
         label=label.strip() or None,
         start_zulu=start_zulu,
         end_zulu=end_zulu,
-        max_power_dbm=max_power_dbm,
+        max_power_dbm=_to_dbm(max_power_dbm, unit),
+        max_power_unit=unit,
     )
     db.add(window)
     db.flush()
@@ -370,6 +390,7 @@ async def cda_window_edit(
     start_zulu: str = Form(...),
     end_zulu: str = Form(...),
     max_power_dbm: Optional[float] = Form(None),
+    max_power_unit: str = Form("dBm"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -389,11 +410,13 @@ async def cda_window_edit(
     except ValueError as e:
         return RedirectResponse(f"/cda/{table_id}?toast=Invalid+time+format:+{e}", status_code=302)
 
+    unit = max_power_unit if max_power_unit in CDA_POWER_UNITS else "dBm"
     previous = f"{window.start_zulu}-{window.end_zulu}"
     window.label = label.strip() or None
     window.start_zulu = start_zulu
     window.end_zulu = end_zulu
-    window.max_power_dbm = max_power_dbm
+    window.max_power_dbm = _to_dbm(max_power_dbm, unit)
+    window.max_power_unit = unit
     db.add(AuditLog(
         user_id=current_user.id,
         action_type="CDA_WINDOW_EDIT",
@@ -436,6 +459,7 @@ async def cda_copy_to_other(
             start_zulu=window.start_zulu,
             end_zulu=window.end_zulu,
             max_power_dbm=window.max_power_dbm,
+            max_power_unit=window.max_power_unit,
         ))
     dest = "Sandbox" if target else "Live"
     db.add(AuditLog(

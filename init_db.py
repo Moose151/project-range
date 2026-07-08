@@ -12,7 +12,7 @@ from app.file_security import harden_sqlite_storage
 from app.models import (
     User, RangeStateLog, Signal, ModulationType, FecType, SignalSource, AntennaType,
     LogSession, SignalPackage, SignalPackageEntry, Serial, SerialPackage,
-    DocPage, DocVersion, DocLink, DocAlias, AppSetting, RFDevice, DevicePort, DeviceLink,
+    DocPage, DocVersion, DocLink, DocAlias, DocAttachment, AppSetting, RFDevice, DevicePort, DeviceLink,
     CDATable, CDAWindow, SerialCDATable, Incident, CeaseEvent, DutyRole, RoutingPreset,
     ActivityType, Activity, CallType,
 )
@@ -152,6 +152,9 @@ def _migrate(conn):
         "ALTER TABLE device_ports ADD COLUMN observed_routed_from INTEGER",
         "ALTER TABLE device_ports ADD COLUMN observed_label VARCHAR(128)",
         "ALTER TABLE serials ADD COLUMN activity_id INTEGER REFERENCES activities(id)",
+        "ALTER TABLE signal_package_entries ADD COLUMN priority INTEGER",
+        "ALTER TABLE serials ADD COLUMN instructions TEXT",
+        "ALTER TABLE cda_windows ADD COLUMN max_power_unit VARCHAR(4) DEFAULT 'dBm'",
     ]
     for sql in migrations:
         try:

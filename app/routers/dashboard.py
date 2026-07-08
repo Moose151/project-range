@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from urllib.parse import quote_plus
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials, is_testing_state
-from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage, SerialCDATable, CDAWindow, RFDevice, CallType, SignalPackageEntry
+from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage, SerialCDATable, CDAWindow, RFDevice, CallType, SignalPackageEntry, SerialPackage
 from app.cbm_sync import sync_active_cbms
 from app.rf_config import serial_package_rf_config, recalculate_from_values
 from app.signal_warnings import warning_flags_for
@@ -317,6 +317,7 @@ def _dashboard_ctx(db: Session) -> dict:
                 "signals": signals,
                 "buzzer_active": buzzer,
                 "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial.id, signals),
+                "priority_by_signal": _priority_by_signal(db, serial.id, signals),
                 "has_cbm_mapping": any(
                     entry.cbm_device_id
                     for link in serial.package_links
@@ -348,6 +349,9 @@ def _dashboard_ctx(db: Session) -> dict:
                         "end": w.end_zulu,
                         "label": w.label or "",
                         "max_power_dbm": w.max_power_dbm,
+                        "max_power_dbw": w.max_power_dbw,
+                        "max_power_w": w.max_power_w,
+                        "max_power_all": w.max_power_all_label,
                         "type": "reduced_power" if w.max_power_dbm is not None else "no_fire",
                         "type_label": w.window_type_label,
                     }
@@ -599,6 +603,30 @@ def _pkg_rf_by_signal(db: Session, serial_id: int, signals: list[SignalLog]) -> 
     }
 
 
+def _priority_by_signal(db: Session, serial_id: int | None, signals: list[SignalLog]) -> dict:
+    """Map each displayed signal name to its package-entry priority (if any).
+
+    Priority lives on the signal package entry, so we resolve it by name across
+    the packages assigned to the serial. Case-insensitive on the signal name.
+    """
+    if serial_id is None:
+        return {}
+    names = {log.signal_name.strip().casefold() for log in signals}
+    if not names:
+        return {}
+    rows = (
+        db.query(SignalPackageEntry.signal_name, SignalPackageEntry.priority)
+        .join(SerialPackage, SerialPackage.package_id == SignalPackageEntry.package_id)
+        .filter(SerialPackage.serial_id == serial_id)
+        .all()
+    )
+    out: dict[str, int] = {}
+    for name, priority in rows:
+        if priority is not None and name.strip().casefold() in names:
+            out[name] = priority
+    return out
+
+
 def _blank_to_none(value):
     return None if value == "" else value
 
@@ -658,6 +686,7 @@ async def dashboard_fragment(
         "closed_loop": bool(serial and serial.is_closed_loop),
         "pkg_rf": _pkg_rf_for_serial(db, serial_id),
         "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial_id, signals),
+        "priority_by_signal": _priority_by_signal(db, serial_id, signals),
     })
 
 
@@ -827,6 +856,9 @@ async def dashboard_quick_update(
         "pkg_rf_by_signal": (
             _pkg_rf_by_signal(db, effective_serial_id, signals) if effective_serial_id else {}
         ),
+        "priority_by_signal": (
+            _priority_by_signal(db, effective_serial_id, signals) if effective_serial_id else {}
+        ),
     })
 
 
@@ -951,6 +983,7 @@ async def dashboard_bulk_update(
         "serial_id": serial_id,
         "pkg_rf": _pkg_rf_for_serial(db, serial_id) if serial_id else None,
         "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial_id, signals) if serial_id else {},
+        "priority_by_signal": _priority_by_signal(db, serial_id, signals) if serial_id else {},
     })
 
 

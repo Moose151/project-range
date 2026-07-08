@@ -44,6 +44,7 @@ logs/
 backups/
 audit_archives/
 serial_archives/
+doc_attachments/
 
 # Local vendor/device manuals (do not publish restricted PDFs)
 # All equipment manuals now live under "System Manuals/" — ignore the whole tree.

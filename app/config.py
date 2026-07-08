@@ -25,6 +25,8 @@ MIN_PASSWORD_LENGTH = int(os.environ.get("MIN_PASSWORD_LENGTH", "6"))
 LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
 LOGIN_LOCKOUT_SECONDS = int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "300"))
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(2 * 1024 * 1024)))
+# Documentation PDF attachments are allowed to be larger than config-file uploads.
+MAX_DOC_ATTACHMENT_BYTES = int(os.environ.get("MAX_DOC_ATTACHMENT_BYTES", str(20 * 1024 * 1024)))
 MAX_UPLOAD_TOTAL_BYTES = int(os.environ.get("MAX_UPLOAD_TOTAL_BYTES", str(8 * 1024 * 1024)))
 MAX_UPLOAD_ZIP_MEMBERS = int(os.environ.get("MAX_UPLOAD_ZIP_MEMBERS", "100"))
 AUDIT_HASH_SECRET = os.environ.get("AUDIT_HASH_SECRET") or SECRET_KEY
@@ -51,7 +53,7 @@ CBM_AUTO_SYNC_SECONDS = int(os.environ.get("CBM_AUTO_SYNC_SECONDS", "5"))
 SNMP_AUTO_SYNC_SECONDS = int(os.environ.get("SNMP_AUTO_SYNC_SECONDS", "0"))
 # Single source of truth for the app version (shown in the top-right UI and
 # reported as the FastAPI app version). Bump on each release.
-APP_VERSION = "0.25.3"
+APP_VERSION = "0.26.0"
 
 FREQUENCY_BANDS = {
     "C":  {"tx_min": 5.850, "tx_max": 6.725, "rx_min": 3.625, "rx_max": 4.200},

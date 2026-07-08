@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.25.3` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.26.0` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -19,9 +19,11 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.25.3)
+## ✅ Already delivered (through 0.26.0)
 
 Core of the MVP scope is in place:
+
+- **0.26.0:** "Call" button renamed to **Effects** (asterisk icon; admin list is now Effects); optional **priority** number on signal package entries + hideable dashboard column; **serial instructions** field (editable pre-close, shown on dashboard + serials list); CDA reduced-power windows entered/displayed in **W / dBW / dBm**; **PDF attachments** on documentation pages (side-panel list + inline embed); dashboard **chat widget remembers the open room** across navigation.
 
 - RF frequency calculator (TxIF/TxRF/RxRF/RxIF from one known value) + frequency templates
 - Power converter (dBm/dBW/W), gain/loss chain, EIRP

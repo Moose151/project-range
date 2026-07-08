@@ -42,8 +42,8 @@
               <td class="text-muted small">{{ w.label or '—' }}</td>
               <td>
                 {% if w.max_power_dbm is not none %}
-                <span class="badge bg-warning text-dark">
-                  <i class="bi bi-lightning-charge me-1"></i>Reduced Power ≤{{ w.max_power_dbm }} dBm
+                <span class="badge bg-warning text-dark" title="{{ w.max_power_all_label }}">
+                  <i class="bi bi-lightning-charge me-1"></i>Reduced Power ≤{{ w.max_power_all_label }}
                 </span>
                 {% else %}
                 <span class="badge bg-danger">
@@ -86,14 +86,27 @@
                     <label class="form-label small mb-1">Label</label>
                     <input type="text" name="label" class="form-control form-control-sm" value="{{ w.label or '' }}">
                   </div>
-                  <div class="col-sm-3">
-                    <label class="form-label small mb-1">Max power dBm</label>
-                    <input type="number" name="max_power_dbm" class="form-control form-control-sm" step="0.1"
-                           value="{{ '' if w.max_power_dbm is none else w.max_power_dbm }}" placeholder="blank = No Fire">
+                  {% set w_unit = w.max_power_unit or 'dBm' %}
+                  {% if w.max_power_dbm is none %}{% set w_val = '' %}
+                  {% elif w_unit == 'dBW' %}{% set w_val = '%.1f' | format(w.max_power_dbw) %}
+                  {% elif w_unit == 'W' %}{% set w_val = '%.3g' | format(w.max_power_w) %}
+                  {% else %}{% set w_val = w.max_power_dbm %}{% endif %}
+                  <div class="col-sm-2">
+                    <label class="form-label small mb-1">Max power</label>
+                    <input type="number" name="max_power_dbm" class="form-control form-control-sm" step="any"
+                           value="{{ w_val }}" placeholder="blank = No Fire">
                   </div>
                   <div class="col-sm-2">
+                    <label class="form-label small mb-1">Unit</label>
+                    <select name="max_power_unit" class="form-select form-select-sm">
+                      <option value="dBm" {{ 'selected' if w_unit == 'dBm' else '' }}>dBm</option>
+                      <option value="dBW" {{ 'selected' if w_unit == 'dBW' else '' }}>dBW</option>
+                      <option value="W" {{ 'selected' if w_unit == 'W' else '' }}>W</option>
+                    </select>
+                  </div>
+                  <div class="col-sm-1">
                     <button type="submit" class="btn btn-sm btn-primary w-100">
-                      <i class="bi bi-check2 me-1"></i>Save
+                      <i class="bi bi-check2"></i>
                     </button>
                   </div>
                 </form>
@@ -195,10 +208,18 @@
           </div>
           <div class="mb-3">
             <label class="form-label small fw-semibold mb-1">
-              Max power (dBm) <span class="text-muted fw-normal">— leave blank for No Fire</span>
+              Max power <span class="text-muted fw-normal">— leave blank for No Fire</span>
             </label>
-            <input type="number" name="max_power_dbm" class="form-control form-control-sm"
-                   step="0.1" placeholder="blank = No Fire">
+            <div class="input-group input-group-sm">
+              <input type="number" name="max_power_dbm" class="form-control form-control-sm"
+                     step="any" placeholder="blank = No Fire">
+              <select name="max_power_unit" class="form-select form-select-sm" style="max-width:80px">
+                <option value="dBm" selected>dBm</option>
+                <option value="dBW">dBW</option>
+                <option value="W">W</option>
+              </select>
+            </div>
+            <div class="form-text text-muted small">Stored as dBm; displayed in dBm / dBW / W.</div>
           </div>
           <button type="submit" class="btn btn-primary btn-sm w-100">
             <i class="bi bi-plus-lg me-1"></i>Add Window

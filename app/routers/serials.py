@@ -60,6 +60,7 @@ async def serial_create(
     request: Request,
     title: str = Form(...),
     notes: str = Form(""),
+    instructions: str = Form(""),
     package_ids: list[int] = Form(default=[]),
     action: str = Form("start"),
     activity_id: int = Form(0),
@@ -70,6 +71,7 @@ async def serial_create(
     serial = Serial(
         title=title.strip(),
         notes=notes.strip() or None,
+        instructions=instructions.strip() or None,
         opened_by_id=current_user.id,
         is_testing=testing,
     )
@@ -245,6 +247,32 @@ async def serial_delete(
     return RedirectResponse("/serials?toast=Pending+serial+discarded", status_code=302)
 
 
+@router.post("/{serial_id}/details")
+async def serial_update_details(
+    serial_id: int,
+    notes: str = Form(""),
+    instructions: str = Form(""),
+    redirect: str = Form("/serials"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update a serial's notes and operational instructions (any time before close)."""
+    serial = db.query(Serial).filter(
+        Serial.id == serial_id, Serial.is_testing == is_testing_state(db),
+    ).first()
+    if serial and serial.closed_at is None:
+        serial.notes = notes.strip() or None
+        serial.instructions = instructions.strip() or None
+        db.add(AuditLog(
+            user_id=current_user.id, action_type="SERIAL_UPDATE",
+            entity_type="Serial", entity_id=serial_id, new_value=serial.title,
+            comment="Updated serial notes/instructions",
+        ))
+        db.commit()
+    target = redirect if redirect.startswith("/") else "/serials"
+    return RedirectResponse(f"{target}?toast=Serial+updated", status_code=302)
+
+
 @router.post("/{serial_id}/packages/add")
 async def serial_add_package(
     serial_id: int,
@@ -390,6 +418,7 @@ async def serial_copy_to_other(
     new_serial = Serial(
         title=orig.title,
         notes=orig.notes,
+        instructions=orig.instructions,
         opened_by_id=current_user.id,
         is_testing=target,
     )

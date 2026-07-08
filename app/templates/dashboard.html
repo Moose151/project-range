@@ -203,8 +203,8 @@
                       <td class="text-muted py-1">{{ w.label or '—' }}</td>
                       <td class="py-1">
                         {% if w.max_power_dbm is not none %}
-                        <span class="badge bg-warning text-dark" style="font-size:0.7rem">
-                          ≤{{ w.max_power_dbm }} dBm
+                        <span class="badge bg-warning text-dark" style="font-size:0.7rem" title="{{ w.max_power_all }}">
+                          ≤{{ w.max_power_all }}
                         </span>
                         {% else %}
                         <span class="badge bg-danger" style="font-size:0.7rem">No Fire</span>
@@ -310,12 +310,18 @@
             {% endif %}
             {% endif %}
           </div>
+          {% if serial and serial.instructions %}
+          <div class="alert alert-info py-2 px-3 mb-0 rounded-0 d-flex gap-2 border-start-0 border-end-0">
+            <i class="bi bi-card-checklist mt-1"></i>
+            <div class="small" style="white-space:pre-wrap"><span class="fw-semibold">Instructions:</span> {{ serial.instructions }}</div>
+          </div>
+          {% endif %}
           <div class="card-body p-0 overflow-auto serial-table-body"
                id="signalTableContainer-{{ sval }}"
                {% if serial %}hx-get="/dashboard/fragment/{{ serial.id }}"{% else %}hx-get="/dashboard/fragment"{% endif %}
                hx-trigger="every 5s, range-state-changed from:body"
                hx-swap="innerHTML" hx-on::after-request="updateRefreshTime()">
-            {% with signals=w_signals, buzzer_active=w_buzzer, serial_id=(serial.id if serial else none), pkg_rf_by_signal=(sd.pkg_rf_by_signal if serial else {}), closed_loop=(serial.is_closed_loop if serial else False) %}
+            {% with signals=w_signals, buzzer_active=w_buzzer, serial_id=(serial.id if serial else none), pkg_rf_by_signal=(sd.pkg_rf_by_signal if serial else {}), priority_by_signal=(sd.priority_by_signal if serial else {}), closed_loop=(serial.is_closed_loop if serial else False) %}
             {% include "partials/signal_table.html" %}
             {% endwith %}
           </div>
@@ -428,6 +434,7 @@ function saveUtilityWidgets() {
     if (type === 'notes') config.text = group.querySelector('textarea')?.value || '';
     if (type === 'doc') config.slug = group.querySelector('select')?.value || '';
     if (type === 'clock') config.mode = group.querySelector('[data-clock-mode]')?.value || 'both';
+    if (type === 'chat') config.selectedRoom = group.querySelector('[data-dashboard-chat-widget]')?.dataset.selectedRoom || '';
     return { id, type, config, collapsed: group.classList.contains('collapsed'), span1: group.classList.contains('span-1') };
   });
   localStorage.setItem(UTILITY_WIDGETS_KEY, JSON.stringify(widgets));
@@ -645,7 +652,12 @@ function renderUtilityWidget(widget) {
   if (widget.collapsed) setCollapsed(group, true);
   if (type === 'doc' && widget.config?.slug) loadDocWidget(id, widget.config.slug);
   if (type === 'clock') updateUtilityClocks();
-  if (type === 'chat') renderDashboardChatWidget();
+  if (type === 'chat') {
+    // Restore the previously selected chat room so it re-opens on return.
+    const cw = group.querySelector('[data-dashboard-chat-widget]');
+    if (cw && widget.config?.selectedRoom) cw.dataset.selectedRoom = widget.config.selectedRoom;
+    renderDashboardChatWidget();
+  }
   if (type === 'live-spectrum') liveSpecInit(id);
 }
 function restoreUtilityWidgets() {
@@ -752,7 +764,10 @@ function renderDashboardChatWidget() {
           <i class="bi bi-person-fill me-1"></i>${escapeHtml(u.display_name)} ${chatRoleBadge(u)}
         </button>`).join('') : '<span class="text-muted">No other users online.</span>';
     }
-    if (selected) loadDashboardChatMessages(widgetId, selected);
+    if (selected && roomList.some(room => room.id === selected)) {
+      setDashboardChatEnabled(widget, true);
+      loadDashboardChatMessages(widgetId, selected);
+    }
   });
 }
 
@@ -781,6 +796,7 @@ function selectDashboardChatRoom(widgetId, roomId) {
   if (!widget) return;
   widget.dataset.selectedRoom = roomId || '';
   widget.dataset.lastMessageId = '0';
+  saveUtilityWidgets();  // remember the open room so it re-opens on return
   setDashboardChatEnabled(widget, Boolean(roomId));
   if (roomId) {
     clearChatUnread?.(roomId, { redraw: false });
@@ -1112,7 +1128,7 @@ function splitActive(groupId) {
 // ── Column show/hide (applies to every signal table, persisted) ─────────────
 const COL_DEFS = [
   ['call','Effects'],['chameleon','Chameleon (+ copy)'],
-  ['signal','Signal'],['source','Source'],['status','Status'],['engaged','Engaged'],
+  ['signal','Signal'],['priority','Priority'],['source','Source'],['status','Status'],['engaged','Engaged'],
   ['tx_if','TxIF'],
   ['tx_rf','TxRF'],['rx_rf','RxRF'],['rx_if','RxIF'],['unit','Unit'],['band','Band'],
   ['mod','Mod'],['sym','Sym Rate'],['fec','FEC'],['antenna','Antenna'],['power','Power'],
@@ -1265,7 +1281,7 @@ function updateCDATimers() {
       const winName = activeWin.label
         ? `${activeWin.start}–${activeWin.end} (${activeWin.label})`
         : `${activeWin.start}–${activeWin.end}`;
-      const typeShort = activeWin.type === 'no_fire' ? 'NO FIRE' : `≤${activeWin.max_power_dbm} dBm`;
+      const typeShort = activeWin.type === 'no_fire' ? 'NO FIRE' : `≤${activeWin.max_power_all || (activeWin.max_power_dbm + ' dBm')}`;
       labelEl.textContent = `⚠ IN CDA [${typeShort}]`;
       nameEl.textContent = winName;
       countdownEl.textContent = cdaFmtHms(remainSec);
@@ -1314,7 +1330,7 @@ function updateCDATimers() {
     const winName = nextWin.label
       ? `${nextWin.start}–${nextWin.end} (${nextWin.label})`
       : `${nextWin.start}–${nextWin.end}`;
-    const typeShort = nextWin.type === 'no_fire' ? 'No Fire' : `Reduced Power ≤${nextWin.max_power_dbm} dBm`;
+    const typeShort = nextWin.type === 'no_fire' ? 'No Fire' : `Reduced Power ≤${nextWin.max_power_all || (nextWin.max_power_dbm + ' dBm')}`;
 
     labelEl.textContent = 'Next CDA';
     nameEl.textContent = `${winName} [${typeShort}]`;

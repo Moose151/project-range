@@ -1,21 +1,27 @@
 import re
+import secrets
 from html import escape
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urlencode
+from urllib.parse import quote_plus, urlencode
 
 import bleach
 import markdown as md_lib
-from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from app.config import DATA_DIR, MAX_DOC_ATTACHMENT_BYTES
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, require_supervisor
-from app.models import AuditLog, DocAlias, DocLink, DocPage, DocVersion, User
+from app.models import AuditLog, DocAlias, DocAttachment, DocLink, DocPage, DocVersion, User
+from app.upload_validation import clean_upload_name, validate_upload_file
+
+DOC_ATTACHMENT_DIR = DATA_DIR / "doc_attachments"
+DOC_ATTACHMENT_EXTENSIONS = {"pdf"}
 
 router = APIRouter(prefix="/docs")
 from app.templating import templates
@@ -850,6 +856,103 @@ async def docs_delete_page(
     ))
     db.commit()
     return RedirectResponse("/docs?toast=Documentation+page+deleted", status_code=302)
+
+
+# ── PDF attachments ───────────────────────────────────────────────────────────
+
+@router.post("/{slug}/attachments")
+async def docs_upload_attachment(
+    slug: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Attach a PDF to a documentation page."""
+    doc = db.query(DocPage).filter(DocPage.slug == slug, DocPage.is_published == True).first()
+    if not doc or not _can_view_doc(doc, current_user):
+        return RedirectResponse("/docs?toast=Documentation+page+not+found", status_code=302)
+
+    content = await file.read()
+    try:
+        original_name = validate_upload_file(
+            file.filename, content,
+            allowed_extensions=DOC_ATTACHMENT_EXTENSIONS,
+            max_bytes=MAX_DOC_ATTACHMENT_BYTES,
+        )
+    except ValueError as e:
+        return RedirectResponse(f"/docs/{doc.slug}?toast={quote_plus(str(e))}", status_code=302)
+
+    DOC_ATTACHMENT_DIR.mkdir(parents=True, exist_ok=True)
+    stored_name = f"{doc.id}_{secrets.token_hex(8)}.pdf"
+    (DOC_ATTACHMENT_DIR / stored_name).write_bytes(content)
+
+    attachment = DocAttachment(
+        page_id=doc.id,
+        filename=original_name,
+        stored_name=stored_name,
+        content_type="application/pdf",
+        size_bytes=len(content),
+        uploaded_by_id=current_user.id,
+    )
+    db.add(attachment)
+    db.add(AuditLog(
+        user_id=current_user.id, action_type="doc_attachment_add",
+        entity_type="DocPage", entity_id=doc.id, new_value=original_name,
+    ))
+    db.commit()
+    return RedirectResponse(f"/docs/{doc.slug}?toast=PDF+attached", status_code=302)
+
+
+@router.get("/{slug}/attachments/{attachment_id}")
+async def docs_get_attachment(
+    slug: str,
+    attachment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Serve an attached PDF inline."""
+    doc = db.query(DocPage).filter(DocPage.slug == slug).first()
+    if not doc or not _can_view_doc(doc, current_user):
+        return RedirectResponse("/docs?toast=Documentation+page+not+found", status_code=302)
+    attachment = db.query(DocAttachment).filter(
+        DocAttachment.id == attachment_id, DocAttachment.page_id == doc.id,
+    ).first()
+    if not attachment:
+        return RedirectResponse(f"/docs/{doc.slug}?toast=Attachment+not+found", status_code=302)
+    path = DOC_ATTACHMENT_DIR / attachment.stored_name
+    if not path.exists():
+        return RedirectResponse(f"/docs/{doc.slug}?toast=Attachment+file+missing", status_code=302)
+    return FileResponse(
+        path, media_type="application/pdf", filename=attachment.filename,
+        content_disposition_type="inline",
+    )
+
+
+@router.post("/{slug}/attachments/{attachment_id}/delete")
+async def docs_delete_attachment(
+    slug: str,
+    attachment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    doc = db.query(DocPage).filter(DocPage.slug == slug).first()
+    if not doc:
+        return RedirectResponse("/docs?toast=Documentation+page+not+found", status_code=302)
+    attachment = db.query(DocAttachment).filter(
+        DocAttachment.id == attachment_id, DocAttachment.page_id == doc.id,
+    ).first()
+    if attachment:
+        try:
+            (DOC_ATTACHMENT_DIR / attachment.stored_name).unlink(missing_ok=True)
+        except OSError:
+            pass
+        db.add(AuditLog(
+            user_id=current_user.id, action_type="doc_attachment_delete",
+            entity_type="DocPage", entity_id=doc.id, previous_value=attachment.filename,
+        ))
+        db.delete(attachment)
+        db.commit()
+    return RedirectResponse(f"/docs/{doc.slug}?toast=Attachment+removed", status_code=302)
 
 
 @router.get("/{slug}", response_class=HTMLResponse)

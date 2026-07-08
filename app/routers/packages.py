@@ -200,6 +200,7 @@ def _package_to_dict(pkg: SignalPackage) -> dict:
             {
                 "name": e.signal_name,
                 "description": e.description or "",
+                "priority": e.priority,
                 "band": e.band or "",
                 "tx_if": e.tx_if,
                 "tx_rf": e.tx_rf,
@@ -234,6 +235,7 @@ def _dict_to_entries(data: dict) -> list[dict]:
         entries.append({
             "signal_name": str(s.get("name", "")).strip(),
             "description": str(s.get("description", "")).strip() or None,
+            "priority": _int_or_none(s.get("priority")),
             "band": str(s.get("band", "")).strip() or None,
             "tx_if": _float_or_none(s.get("tx_if")),
             "tx_rf": _float_or_none(s.get("tx_rf")),
@@ -622,6 +624,13 @@ def _float_or_none(v) -> Optional[float]:
         return None
 
 
+def _int_or_none(v) -> Optional[int]:
+    try:
+        return int(v) if v is not None and v != "" else None
+    except (ValueError, TypeError):
+        return None
+
+
 # ── List ──────────────────────────────────────────────────────────────────────
 
 @router.get("", response_class=HTMLResponse)
@@ -776,6 +785,7 @@ async def package_signal_add(
     pkg_id: int,
     signal_name: str = Form(...),
     description: str = Form(""),
+    priority: Optional[int] = Form(None),
     band: str = Form(""),
     tx_if: Optional[float] = Form(None),
     tx_rf: Optional[float] = Form(None),
@@ -812,6 +822,7 @@ async def package_signal_add(
     entry = SignalPackageEntry(
         package_id=pkg_id,
         display_order=order,
+        priority=priority,
         signal_name=signal_name.strip(),
         description=description.strip() or None,
         band=band or None,
@@ -841,6 +852,7 @@ async def package_signal_update(
     entry_id: int,
     signal_name: str = Form(...),
     description: str = Form(""),
+    priority: Optional[int] = Form(None),
     band: str = Form(""),
     tx_if: Optional[float] = Form(None),
     tx_rf: Optional[float] = Form(None),
@@ -878,6 +890,7 @@ async def package_signal_update(
     if entry:
         entry.signal_name = signal_name.strip()
         entry.description = description.strip() or None
+        entry.priority = priority
         entry.band = band or None
         entry.tx_if = tx_if; entry.tx_rf = tx_rf
         entry.rx_rf = rx_rf; entry.rx_if = rx_if

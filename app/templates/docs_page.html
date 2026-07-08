@@ -67,6 +67,19 @@
         {{ rendered | safe }}
       </div>
     </div>
+    {% for att in doc_page.attachments %}
+    <div class="card border-secondary mt-3">
+      <div class="card-header d-flex align-items-center gap-2 py-2">
+        <i class="bi bi-file-earmark-pdf text-danger"></i>
+        <span class="fw-semibold small flex-grow-1 text-truncate">{{ att.filename }}</span>
+        <a href="/docs/{{ doc_page.slug }}/attachments/{{ att.id }}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-2">
+          <i class="bi bi-box-arrow-up-right me-1"></i>Open
+        </a>
+      </div>
+      <embed src="/docs/{{ doc_page.slug }}/attachments/{{ att.id }}#toolbar=1" type="application/pdf"
+             style="width:100%;height:600px;border:0" title="{{ att.filename }}">
+    </div>
+    {% endfor %}
   </div>
   <div class="col-xl-3">
     <div class="docs-side-panel mb-3">
@@ -91,6 +104,37 @@
         </div>
         {% endif %}
       </div>
+    </div>
+
+    <div class="docs-side-panel mb-3">
+      <div class="docs-side-heading"><i class="bi bi-file-earmark-pdf me-1"></i>PDF Attachments</div>
+      <div class="list-group list-group-flush docs-category-list">
+        {% for att in doc_page.attachments %}
+        <div class="list-group-item d-flex align-items-center gap-2 py-2 small">
+          <i class="bi bi-file-earmark-pdf text-danger"></i>
+          <a href="/docs/{{ doc_page.slug }}/attachments/{{ att.id }}" target="_blank" class="text-decoration-none flex-grow-1 text-truncate" title="{{ att.filename }}">{{ att.filename }}</a>
+          <span class="text-muted" style="font-size:0.7rem">{{ (att.size_bytes / 1024) | round(0, 'floor') | int }} KB</span>
+          {% if user.role != 'observer' %}
+          <form method="post" action="/docs/{{ doc_page.slug }}/attachments/{{ att.id }}/delete"
+                onsubmit="return confirm('Remove {{ att.filename | e }}?')">
+            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Remove PDF">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </form>
+          {% endif %}
+        </div>
+        {% else %}
+        <div class="list-group-item text-muted small">No PDFs attached.</div>
+        {% endfor %}
+      </div>
+      {% if user.role != 'observer' %}
+      <div class="p-2 border-top">
+        <form method="post" action="/docs/{{ doc_page.slug }}/attachments" enctype="multipart/form-data" class="d-flex flex-column gap-1">
+          <input type="file" class="form-control form-control-sm" name="file" accept="application/pdf,.pdf" required>
+          <button type="submit" class="btn btn-sm btn-outline-primary"><i class="bi bi-upload me-1"></i>Upload PDF</button>
+        </form>
+      </div>
+      {% endif %}
     </div>
 
     {% if user.role == 'administrator' %}

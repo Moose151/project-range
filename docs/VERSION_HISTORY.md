@@ -1,7 +1,18 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.25.3**
+Current version: **0.26.0**
+
+---
+
+## 0.26.0 — Effects, Priority, Serial Instructions, CDA Units, PDF Docs
+
+- **"Call" renamed to "Effects":** The dashboard signal inline button is now an asterisk (**✳**) **Effects** button — the phone icon is gone. Selecting an effect still logs a serial entry capturing the effect type and modem state (Eb/No, Channel Sync, Carrier Lock, Mod Lock). The admin-configurable list is now **Admin → Config → Effects**, and the Signal Logs quick-filter is **Effect logs only** (`entry_type=Effect`).
+- **Signal priority column:** Signal package entries now carry an optional **Priority** number (lower = higher priority). It appears on the package editor and as a hideable **Priority** column on the dashboard signals widget (resolved by signal name from the serial's assigned packages). Priority round-trips through package JSON import/export.
+- **Serial instructions:** Serials now have a dedicated **Instructions** field for operational direction (e.g. "Turn on signal 102 at 1400Z"). It is captured on serial creation, editable at any time before close from the Serials page, copied on cross-workspace copy, and displayed prominently as an info banner on the dashboard serial widget and the Serials list.
+- **CDA power in W / dBW / dBm:** CDA reduced-power windows can be entered in **dBm, dBW, or Watts** and are displayed in all three units everywhere (CDA editor, dashboard CDA widget table, and the live countdown banner). Values are stored canonically in dBm; the entered unit is preserved for editing.
+- **PDF attachments on documentation pages:** Documentation pages now support **PDF uploads**. Attached PDFs list in the page side panel (view / download / remove) and embed inline below the article. Uploads are validated (PDF only, up to 20 MB) and stored outside the database under `DATA_DIR/doc_attachments`.
+- **Dashboard chat remembers the open room:** The dashboard chat widget now persists the selected chat room. Navigating away and back re-opens the same conversation (input enabled, messages loaded) instead of resetting to "Select a chat".
 
 ---
 

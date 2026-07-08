@@ -163,6 +163,7 @@ class SignalPackageEntry(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     package_id: Mapped[int] = mapped_column(ForeignKey("signal_packages.id"), nullable=False)
     display_order: Mapped[int] = mapped_column(Integer, default=0)
+    priority: Mapped[int | None] = mapped_column(Integer, nullable=True)
     signal_name: Mapped[str] = mapped_column(String(128), nullable=False)
     description: Mapped[str | None] = mapped_column(String(256), nullable=True)
     band: Mapped[str | None] = mapped_column(String(16), nullable=True)
@@ -197,6 +198,7 @@ class Serial(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(256), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
     opened_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     opened_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     closed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
@@ -365,6 +367,30 @@ class DocPage(Base):
         cascade="all, delete-orphan",
         order_by="DocAlias.alias_title",
     )
+    attachments: Mapped[list["DocAttachment"]] = relationship(
+        "DocAttachment",
+        back_populates="page",
+        cascade="all, delete-orphan",
+        order_by="DocAttachment.uploaded_at.desc()",
+    )
+
+
+class DocAttachment(Base):
+    """A file (e.g. PDF) attached to a documentation page. Bytes live on disk
+    under DATA_DIR/doc_attachments; only metadata is stored in the DB."""
+    __tablename__ = "doc_attachments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    page_id: Mapped[int] = mapped_column(ForeignKey("doc_pages.id"), nullable=False, index=True)
+    filename: Mapped[str] = mapped_column(String(256), nullable=False)   # original display name
+    stored_name: Mapped[str] = mapped_column(String(256), nullable=False)  # on-disk name
+    content_type: Mapped[str] = mapped_column(String(128), default="application/pdf")
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    uploaded_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    page: Mapped["DocPage"] = relationship("DocPage", back_populates="attachments")
+    uploaded_by: Mapped[User] = relationship("User", foreign_keys="DocAttachment.uploaded_by_id")
 
 
 class DocAlias(Base):
@@ -714,7 +740,10 @@ class CDAWindow(Base):
     label: Mapped[str | None] = mapped_column(String(128), nullable=True)
     start_zulu: Mapped[str] = mapped_column(String(5), nullable=False)   # 'HH:MM'
     end_zulu: Mapped[str] = mapped_column(String(5), nullable=False)     # 'HH:MM'
+    # Canonical ceiling is always stored in dBm. max_power_unit records the unit
+    # the value was entered/displayed in (dBm | dBW | W) for round-tripping forms.
     max_power_dbm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_power_unit: Mapped[str] = mapped_column(String(4), default="dBm")
 
     cda_table: Mapped["CDATable"] = relationship("CDATable", back_populates="windows")
 
@@ -723,9 +752,28 @@ class CDAWindow(Base):
         return "reduced_power" if self.max_power_dbm is not None else "no_fire"
 
     @property
+    def max_power_dbw(self) -> float | None:
+        """Ceiling expressed in dBW (dBm − 30)."""
+        return None if self.max_power_dbm is None else self.max_power_dbm - 30.0
+
+    @property
+    def max_power_w(self) -> float | None:
+        """Ceiling expressed in Watts (10^((dBm − 30) / 10))."""
+        return None if self.max_power_dbm is None else 10 ** ((self.max_power_dbm - 30.0) / 10.0)
+
+    @property
+    def max_power_all_label(self) -> str:
+        """All three unit representations, e.g. '10.0 dBm / −20.0 dBW / 0.01 W'."""
+        if self.max_power_dbm is None:
+            return "—"
+        w = self.max_power_w
+        w_str = f"{w:.3g} W" if w is not None else "—"
+        return f"{self.max_power_dbm:.1f} dBm / {self.max_power_dbw:.1f} dBW / {w_str}"
+
+    @property
     def window_type_label(self) -> str:
         if self.max_power_dbm is not None:
-            return f"Reduced Power (max {self.max_power_dbm:.1f} dBm)"
+            return f"Reduced Power (max {self.max_power_all_label})"
         return "No Fire"
 
 
