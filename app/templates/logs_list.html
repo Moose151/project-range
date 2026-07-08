@@ -11,6 +11,10 @@
   <span class="badge bg-info text-dark"><i class="bi bi-clock-history me-1"></i>History: {{ filters.signal_name }}</span>
   <a href="/logs" class="btn btn-sm btn-outline-secondary py-0">Clear</a>
   {% endif %}
+  {% if filters.entry_type %}
+  <span class="badge bg-info text-dark"><i class="bi bi-telephone me-1"></i>{{ filters.entry_type }} logs only</span>
+  <a href="/logs" class="btn btn-sm btn-outline-secondary py-0">Clear</a>
+  {% endif %}
   <div class="ms-auto d-flex gap-2 flex-wrap">
     <a href="/logs/export/csv?search={{ filters.search }}&status={{ filters.status }}&band={{ filters.band }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&activity={{ filters.activity }}"
        class="btn btn-sm btn-outline-secondary">
@@ -76,6 +80,7 @@
                value="{{ filters.date_to }}" title="To date">
       </div>
       <input type="hidden" name="signal_name" value="{{ filters.signal_name }}">
+      <input type="hidden" name="entry_type" value="{{ filters.entry_type }}">
       <div class="col-auto">
         <button type="submit" class="btn btn-sm btn-primary">
           <i class="bi bi-search me-1"></i>Filter
@@ -111,6 +116,10 @@
   <a class="btn btn-sm btn-outline-secondary py-0" href="/logs?date_from={{ quick_dates.yesterday }}&date_to={{ quick_dates.yesterday }}">Yesterday</a>
   <a class="btn btn-sm btn-outline-secondary py-0" href="/logs?date_from={{ quick_dates.last7 }}&date_to={{ quick_dates.today }}">Last 7 days</a>
   <a class="btn btn-sm btn-outline-danger py-0" href="/logs?status=Faulted">Faulted</a>
+  <a class="btn btn-sm btn-outline-info py-0 {% if filters.entry_type == 'Call' %}active{% endif %}"
+     href="{% if filters.entry_type == 'Call' %}/logs{% else %}/logs?entry_type=Call{% endif %}">
+    <i class="bi bi-telephone me-1"></i>Call logs only
+  </a>
   {% if active_serials %}
   <a class="btn btn-sm btn-outline-success py-0" href="/logs?serial_id={{ active_serials[0].id }}">Current serial</a>
   {% endif %}

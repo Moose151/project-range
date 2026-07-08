@@ -22,6 +22,8 @@
   <thead class="table-secondary">
     <tr>
       <th></th>
+      <th data-col="call" class="text-nowrap">Call</th>
+      <th data-col="chameleon"></th>
       <th data-col="signal">Signal</th>
       <th data-col="source">Source</th>
       <th data-col="status">Status</th>
@@ -78,6 +80,41 @@
                 title="Quick-edit {{ log.signal_name }}">
           <i class="bi bi-pencil-square"></i>
         </button>
+      </td>
+      <td data-col="call" class="py-0">
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-info py-0 px-2 dropdown-toggle" type="button"
+                  data-bs-toggle="dropdown" aria-expanded="false"
+                  title="Log a call for {{ log.signal_name }}">
+            <i class="bi bi-telephone me-1"></i>Call
+          </button>
+          <ul class="dropdown-menu dropdown-menu-dark">
+            {% if call_types is defined and call_types %}
+              {% for ct in call_types %}
+              <li>
+                <form method="post" action="/dashboard/signal-call" class="d-block">
+                  <input type="hidden" name="signal_name" value="{{ log.signal_name }}">
+                  <input type="hidden" name="serial_id" value="{{ serial_id if serial_id is not none else '' }}">
+                  <input type="hidden" name="call_type" value="{{ ct }}">
+                  <button type="submit" class="dropdown-item small py-1">{{ ct }}</button>
+                </form>
+              </li>
+              {% endfor %}
+            {% else %}
+              <li><span class="dropdown-item text-muted small">No call types configured</span></li>
+            {% endif %}
+          </ul>
+        </div>
+      </td>
+      <td data-col="chameleon" class="py-0" style="width:36px">
+        <form method="post" action="/dashboard/chameleon">
+          <input type="hidden" name="signal_name" value="{{ log.signal_name }}">
+          <input type="hidden" name="serial_id" value="{{ serial_id if serial_id is not none else '' }}">
+          <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                  title="Create chameleon of {{ log.signal_name }} (duplicate for parameter change tracking)">
+            <i class="bi bi-plus-lg"></i>
+          </button>
+        </form>
       </td>
       <td data-col="signal" class="fw-semibold"><a href="/logs?signal_name={{ log.signal_name }}" class="text-reset text-decoration-none" title="View history for {{ log.signal_name }}">{{ log.signal_name }}</a></td>
       <td data-col="source" class="text-muted small">{{ log.source or 'No modem assigned' }}</td>
@@ -156,7 +193,7 @@
 
     <!-- Inline quick-edit row (collapsed by default) -->
     <tr class="collapse" id="{{ row_id }}-edit">
-      <td colspan="20" class="p-0">
+      <td colspan="22" class="p-0">
         <div class="p-2 bg-body-tertiary border-top border-secondary">
           <form data-dashboard-edit-form="{{ row_id }}" onsubmit="event.preventDefault(); submitAllDirty(this);">
             <input type="hidden" name="signal_name" value="{{ log.signal_name }}">

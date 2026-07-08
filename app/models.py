@@ -523,6 +523,16 @@ class ActivityType(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class CallType(Base):
+    """Admin-configurable list of call types for the dashboard Call button."""
+    __tablename__ = "call_types"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    display_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class Activity(Base):
     __tablename__ = "activities"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

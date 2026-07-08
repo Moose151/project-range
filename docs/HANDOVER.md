@@ -5,7 +5,7 @@
 
 ---
 
-## ⚑ Current Status & Handover — 2026-07-07 (READ THIS FIRST)
+## ⚑ Current Status & Handover — 2026-07-08 (READ THIS FIRST)
 
 > The detailed sections **below this block predate a large body of work** and are
 > partially stale (e.g. port, model/router lists, "dark only", **top navbar** —
@@ -13,13 +13,20 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.25.2` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.25.3` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
 **DB:** SQLite at `/app/data/range.db` (named volume). `init_db.py` runs automatically on container start and is idempotent (migrations + new tables auto-create).
 
 ### Shipped (all on `main`, in order)
+- **0.25.3 — Dashboard signal Call button + Chameleon signal tracking:**
+  - **Call button** on every dashboard signal row (column `call`, hideable via column picker). A Bootstrap dropdown lists admin-configured call types; selecting one creates a `SignalLog` with `entry_type="Call"` capturing the call type name plus current Eb/No, Channel Sync, Carrier Lock, and Mod Lock (EBEM state from CBM if available) in the notes field.
+  - **Call Types** admin config tab at `/config` → Call Types: full CRUD + drag-reorder, same pattern as Activity Types. Seeded defaults: Radio Check, Time Hack, Status Check, Briefing Call, Security Call. Model `CallType` in `app/models.py`; CRUD routes in `app/routers/config.py`.
+  - **Chameleon (+) button** on every dashboard signal row (column `chameleon`, hideable). Pressing it creates a duplicate signal named `{base}-1`, `{base}-2`, etc. (stripping any existing `-N` suffix first, then incrementing the highest suffix in the whole family). New signal copies all log fields from the original except `source` and `eb_no` (cleared). Creates a `Signal` registry entry and an initial `SignalLog` with `entry_type="Chameleon"`.
+  - **Modem source uniqueness enforced**: a CBM modem (`cbm_device_id`) can now only be assigned to one `SignalPackageEntry` at a time. Assigning it to a new signal clears it from any previous entry. Enforced in `_update_serial_package_signal_source` (dashboard), `package_signal_add`, and `package_signal_update` (packages) via `_clear_modem_from_other_entries` helper in each file.
+  - **"Call logs only" filter** added to `/logs` quick filters and the filter form. Filter chip toggles `?entry_type=Call`; active filter badge shown in the header. `_apply_filters` in `logs.py` accepts new `entry_type` kwarg.
+  - CSS/JS cache keys bumped to `app.css?v=34` / `app.js?v=33`.
 - **0.25.2 — Activity detail hub:**
   - `activity_detail.html` now provides an expandable planning hub for serials assigned to an activity: pending/active/completed groupings, readiness badges, serial details, CDA tables, assigned signal packages, and package signal rows.
   - `activities.py` adds activity-scoped write routes for editing open serial title/notes, assigning/removing serial packages, assigning/removing CDA tables, and updating package signal entries from the activity page. Observers and closed serials remain read-only.

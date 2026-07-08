@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, Form, Request
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 from urllib.parse import quote_plus
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials, is_testing_state
-from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage, SerialCDATable, CDAWindow, RFDevice
+from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage, SerialCDATable, CDAWindow, RFDevice, CallType, SignalPackageEntry
 from app.cbm_sync import sync_active_cbms
 from app.rf_config import serial_package_rf_config, recalculate_from_values
 from app.signal_warnings import warning_flags_for
@@ -161,6 +162,9 @@ def _update_serial_package_signal_source(
     if cbm_device:
         source_name = cbm_device.name
 
+    if cbm_device_id:
+        _clear_modem_from_other_entries(db, cbm_device_id)
+
     updated = 0
     for link in serial.package_links:
         for entry in link.package.signals:
@@ -197,6 +201,29 @@ def _get_antennas(db: Session) -> list[str]:
     ]
 
 
+def _get_call_types(db: Session) -> list[str]:
+    return [
+        ct.name for ct in db.query(CallType)
+        .filter(CallType.is_active == True)
+        .order_by(CallType.display_order, CallType.name)
+        .all()
+    ]
+
+
+def _clear_modem_from_other_entries(db: Session, cbm_device_id: int, except_entry_id: int | None = None) -> None:
+    """Enforce one-to-one modem assignment: clear this modem from any other package signal entries."""
+    if not cbm_device_id:
+        return
+    q = db.query(SignalPackageEntry).filter(
+        SignalPackageEntry.cbm_device_id == cbm_device_id
+    )
+    if except_entry_id is not None:
+        q = q.filter(SignalPackageEntry.id != except_entry_id)
+    for entry in q.all():
+        entry.cbm_device_id = None
+        entry.source = None
+
+
 def _cbm_status_by_source(db: Session, testing: bool) -> dict[str, dict | None]:
     """Return {device_name: sync_states_dict} for all CBM/EBEM-enabled modems.
 
@@ -226,6 +253,27 @@ def _cbm_status_by_source(db: Session, testing: bool) -> dict[str, dict | None]:
     return result
 
 
+def _chameleon_base_name(signal_name: str) -> str:
+    """Strip trailing -N suffix to find the family base name."""
+    m = re.match(r'^(.*)-(\d+)$', signal_name)
+    return m.group(1) if m else signal_name
+
+
+def _next_chameleon_name(db: Session, signal_name: str) -> str:
+    """Return the next available chameleon name in the family (base, base-1, base-2, ...)."""
+    base = _chameleon_base_name(signal_name)
+    pattern = re.compile(r'^' + re.escape(base) + r'(?:-(\d+))?$')
+    existing = db.query(Signal).filter(Signal.name.like(f"{base}%")).all()
+    max_n = 0
+    for sig in existing:
+        m = pattern.match(sig.name)
+        if m:
+            n = int(m.group(1)) if m.group(1) else 0
+            if n > max_n:
+                max_n = n
+    return f"{base}-{max_n + 1}"
+
+
 def _get_exclusivity_map(db: Session) -> dict[str, list[str]]:
     """Return {signal_name: [sibling_names]} for signals in exclusivity groups."""
     sigs = db.query(Signal).filter(
@@ -253,6 +301,7 @@ def _dashboard_ctx(db: Session) -> dict:
     antenna_types = _get_antennas(db)
     exclusivity_map = _get_exclusivity_map(db)
 
+    call_types = _get_call_types(db)
     active_serials = get_active_serials(db)
 
     if active_serials:
@@ -330,6 +379,7 @@ def _dashboard_ctx(db: Session) -> dict:
         "exclusivity_map": exclusivity_map,
         "local_timezone": get_local_timezone(db),
         "cda_by_serial": cda_by_serial,
+        "call_types": call_types,
     }
 
 
@@ -361,6 +411,161 @@ async def dashboard_cbm_sync(
         first_issue = result.errors[0]
         message += f", {len(result.errors)} issue(s): {first_issue[:120]}"
     return RedirectResponse(f"/?toast={quote_plus(message)}", status_code=302)
+
+
+@router.post("/dashboard/signal-call")
+async def dashboard_signal_call(
+    signal_name: str = Form(...),
+    serial_id: Optional[int] = Form(None),
+    call_type: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a call log entry for a signal, capturing modem state at time of call."""
+    testing = is_testing_state(db)
+    range_state = get_current_range_state(db)
+
+    latest_q = db.query(SignalLog).filter(
+        SignalLog.signal_name == signal_name,
+        SignalLog.is_deleted == False,
+        SignalLog.is_testing == testing,
+    )
+    if serial_id is not None:
+        latest_q = latest_q.filter(SignalLog.serial_id == serial_id)
+    latest = latest_q.order_by(SignalLog.timestamp.desc()).first()
+
+    # Build modem state string from EBEM status if the signal has a CBM source
+    modem_parts = []
+    if latest and latest.eb_no is not None:
+        modem_parts.append(f"Eb/No: {latest.eb_no} dB")
+    else:
+        modem_parts.append("Eb/No: —")
+
+    cbm_status = _cbm_status_by_source(db, testing)
+    source = latest.source if latest else None
+    if source and source in cbm_status:
+        ebem = cbm_status[source]
+        if ebem:
+            modem_parts.append(f"Channel Sync: {'OK' if ebem.get('ebem_sync') == True else ('Fault' if ebem.get('ebem_sync') == False else '—')}")
+            modem_parts.append(f"Carrier Lock: {'OK' if ebem.get('carrier_lock') == True else ('Fault' if ebem.get('carrier_lock') == False else '—')}")
+            modem_parts.append(f"Mod Lock: {'OK' if ebem.get('bit_sync') == True else ('Fault' if ebem.get('bit_sync') == False else '—')}")
+        else:
+            modem_parts += ["Channel Sync: —", "Carrier Lock: —", "Mod Lock: —"]
+    else:
+        modem_parts += ["Channel Sync: —", "Carrier Lock: —", "Mod Lock: —"]
+
+    notes_text = f"Call: {call_type} | " + " | ".join(modem_parts)
+
+    new_entry = SignalLog(
+        operator_id=current_user.id,
+        range_state=range_state,
+        signal_name=signal_name,
+        signal_status=latest.signal_status if latest else "Down",
+        tx_if=latest.tx_if if latest else None,
+        tx_rf=latest.tx_rf if latest else None,
+        rx_rf=latest.rx_rf if latest else None,
+        rx_if=latest.rx_if if latest else None,
+        freq_unit=latest.freq_unit if latest else "MHz",
+        band=latest.band if latest else None,
+        modulation=latest.modulation if latest else None,
+        symbol_rate=latest.symbol_rate if latest else None,
+        fec=latest.fec if latest else None,
+        power=latest.power if latest else None,
+        power_unit=latest.power_unit if latest else "dBm",
+        eb_no=latest.eb_no if latest else None,
+        engaged=latest.engaged if latest else False,
+        source=latest.source if latest else None,
+        antenna=latest.antenna if latest else None,
+        notes=notes_text,
+        entry_type="Call",
+        updated_by_id=current_user.id,
+        serial_id=serial_id if serial_id is not None else (latest.serial_id if latest else None),
+        is_testing=testing,
+    )
+    db.add(new_entry)
+    db.add(AuditLog(
+        user_id=current_user.id,
+        action_type="SIGNAL_CALL_LOG",
+        entity_type="SignalLog",
+        new_value=f"{signal_name}: {call_type}",
+        comment=notes_text,
+    ))
+    db.commit()
+    return RedirectResponse(f"/?toast={quote_plus(f'Call logged: {call_type} for {signal_name}')}", status_code=302)
+
+
+@router.post("/dashboard/chameleon")
+async def dashboard_chameleon(
+    signal_name: str = Form(...),
+    serial_id: Optional[int] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a chameleon signal: a duplicate with an incremented name suffix, no modem source."""
+    testing = is_testing_state(db)
+    range_state = get_current_range_state(db)
+
+    new_name = _next_chameleon_name(db, signal_name)
+
+    # Ensure the new name doesn't already exist as a Signal registry entry
+    if not db.query(Signal).filter(Signal.name == new_name).first():
+        original_sig = db.query(Signal).filter(Signal.name == _chameleon_base_name(signal_name)).first()
+        db.add(Signal(
+            name=new_name,
+            description=f"Chameleon of {signal_name}",
+            default_band=original_sig.default_band if original_sig else None,
+            default_modulation=original_sig.default_modulation if original_sig else None,
+            default_symbol_rate=original_sig.default_symbol_rate if original_sig else None,
+            default_fec=original_sig.default_fec if original_sig else None,
+            max_power_dbm=original_sig.max_power_dbm if original_sig else None,
+        ))
+
+    # Copy latest log entry for the original signal — no source/modem
+    latest_q = db.query(SignalLog).filter(
+        SignalLog.signal_name == signal_name,
+        SignalLog.is_deleted == False,
+        SignalLog.is_testing == testing,
+    )
+    if serial_id is not None:
+        latest_q = latest_q.filter(SignalLog.serial_id == serial_id)
+    latest = latest_q.order_by(SignalLog.timestamp.desc()).first()
+
+    initial_entry = SignalLog(
+        operator_id=current_user.id,
+        range_state=range_state,
+        signal_name=new_name,
+        signal_status=latest.signal_status if latest else "Down",
+        tx_if=latest.tx_if if latest else None,
+        tx_rf=latest.tx_rf if latest else None,
+        rx_rf=latest.rx_rf if latest else None,
+        rx_if=latest.rx_if if latest else None,
+        freq_unit=latest.freq_unit if latest else "MHz",
+        band=latest.band if latest else None,
+        modulation=latest.modulation if latest else None,
+        symbol_rate=latest.symbol_rate if latest else None,
+        fec=latest.fec if latest else None,
+        power=latest.power if latest else None,
+        power_unit=latest.power_unit if latest else "dBm",
+        eb_no=None,
+        engaged=False,
+        source=None,
+        antenna=latest.antenna if latest else None,
+        notes=f"Chameleon of {signal_name}",
+        entry_type="Chameleon",
+        updated_by_id=current_user.id,
+        serial_id=serial_id if serial_id is not None else (latest.serial_id if latest else None),
+        is_testing=testing,
+    )
+    db.add(initial_entry)
+    db.add(AuditLog(
+        user_id=current_user.id,
+        action_type="SIGNAL_CHAMELEON",
+        entity_type="SignalLog",
+        new_value=new_name,
+        comment=f"Chameleon created from {signal_name} → {new_name}",
+    ))
+    db.commit()
+    return RedirectResponse(f"/?toast={quote_plus(f'Chameleon created: {new_name}')}", status_code=302)
 
 
 @router.get("/dashboard/fragment", response_class=HTMLResponse)

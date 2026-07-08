@@ -14,7 +14,7 @@ from app.models import (
     LogSession, SignalPackage, SignalPackageEntry, Serial, SerialPackage,
     DocPage, DocVersion, DocLink, DocAlias, AppSetting, RFDevice, DevicePort, DeviceLink,
     CDATable, CDAWindow, SerialCDATable, Incident, CeaseEvent, DutyRole, RoutingPreset,
-    ActivityType, Activity,
+    ActivityType, Activity, CallType,
 )
 from app.auth import hash_password
 from sqlalchemy.orm import Session
@@ -667,6 +667,12 @@ def main():
                 db.add(ActivityType(name=name, display_order=i))
             db.commit()
             print("Seeded default activity types.")
+
+        if not db.query(CallType).first():
+            for i, name in enumerate(["Radio Check", "Time Hack", "Status Check", "Briefing Call", "Security Call"]):
+                db.add(CallType(name=name, display_order=i))
+            db.commit()
+            print("Seeded default call types.")
 
         # Seed duty-role tags if table is empty
         if not db.query(DutyRole).first():

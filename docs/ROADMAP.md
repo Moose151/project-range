@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.25.2` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.25.3` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -19,7 +19,7 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.25.2)
+## ✅ Already delivered (through 0.25.3)
 
 Core of the MVP scope is in place:
 
@@ -73,6 +73,7 @@ Core of the MVP scope is in place:
 - Handover now has an Open Issues section, serials show readiness badges, and package cards show health/assignment badges
 - Documentation wiki home/page layouts are cleaner, with category counts, an Uncategorised filter, calmer result rows, and a less cluttered page toolbar
 - Activity detail pages now provide an inline planning hub for serial notes, CDA assignment, package assignment, and package signal edits
+- Dashboard signal rows now have a **Call** dropdown button (admin-configured call types; logs Eb/No, Channel Sync, Carrier Lock, Mod Lock at time of call) and a **+** (Chameleon) button to create a duplicate signal with an incremented name suffix for tracking parameter changes. Modem source enforced as one-to-one across all package signals. Call log filter added to Signal Logs.
 - **0.6.0:** TxLO/RxLO naming, version badge, fully offline (LAN) styling, Docker deploy on port 7474
 
 ---

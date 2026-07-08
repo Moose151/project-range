@@ -9,7 +9,7 @@ from app.database import get_db
 from app.deps import get_current_user, require_supervisor, get_current_range_state, is_testing_state
 from app.config import AUDIT_ARCHIVE_DIR, DATABASE_URL, SERIAL_ARCHIVE_DIR
 from app.file_security import permission_status
-from app.models import AuditLog, ModulationType, FecType, SignalSource, AntennaType, Signal, FrequencyTemplate, User, DutyRole, RFDevice, ActivityType, Activity
+from app.models import AuditLog, ModulationType, FecType, SignalSource, AntennaType, Signal, FrequencyTemplate, User, DutyRole, RFDevice, ActivityType, Activity, CallType
 from app.settings import (
     AUDIT_LIVE_RECORD_LIMIT_KEY,
     MAX_AUDIT_LIVE_RECORD_LIMIT,
@@ -92,6 +92,7 @@ async def config_page(
     freq_templates = db.query(FrequencyTemplate).order_by(FrequencyTemplate.name).all()
     duty_roles = db.query(DutyRole).order_by(DutyRole.display_order, DutyRole.name).all()
     activity_types = db.query(ActivityType).order_by(ActivityType.display_order, ActivityType.name).all()
+    call_types = db.query(CallType).order_by(CallType.display_order, CallType.name).all()
     db_path = _sqlite_db_path()
     db_permissions = permission_status(db_path) if db_path else {"mode": "n/a", "secure": None, "note": "Non-SQLite database."}
     audit_dir_permissions = permission_status(AUDIT_ARCHIVE_DIR, directory=True)
@@ -110,6 +111,7 @@ async def config_page(
         "freq_templates": freq_templates,
         "duty_roles": duty_roles,
         "activity_types": activity_types,
+        "call_types": call_types,
         "bands": ["C", "X", "Ku", "Ka", "Other"],
         "time_zones": TIME_ZONES,
         "local_timezone": get_local_timezone(db),
@@ -806,3 +808,79 @@ async def activity_type_reorder(
                     pass
     db.commit()
     return RedirectResponse("/config?toast=Order+saved#cfg-activity-types", status_code=302)
+
+
+# ── Call types ────────────────────────────────────────────────────────────────
+
+@router.post("/call-type/add")
+async def call_type_add(
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    name = name.strip()
+    if name and not db.query(CallType).filter(CallType.name == name).first():
+        max_order = db.query(CallType).count()
+        db.add(CallType(name=name, display_order=max_order))
+        db.commit()
+    return RedirectResponse("/config?toast=Call+type+added#cfg-call-types", status_code=302)
+
+
+@router.post("/call-type/{type_id}/edit")
+async def call_type_edit(
+    type_id: int,
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    ct = db.query(CallType).filter(CallType.id == type_id).first()
+    if ct:
+        ct.name = name.strip() or ct.name
+        db.commit()
+    return RedirectResponse("/config?toast=Call+type+updated#cfg-call-types", status_code=302)
+
+
+@router.post("/call-type/{type_id}/toggle")
+async def call_type_toggle(
+    type_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    ct = db.query(CallType).filter(CallType.id == type_id).first()
+    if ct:
+        ct.is_active = not ct.is_active
+        db.commit()
+    return RedirectResponse("/config#cfg-call-types", status_code=302)
+
+
+@router.post("/call-type/{type_id}/delete")
+async def call_type_delete(
+    type_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    ct = db.query(CallType).filter(CallType.id == type_id).first()
+    if ct:
+        db.delete(ct)
+        db.commit()
+    return RedirectResponse("/config?toast=Call+type+deleted#cfg-call-types", status_code=302)
+
+
+@router.post("/call-types/order")
+async def call_type_reorder(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    form = await request.form()
+    for key, val in form.items():
+        if key.startswith("order_"):
+            type_id = int(key.split("_")[1])
+            ct = db.query(CallType).filter(CallType.id == type_id).first()
+            if ct:
+                try:
+                    ct.display_order = int(val)
+                except ValueError:
+                    pass
+    db.commit()
+    return RedirectResponse("/config?toast=Order+saved#cfg-call-types", status_code=302)

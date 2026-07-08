@@ -1,7 +1,17 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.25.2**
+Current version: **0.25.3**
+
+---
+
+## 0.25.3 — Dashboard Call Button + Chameleon Signal Tracking
+
+- **Call button on every signal row:** Each signal in the dashboard now has an inline **Call** dropdown button. Selecting a call type (e.g. Radio Check, Time Hack, Status Check) creates a serial log entry capturing the call type and the modem state at that moment — Eb/No, Channel Sync, Carrier Lock, and Mod Lock (populated from live EBEM data if a CBM modem is assigned). The button is hideable via the column picker.
+- **Admin-configurable Call Types:** Administrators manage the call type list under **Admin → Config → Call Types** — full add, rename, enable/disable, drag-reorder, and delete. Seeded defaults: Radio Check, Time Hack, Status Check, Briefing Call, Security Call.
+- **Chameleon (+) button:** Each signal row now has a **+** button that creates a "chameleon" — a duplicate signal used to track a signal that has changed a key parameter (mod type, symbol rate, frequency, etc.) while keeping the original visible. The new signal is named by incrementing a family suffix: `102` → `102-1`, and pressing + on either `102` or `102-1` produces `102-2`, and so on. The chameleon copies all parameters from the parent except modem source and Eb/No (which are cleared so the operator can assign the correct modem separately).
+- **Modem source uniqueness:** A CBM modem can now only be assigned as source for one signal at a time. Changing a signal's modem source automatically unassigns it from whichever signal previously held it. Enforced in both the dashboard quick-edit source field and the package signal add/edit forms.
+- **Call logs filter in Signal Logs:** A **Call logs only** quick-filter chip is available in `/logs`. When active, only entries with `entry_type=Call` are shown. An active-filter badge appears in the header and can be cleared in one click.
 
 ---
 

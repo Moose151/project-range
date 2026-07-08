@@ -58,7 +58,7 @@ def _db_antennas(db: Session) -> list[str]:
 LOG_PAGE_SIZE = 100
 
 
-def _apply_filters(query, search, status, band, date_from, date_to, activity, serial_id=None, signal_name=None):
+def _apply_filters(query, search, status, band, date_from, date_to, activity, serial_id=None, signal_name=None, entry_type=None):
     if signal_name:
         query = query.filter(SignalLog.signal_name == signal_name)
     if search:
@@ -75,6 +75,8 @@ def _apply_filters(query, search, status, band, date_from, date_to, activity, se
         query = query.filter(SignalLog.band == band)
     if activity:
         query = query.filter(SignalLog.activity_ref.ilike(f"%{activity}%"))
+    if entry_type:
+        query = query.filter(SignalLog.entry_type == entry_type)
     if serial_id:
         try:
             query = query.filter(SignalLog.serial_id == int(serial_id))
@@ -117,6 +119,7 @@ async def log_list(
     activity: str = "",
     serial_id: str = "",
     signal_name: str = "",
+    entry_type: str = "",
     show_deleted: str = "",
     local_time: str = "",
     toast: str = "",
@@ -130,7 +133,7 @@ async def log_list(
     q = db.query(SignalLog).filter(SignalLog.is_testing == testing)
     if not (show_deleted == "1" and current_user.role == Role.SUPERVISOR):
         q = q.filter(SignalLog.is_deleted == False)
-    q = _apply_filters(q, search, status, band, date_from, date_to, activity, serial_id, signal_name)
+    q = _apply_filters(q, search, status, band, date_from, date_to, activity, serial_id, signal_name, entry_type)
     total = q.count()
     sort_col = _SORT_COLS.get(sort, SignalLog.timestamp)
     order = sort_col.asc() if sort_dir == "asc" else sort_col.desc()
@@ -181,7 +184,7 @@ async def log_list(
             "date_from": date_from, "date_to": date_to,
             "activity": activity, "show_deleted": show_deleted,
             "serial_id": serial_id, "signal_name": signal_name,
-            "local_time": local_time,
+            "local_time": local_time, "entry_type": entry_type,
         },
         "sort": sort,
         "sort_dir": sort_dir,

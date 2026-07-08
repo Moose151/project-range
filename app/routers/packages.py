@@ -395,6 +395,20 @@ def _cbm_source_device_id(db: Session, source: str, testing: bool) -> int | None
     return device.id if device else None
 
 
+def _clear_modem_from_other_entries(db: Session, cbm_device_id: int, except_entry_id: int | None = None) -> None:
+    """Enforce one-to-one modem assignment: clear this modem from any other package signal entries."""
+    if not cbm_device_id:
+        return
+    q = db.query(SignalPackageEntry).filter(
+        SignalPackageEntry.cbm_device_id == cbm_device_id
+    )
+    if except_entry_id is not None:
+        q = q.filter(SignalPackageEntry.id != except_entry_id)
+    for entry in q.all():
+        entry.cbm_device_id = None
+        entry.source = None
+
+
 def _cbm_entry_from_text(text: str, filename: str, display_order: int = 0) -> dict:
     pairs = _cbm_pairs_from_text(text)
     stem = (filename.rsplit("/", 1)[-1] or "").rsplit(".", 1)[0]
@@ -792,6 +806,8 @@ async def package_signal_add(
     cbm_device_id = cbm_device.id if cbm_device else None
     if cbm_device:
         source_name = cbm_device.name
+    if cbm_device_id:
+        _clear_modem_from_other_entries(db, cbm_device_id)
     order = len(pkg.signals)
     entry = SignalPackageEntry(
         package_id=pkg_id,
@@ -853,6 +869,8 @@ async def package_signal_update(
     cbm_device_id = cbm_device.id if cbm_device else None
     if cbm_device:
         source_name = cbm_device.name
+    if cbm_device_id:
+        _clear_modem_from_other_entries(db, cbm_device_id, except_entry_id=entry_id)
     entry = db.query(SignalPackageEntry).filter(
         SignalPackageEntry.id == entry_id,
         SignalPackageEntry.package_id == pkg_id,
