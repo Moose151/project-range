@@ -50,6 +50,26 @@ def recalculate_frequencies(
     }
 
 
+def frequencies_from_dual_if(tx_if: float | None, rx_if: float | None, rf: dict | None) -> dict:
+    """Derive TxRF from TxLO and RxRF from RxLO when both IFs are independently known.
+
+    Used for live modem readings where the TX and RX IF are each measured directly.
+    The single-known-value path (``recalculate_frequencies``) chains TX→RX through
+    TTF, which mislabels RxRF (it ends up TxLO/TTF-based, never using RxLO). When we
+    genuinely know both IFs, each RF must come from its own LO.
+    """
+    if not rf:
+        return {}
+    tx_lo = rf.get("tx_lo")
+    rx_lo = rf.get("rx_lo")
+    out: dict[str, float | None] = {}
+    if tx_if is not None and tx_lo is not None:
+        out["tx_rf"] = round_freq(tx_if + tx_lo)
+    if rx_if is not None and rx_lo is not None:
+        out["rx_rf"] = round_freq(rx_if + rx_lo)
+    return out
+
+
 def recalculate_from_values(values: dict, rf: dict | None, preferred: list[str] | None = None) -> dict:
     """Return values with all frequencies recalculated when a usable RF plan exists."""
     if not rf:

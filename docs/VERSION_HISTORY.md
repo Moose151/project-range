@@ -1,7 +1,13 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.26.1**
+Current version: **0.26.2**
+
+---
+
+## 0.26.2 — RxRF/TxRF Calculation Fix (live modem sync)
+
+- **RxRF is now calculated from RxLO, not TxLO:** when a CBM/EBEM modem reports both its TX and RX IF frequencies, the dashboard now derives **TxRF from TxLO** and **RxRF from RxLO** independently. Previously the sync derived RxRF by chaining from TxRF through the TTF offset, so with TTF unset (0) RxRF came out equal to TxRF — i.e. TxLO was effectively used for both. Existing signals correct themselves on the next modem sync.
 
 ---
 

@@ -13,13 +13,16 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.26.1` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.26.2` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
 **DB:** SQLite at `/app/data/range.db` (named volume). `init_db.py` runs automatically on container start and is idempotent (migrations + new tables auto-create).
 
 ### Shipped (all on `main`, in order)
+- **0.26.2 — RxRF/TxRF live-sync calc fix:**
+  - New `frequencies_from_dual_if(tx_if, rx_if, rf)` in `rf_config.py`: when both IFs are known independently (live modem read), TxRF = TxIF+TxLO and RxRF = RxIF+RxLO are computed separately. `cbm_sync.py` now uses it when a snapshot yields both `tx_if` and `rx_if`; only the single-known-value case still chains through TTF via `recalculate_from_values`. Fixes RxRF being TxLO/TTF-based (it equalled TxRF when TTF=0).
+  - **Still open (need live modem diagnostic to fix safely):** false "transmitting" when a CBM modem is assigned but TX is off (transmit-state field mapping in `_status_from_snapshot`, `cbm.py` summary — `TX_OP`/`TXIF_EN`/`ITT_STAT`), and EBEM sync LEDs showing green with no/inactive source. These depend on the specific modem's ICC field reporting; do not guess-change on the live range without the `/devices/{id}/cbm/diagnostics` output.
 - **0.26.1 — Dashboard bug fixes + CDA/clock polish:**
   - **Effect logging no longer reloads the page:** `/dashboard/signal-call` now returns JSON and the effect dropdown items call a `logSignalEffect()` fetch helper (toast, no navigation). Fixes the jarring full reload and the bug where clicking an effect item also triggered the chameleon `+` button behind the open menu (menu z-index + `event.preventDefault/stopPropagation`).
   - **Dashboard modem source uniqueness:** assigning a modem to a signal now clears that modem from any *other* signal currently sourcing it — a fresh `SignalLog` (source/eb_no cleared) is written for the displaced signal so the dashboard reflects it immediately (not just the package entry). See `_reassign_modem_source` in `dashboard.py`.

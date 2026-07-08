@@ -14,7 +14,7 @@ from app.cbm import CBMError, CBMSnapshot, poll_cbm_ssh
 from app.crypto import decrypt_secret
 from app.deps import get_current_range_state, is_testing_state
 from app.models import AuditLog, RFDevice, Serial, SignalLog, SignalPackageEntry
-from app.rf_config import serial_package_rf_config, recalculate_from_values
+from app.rf_config import serial_package_rf_config, recalculate_from_values, frequencies_from_dual_if
 from app.settings import (
     get_cbm_ebno_log_threshold,
     get_cbm_ebno_log_enabled,
@@ -299,11 +299,18 @@ def sync_active_cbms(db: Session, actor_id: int | None, audit_when_noop: bool = 
             "rx_if": values.get("rx_if") if values.get("rx_if") is not None else (latest.rx_if if latest else entry.rx_if),
             "freq_unit": "MHz",
         }
-        values.update(recalculate_from_values(
-            baseline,
-            serial_package_rf_config(db, serial.id, entry.signal_name),
-            preferred=[field for field in ("tx_if", "rx_if") if values.get(field) is not None],
-        ))
+        rf_plan = serial_package_rf_config(db, serial.id, entry.signal_name)
+        if values.get("tx_if") is not None and values.get("rx_if") is not None and rf_plan:
+            # Both IFs read live from the modem — derive TxRF from TxLO and RxRF from
+            # RxLO independently (chaining TX→RX through TTF mislabels RxRF).
+            values["freq_unit"] = rf_plan.get("freq_unit") or "MHz"
+            values.update(frequencies_from_dual_if(values.get("tx_if"), values.get("rx_if"), rf_plan))
+        else:
+            values.update(recalculate_from_values(
+                baseline,
+                rf_plan,
+                preferred=[field for field in ("tx_if", "rx_if") if values.get(field) is not None],
+            ))
         other_changed = _non_ebno_changed(latest, values)
         ebno_significant = _ebno_changed(
             latest.eb_no if latest else None,
