@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-registry" type="button"><i class="bi bi-reception-4 me-1"></i>Signal Registry</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-roles" type="button"><i class="bi bi-person-badge me-1"></i>Duty Roles</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-activity-types" type="button"><i class="bi bi-calendar3-range me-1"></i>Activity Types</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-call-types" type="button"><i class="bi bi-telephone me-1"></i>Call Types</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-call-types" type="button"><i class="bi bi-asterisk me-1"></i>Effects</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-system" type="button"><i class="bi bi-globe2 me-1"></i>System</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cfg-desktop" type="button"><i class="bi bi-window-desktop me-1"></i>Desktop App</button></li>
 </ul>
@@ -737,11 +737,11 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
   </div>
 
-  <!-- Call Types -->
+  <!-- Effects -->
   <div class="tab-pane fade" id="cfg-call-types" role="tabpanel">
     <div class="card border-secondary">
       <div class="card-header d-flex align-items-center justify-content-between">
-        <span><i class="bi bi-telephone me-1"></i>Call Types</span>
+        <span><i class="bi bi-asterisk me-1"></i>Effects</span>
         <span class="text-muted small">{{ call_types | selectattr('is_active') | list | length }} active</span>
       </div>
       <div class="card-body p-0">
@@ -771,7 +771,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   </button>
                 </form>
                 <form method="post" action="/config/call-type/{{ ct.id }}/delete" class="d-inline"
-                      onsubmit="return confirm('Delete call type {{ ct.name }}?')">
+                      onsubmit="return confirm('Delete effect {{ ct.name }}?')">
                   <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">
                     <i class="bi bi-trash"></i>
                   </button>
@@ -780,7 +780,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </tr>
             {% endfor %}
             {% if not call_types %}
-            <tr><td colspan="4" class="text-muted fst-italic small ps-3 py-2">No call types yet — add one below.</td></tr>
+            <tr><td colspan="4" class="text-muted fst-italic small ps-3 py-2">No effects yet — add one below.</td></tr>
             {% endif %}
           </tbody>
         </table>

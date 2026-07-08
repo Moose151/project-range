@@ -421,7 +421,7 @@ async def dashboard_signal_call(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create a call log entry for a signal, capturing modem state at time of call."""
+    """Create an effect log entry for a signal, capturing modem state at time of the effect."""
     testing = is_testing_state(db)
     range_state = get_current_range_state(db)
 
@@ -454,7 +454,7 @@ async def dashboard_signal_call(
     else:
         modem_parts += ["Channel Sync: —", "Carrier Lock: —", "Mod Lock: —"]
 
-    notes_text = f"Call: {call_type} | " + " | ".join(modem_parts)
+    notes_text = f"Effect: {call_type} | " + " | ".join(modem_parts)
 
     new_entry = SignalLog(
         operator_id=current_user.id,
@@ -477,7 +477,7 @@ async def dashboard_signal_call(
         source=latest.source if latest else None,
         antenna=latest.antenna if latest else None,
         notes=notes_text,
-        entry_type="Call",
+        entry_type="Effect",
         updated_by_id=current_user.id,
         serial_id=serial_id if serial_id is not None else (latest.serial_id if latest else None),
         is_testing=testing,
@@ -485,13 +485,13 @@ async def dashboard_signal_call(
     db.add(new_entry)
     db.add(AuditLog(
         user_id=current_user.id,
-        action_type="SIGNAL_CALL_LOG",
+        action_type="SIGNAL_EFFECT_LOG",
         entity_type="SignalLog",
         new_value=f"{signal_name}: {call_type}",
         comment=notes_text,
     ))
     db.commit()
-    return RedirectResponse(f"/?toast={quote_plus(f'Call logged: {call_type} for {signal_name}')}", status_code=302)
+    return RedirectResponse(f"/?toast={quote_plus(f'Effect logged: {call_type} for {signal_name}')}", status_code=302)
 
 
 @router.post("/dashboard/chameleon")

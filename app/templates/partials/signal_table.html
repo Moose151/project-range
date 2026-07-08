@@ -22,7 +22,7 @@
   <thead class="table-secondary">
     <tr>
       <th></th>
-      <th data-col="call" class="text-nowrap">Call</th>
+      <th data-col="call" class="text-nowrap">Effects</th>
       <th data-col="chameleon"></th>
       <th data-col="signal">Signal</th>
       <th data-col="source">Source</th>
@@ -85,8 +85,8 @@
         <div class="dropdown">
           <button class="btn btn-sm btn-outline-info py-0 px-2 dropdown-toggle" type="button"
                   data-bs-toggle="dropdown" aria-expanded="false"
-                  title="Log a call for {{ log.signal_name }}">
-            <i class="bi bi-telephone me-1"></i>Call
+                  title="Log an effect for {{ log.signal_name }}">
+            <i class="bi bi-asterisk"></i>
           </button>
           <ul class="dropdown-menu dropdown-menu-dark">
             {% if call_types is defined and call_types %}
@@ -101,7 +101,7 @@
               </li>
               {% endfor %}
             {% else %}
-              <li><span class="dropdown-item text-muted small">No call types configured</span></li>
+              <li><span class="dropdown-item text-muted small">No effects configured</span></li>
             {% endif %}
           </ul>
         </div>

@@ -810,7 +810,7 @@ async def activity_type_reorder(
     return RedirectResponse("/config?toast=Order+saved#cfg-activity-types", status_code=302)
 
 
-# ── Call types ────────────────────────────────────────────────────────────────
+# ── Effects (admin-configurable list; stored as CallType for back-compat) ──────
 
 @router.post("/call-type/add")
 async def call_type_add(
