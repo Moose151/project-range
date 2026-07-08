@@ -11,7 +11,7 @@ from app.database import engine, Base
 from app.file_security import harden_sqlite_storage
 from app.models import (
     User, RangeStateLog, Signal, ModulationType, FecType, SignalSource, AntennaType,
-    LogSession, SignalPackage, SignalPackageEntry, Serial, SerialPackage,
+    LogSession, SignalPackage, SignalPackageEntry, Serial, SerialPackage, SignalLog,
     DocPage, DocVersion, DocLink, DocAlias, DocAttachment, AppSetting, RFDevice, DevicePort, DeviceLink,
     CDATable, CDAWindow, SerialCDATable, Incident, CeaseEvent, DutyRole, RoutingPreset,
     ActivityType, Activity, CallType,
@@ -590,6 +590,62 @@ def _ensure_doc(db, admin_id: int, title: str, slug: str, content: str):
     return True
 
 
+def _down_up_signals_on_closed_serials(db: Session) -> int:
+    """One-time cleanup: no signal on a closed (historical) serial may stay "Up".
+
+    For every closed serial, find each signal whose most recent entry in that
+    serial is "Up" and append an automatic Down entry. Idempotent — after the
+    first pass those signals' latest status is Down, so re-runs do nothing.
+    """
+    closed_serials = db.query(Serial).filter(Serial.closed_at != None).all()  # noqa: E711
+    downed = 0
+    for serial in closed_serials:
+        logs = (
+            db.query(SignalLog)
+            .filter(
+                SignalLog.serial_id == serial.id,
+                SignalLog.is_deleted == False,  # noqa: E712
+                SignalLog.signal_name != "[NOTE]",
+            )
+            .order_by(SignalLog.signal_name, SignalLog.timestamp.desc())
+            .all()
+        )
+        actor_id = serial.closed_by_id or serial.opened_by_id
+        seen: set[str] = set()
+        for log in logs:
+            if log.signal_name in seen:
+                continue
+            seen.add(log.signal_name)
+            if log.signal_status != "Up":
+                continue
+            db.add(SignalLog(
+                operator_id=actor_id,
+                range_state=log.range_state or "Standby/Off",
+                signal_name=log.signal_name,
+                signal_status="Down",
+                tx_if=log.tx_if, tx_rf=log.tx_rf, rx_rf=log.rx_rf, rx_if=log.rx_if,
+                freq_unit=log.freq_unit, band=log.band,
+                modulation=log.modulation, symbol_rate=log.symbol_rate, fec=log.fec,
+                power=log.power, power_unit=log.power_unit,
+                eb_no=None,
+                engaged=log.engaged,
+                source=log.source, antenna=log.antenna,
+                notes=f"Auto-down: serial closed ({serial.title})",
+                entry_type="Automatic",
+                updated_by_id=actor_id,
+                serial_id=serial.id,
+                is_testing=log.is_testing,
+                # Stamp "now" so this Down is unambiguously the signal's latest
+                # entry (some closed serials have Up logs dated after closed_at),
+                # which also makes this cleanup idempotent on re-run.
+                timestamp=datetime.utcnow(),
+            ))
+            downed += 1
+    if downed:
+        db.commit()
+    return downed
+
+
 def main():
     print("Creating database tables...")
     Base.metadata.create_all(bind=engine)
@@ -723,6 +779,10 @@ def main():
         backfilled_testing = backfill_audit_hashes(db, is_testing=True)
         if backfilled_live or backfilled_testing:
             print(f"Backfilled audit integrity hashes: live={backfilled_live}, testing={backfilled_testing}")
+
+        downed = _down_up_signals_on_closed_serials(db)
+        if downed:
+            print(f"Downed {downed} signal(s) left Up on closed serials.")
 
     print("Done.")
 

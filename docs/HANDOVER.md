@@ -13,13 +13,15 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.26.4` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.26.5` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
 **DB:** SQLite at `/app/data/range.db` (named volume). `init_db.py` runs automatically on container start and is idempotent (migrations + new tables auto-create).
 
 ### Shipped (all on `main`, in order)
+- **0.26.5 — Cleanup of stale Up signals on old serials:**
+  - `_down_up_signals_on_closed_serials(db)` in `init_db.py` (run from `main()` on every startup): for each serial with `closed_at != None`, appends an `Automatic` **Down** log (timestamped `utcnow()` so it's authoritative — some closed serials had Up logs dated *after* `closed_at`) for any signal whose latest entry in that serial is still Up. Idempotent. Verified on the dev DB: 2 stale Up signals (S101/S102 on closed serial 3) → 0 after run, re-run is a no-op.
 - **0.26.4 — "Up" restricted to running serials:**
   - New `_active_serial_signals(db)` in `dashboard.py`: latest log per signal **restricted to started, open serials** (`get_active_serials`). The transmitting badge (`buzzer_fragment`), Up count (`active_count_fragment`/`active_count_raw`), and the `_dashboard_ctx` summary aggregates (`up_count`/`faulted_count`/`any_buzzer`/`buzzer_active`) all derive from it now — so signals on closed serials or with `serial_id=None` never register as Up/transmitting. The no-active-serial legacy branch forces `all_buzzer=False`.
   - `serials.py serial_end` now appends an `Automatic` **Down** log for any signal still Up on the serial being closed, so history never shows Up.

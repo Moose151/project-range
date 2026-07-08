@@ -1,7 +1,13 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.26.4**
+Current version: **0.26.5**
+
+---
+
+## 0.26.5 — Clean Up Stale "Up" Signals on Old Serials
+
+- **One-time cleanup on startup:** any signal left showing **Up** on an already-closed serial is now automatically set **Down** when the app starts (via `init_db.py`). This clears historical serials that were closed while signals were still marked Up (before the end-of-serial auto-down existed). The cleanup is idempotent — it only ever acts on signals whose latest entry is still Up, so repeated startups do nothing.
 
 ---
 
