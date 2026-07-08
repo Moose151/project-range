@@ -13,13 +13,20 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.26.0` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.26.1` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
 **DB:** SQLite at `/app/data/range.db` (named volume). `init_db.py` runs automatically on container start and is idempotent (migrations + new tables auto-create).
 
 ### Shipped (all on `main`, in order)
+- **0.26.1 — Dashboard bug fixes + CDA/clock polish:**
+  - **Effect logging no longer reloads the page:** `/dashboard/signal-call` now returns JSON and the effect dropdown items call a `logSignalEffect()` fetch helper (toast, no navigation). Fixes the jarring full reload and the bug where clicking an effect item also triggered the chameleon `+` button behind the open menu (menu z-index + `event.preventDefault/stopPropagation`).
+  - **Dashboard modem source uniqueness:** assigning a modem to a signal now clears that modem from any *other* signal currently sourcing it — a fresh `SignalLog` (source/eb_no cleared) is written for the displaced signal so the dashboard reflects it immediately (not just the package entry). See `_reassign_modem_source` in `dashboard.py`.
+  - **Chameleon (+) now creates a real `SignalPackageEntry`** (cloned from the parent entry, minus source/modem) in the parent's package, so chameleons sync EBEM parameters and participate in modem-uniqueness like any other signal.
+  - **Eb/No clears** when a signal's source is removed or the signal is set to a non-Up status (quick-update / dashboard-update).
+  - **Server-provided clock:** new `GET /api/time` returns the server epoch; the dashboard computes a `serverClockOffset` at load (and re-syncs periodically) and all clock renders use `serverNow()` instead of `new Date()`.
+  - **CDA now-indicator:** the CDA widget window table highlights the active window row, or inserts a "◀ now HH:MMZ" row between windows when between them (`updateCDANowIndicator()`), driven by server time.
 - **0.26.0 — Effects rename, priority, serial instructions, CDA units, PDF docs, chat memory:**
   - **"Call" → "Effects":** dashboard inline button is now an asterisk `bi-asterisk` **Effects** button (phone icon removed); it logs a `SignalLog` with `entry_type="Effect"` (was `"Call"`). Admin config tab is now **Effects** (still backed by the `CallType` model/routes for back-compat — table `call_types`, routes `/config/call-type/*`). Signal Logs quick-filter is **Effect logs only** (`?entry_type=Effect`). Route `/dashboard/signal-call` and helper `_get_call_types` unchanged in name.
   - **Signal priority:** `SignalPackageEntry.priority` (nullable int, lower = higher priority). Package add/edit forms + JSON import/export (`_int_or_none` helper). Dashboard shows a hideable `priority` column; values are resolved by signal name from the serial's assigned packages via `_priority_by_signal(db, serial_id, signals)` in `dashboard.py`, passed as `priority_by_signal` in every signal-table context and the `{% with %}` include in `dashboard.html`.

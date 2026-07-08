@@ -356,13 +356,28 @@ const DASHBOARD_DOCS = [
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+// Clocks are driven by the server, not the device, so all terminals agree.
+// serverClockOffset = (server epoch) − (this device's epoch), in ms.
+let serverClockOffset = 0;
+function serverNow() { return new Date(Date.now() + serverClockOffset); }
+async function syncServerClock() {
+  try {
+    const t0 = Date.now();
+    const resp = await fetch('/api/time', { cache: 'no-store' });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const t1 = Date.now();
+    // Account for round-trip: assume the server timestamp is mid-flight.
+    serverClockOffset = data.epoch_ms - (t0 + (t1 - t0) / 2);
+  } catch (_) { /* keep last known offset (or 0) */ }
+}
 function clockFmt(timeZone, opts) {
   return new Intl.DateTimeFormat(undefined, { timeZone, ...opts });
 }
 function updateClockWidget() {
   const clock = document.querySelector('.dashboard-clock');
   if (!clock) return;
-  const now = new Date();
+  const now = serverNow();
   const localTz = clock.dataset.localTz || 'UTC';
   const timeOpts = { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
   const dateOpts = { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' };
@@ -378,7 +393,7 @@ function updateClockWidget() {
 }
 function updateUtilityClocks() {
   document.querySelectorAll('.utility-clock').forEach(clock => {
-    const now = new Date();
+    const now = serverNow();
     const mode = clock.querySelector('[data-clock-mode]')?.value || 'both';
     const localTz = clock.dataset.localTz || 'UTC';
     const timeOpts = { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
@@ -1244,7 +1259,7 @@ function updateCDATimers() {
     const card = document.getElementById('cdaTimerCard-' + tableId);
     if (!countdownEl) return;
 
-    const now = new Date();
+    const now = serverNow();
     const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
     const nowSeconds = nowMinutes * 60 + now.getUTCSeconds();
 
@@ -1361,6 +1376,63 @@ function updateCDATimers() {
     card.style.border = cardBorder;
     countdownEl.style.color = countdownColor;
     labelEl.style.color = minsUntil < 5 ? countdownColor : '';
+  });
+}
+
+// Mark where "now" (Zulu) sits in each CDA window table: highlight the active
+// window row, or draw a between-windows line where the current time falls.
+function cdaHhmmToSec(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 3600 + m * 60;
+}
+function updateCDANowIndicator() {
+  const now = serverNow();
+  const nowSec = now.getUTCHours() * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds();
+  const nowLabel = String(now.getUTCHours()).padStart(2, '0') + ':' + String(now.getUTCMinutes()).padStart(2, '0') + 'Z';
+  document.querySelectorAll('#cdaWidgetBody table tbody').forEach(tbody => {
+    const rows = [...tbody.querySelectorAll('tr[data-cda-window]')];
+    if (!rows.length) return;
+    // Reset previous markers/highlights.
+    tbody.querySelectorAll('.cda-now-row').forEach(r => r.remove());
+    rows.forEach(r => {
+      r.style.background = '';
+      r.style.fontWeight = '';
+      r.querySelector('.cda-now-badge')?.remove();
+    });
+
+    // Find the active window (handles midnight-spanning windows).
+    let activeRow = null;
+    for (const r of rows) {
+      const s = cdaHhmmToSec(r.dataset.start), e = cdaHhmmToSec(r.dataset.end);
+      const inside = (e <= s) ? (nowSec >= s || nowSec < e) : (nowSec >= s && nowSec < e);
+      if (inside) { activeRow = r; break; }
+    }
+
+    if (activeRow) {
+      activeRow.style.background = 'rgba(var(--bs-danger-rgb),0.22)';
+      activeRow.style.fontWeight = '600';
+      const cell = activeRow.querySelector('td');
+      if (cell) {
+        const badge = document.createElement('span');
+        badge.className = 'cda-now-badge badge bg-danger ms-1';
+        badge.style.fontSize = '0.6rem';
+        badge.textContent = 'NOW';
+        cell.appendChild(badge);
+      }
+      return;
+    }
+
+    // Between windows: insert a "now" line before the next upcoming window row.
+    let insertBefore = null;
+    for (const r of rows) {
+      if (cdaHhmmToSec(r.dataset.start) > nowSec) { insertBefore = r; break; }
+    }
+    const marker = document.createElement('tr');
+    marker.className = 'cda-now-row';
+    marker.innerHTML = `<td colspan="4" class="py-0" style="border-top:2px dashed var(--bs-info);color:var(--bs-info);font-size:0.7rem">`
+      + `<i class="bi bi-caret-right-fill me-1"></i>now ${nowLabel}</td>`;
+    if (insertBefore) tbody.insertBefore(marker, insertBefore);
+    else tbody.appendChild(marker);
   });
 }
 
@@ -1489,10 +1561,16 @@ document.addEventListener('DOMContentLoaded', () => {
   refreshAllControls();
   buildColumnMenu();
   applyColumnVisibility();
-  updateClockWidget();
-  updateUtilityClocks();
-  updateCDATimers();
-  setInterval(() => { updateClockWidget(); updateUtilityClocks(); updateCDATimers(); }, 1000);
+  // Sync to server time first, then tick clocks/CDA from it every second and
+  // re-sync the offset periodically (covers drift + suspended tabs).
+  syncServerClock().finally(() => {
+    updateClockWidget();
+    updateUtilityClocks();
+    updateCDATimers();
+    updateCDANowIndicator();
+  });
+  setInterval(() => { updateClockWidget(); updateUtilityClocks(); updateCDATimers(); updateCDANowIndicator(); }, 1000);
+  setInterval(syncServerClock, 60000);
 });
 
 function restoreLayout() {
@@ -1828,6 +1906,27 @@ async function onEngagedToggle(rowId) {
     showToast('Engaged update failed — please try again', 'danger');
   } finally {
     input.disabled = false;
+  }
+}
+
+// Log an effect for a signal without reloading the page. Called from the
+// Effects dropdown items. stopPropagation prevents the click bleeding through
+// to controls (e.g. the chameleon +) sitting under the open menu.
+async function logSignalEffect(event, signalName, serialId, callType) {
+  if (event) { event.preventDefault(); event.stopPropagation(); }
+  try {
+    const body = new URLSearchParams({ signal_name: signalName, call_type: callType });
+    if (serialId) body.set('serial_id', serialId);
+    const resp = await fetch('/dashboard/signal-call', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    if (!resp.ok) throw new Error();
+    const data = await resp.json();
+    showToast(data.message || `Effect logged for ${signalName}`, 'success');
+  } catch (_) {
+    showToast('Could not log effect — please try again', 'danger');
   }
 }
 

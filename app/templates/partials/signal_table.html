@@ -89,16 +89,12 @@
                   title="Log an effect for {{ log.signal_name }}">
             <i class="bi bi-asterisk"></i>
           </button>
-          <ul class="dropdown-menu dropdown-menu-dark">
+          <ul class="dropdown-menu dropdown-menu-dark" style="z-index:1080">
             {% if call_types is defined and call_types %}
               {% for ct in call_types %}
               <li>
-                <form method="post" action="/dashboard/signal-call" class="d-block">
-                  <input type="hidden" name="signal_name" value="{{ log.signal_name }}">
-                  <input type="hidden" name="serial_id" value="{{ serial_id if serial_id is not none else '' }}">
-                  <input type="hidden" name="call_type" value="{{ ct }}">
-                  <button type="submit" class="dropdown-item small py-1">{{ ct }}</button>
-                </form>
+                <button type="button" class="dropdown-item small py-1"
+                        onclick="logSignalEffect(event, '{{ log.signal_name|e }}', '{{ serial_id if serial_id is not none else '' }}', '{{ ct|e }}')">{{ ct }}</button>
               </li>
               {% endfor %}
             {% else %}

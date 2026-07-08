@@ -1,7 +1,17 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.26.0**
+Current version: **0.26.1**
+
+---
+
+## 0.26.1 — Dashboard Bug Fixes + CDA/Clock Polish
+
+- **Logging an effect no longer reloads the page:** selecting an effect from a signal's dropdown now records it in place and shows a toast, instead of navigating away. This also fixes a bug where clicking an effect could also trigger the chameleon **+** button sitting behind the open menu.
+- **Modem source is unique on the dashboard:** assigning a modem to a signal now removes it from whichever signal previously used it — the change is reflected immediately on the dashboard (the old signal's source and Eb/No clear), not just in the underlying package configuration. Signals created with the chameleon **+** button are now proper package signals, so they pull EBEM parameters (Eb/No, sync/lock) and take part in modem-uniqueness like any other signal.
+- **Eb/No clears when it should:** a signal's Eb/No now clears when its modem source is removed or when the signal is taken off transmit (any non-Up status), instead of showing a stale value.
+- **Clocks use server time:** the dashboard Zulu/local clock and any additional clock widgets are now driven by the server's clock (with periodic re-sync), so every terminal shows the same time regardless of the device's own clock.
+- **CDA "now" indicator:** the CDA dashboard widget now shows where the current time sits — it highlights the window you're currently inside (with a **NOW** tag), or draws a between-windows line marking the current time when you're between windows.
 
 ---
 

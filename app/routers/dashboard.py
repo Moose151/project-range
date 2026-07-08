@@ -192,6 +192,73 @@ def _update_serial_package_signal_source(
     return source_name or None, updated
 
 
+def _reassign_modem_source(
+    db: Session,
+    serial_id: int | None,
+    testing: bool,
+    range_state: str,
+    keep_signal_name: str,
+    device_name: str,
+    current_user: User,
+) -> list[str]:
+    """Enforce dashboard modem-source uniqueness across displayed signals.
+
+    When a modem is assigned to ``keep_signal_name``, any *other* signal that
+    currently shows that same modem as its source has a fresh log written with
+    source and Eb/No cleared, so the dashboard reflects the move immediately
+    (not just in the underlying package entries).
+    """
+    if not device_name:
+        return []
+    # Latest log per signal in this serial that still carries this modem source.
+    q = db.query(SignalLog).filter(
+        SignalLog.source == device_name,
+        SignalLog.is_deleted == False,
+        SignalLog.is_testing == testing,
+        SignalLog.signal_name != keep_signal_name,
+    )
+    if serial_id is not None:
+        q = q.filter(SignalLog.serial_id == serial_id)
+    seen: set[str] = set()
+    displaced: list[str] = []
+    for log in q.order_by(SignalLog.timestamp.desc()).all():
+        if log.signal_name in seen:
+            continue
+        seen.add(log.signal_name)
+        # Only act if this is still the signal's current (latest) source.
+        latest_q = db.query(SignalLog).filter(
+            SignalLog.signal_name == log.signal_name,
+            SignalLog.is_deleted == False,
+            SignalLog.is_testing == testing,
+        )
+        if serial_id is not None:
+            latest_q = latest_q.filter(SignalLog.serial_id == serial_id)
+        latest = latest_q.order_by(SignalLog.timestamp.desc()).first()
+        if not latest or latest.source != device_name:
+            continue
+        db.add(SignalLog(
+            operator_id=current_user.id,
+            range_state=range_state,
+            signal_name=log.signal_name,
+            signal_status=latest.signal_status,
+            tx_if=latest.tx_if, tx_rf=latest.tx_rf, rx_rf=latest.rx_rf, rx_if=latest.rx_if,
+            freq_unit=latest.freq_unit, band=latest.band,
+            modulation=latest.modulation, symbol_rate=latest.symbol_rate, fec=latest.fec,
+            power=latest.power, power_unit=latest.power_unit,
+            eb_no=None,                 # modem gone → no valid Eb/No
+            engaged=latest.engaged,
+            source=None,                # modem reassigned elsewhere
+            antenna=latest.antenna,
+            notes=f"Modem {device_name} reassigned to {keep_signal_name}",
+            entry_type="Automatic",
+            updated_by_id=current_user.id,
+            serial_id=serial_id,
+            is_testing=testing,
+        ))
+        displaced.append(log.signal_name)
+    return displaced
+
+
 def _get_antennas(db: Session) -> list[str]:
     return [
         a.name for a in db.query(AntennaType)
@@ -495,7 +562,12 @@ async def dashboard_signal_call(
         comment=notes_text,
     ))
     db.commit()
-    return RedirectResponse(f"/?toast={quote_plus(f'Effect logged: {call_type} for {signal_name}')}", status_code=302)
+    return JSONResponse({
+        "ok": True,
+        "message": f"Effect logged: {call_type} for {signal_name}",
+        "signal_name": signal_name,
+        "call_type": call_type,
+    })
 
 
 @router.post("/dashboard/chameleon")
@@ -523,6 +595,45 @@ async def dashboard_chameleon(
             default_fec=original_sig.default_fec if original_sig else None,
             max_power_dbm=original_sig.max_power_dbm if original_sig else None,
         ))
+
+    # Clone the parent's package entry (minus modem source) so the chameleon is a
+    # first-class package signal — this makes EBEM parameter sync and modem-source
+    # uniqueness work for it exactly like any other package signal.
+    if serial_id is not None:
+        serial_obj = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
+        if serial_obj:
+            parent_entry = None
+            already_exists = False
+            for link in serial_obj.package_links:
+                for entry in link.package.signals:
+                    if entry.signal_name == new_name:
+                        already_exists = True
+                    if entry.signal_name == signal_name and parent_entry is None:
+                        parent_entry = entry
+            if parent_entry and not already_exists:
+                db.add(SignalPackageEntry(
+                    package_id=parent_entry.package_id,
+                    display_order=len(parent_entry.package.signals),
+                    priority=parent_entry.priority,
+                    signal_name=new_name,
+                    description=f"Chameleon of {signal_name}",
+                    band=parent_entry.band,
+                    tx_if=parent_entry.tx_if, tx_rf=parent_entry.tx_rf,
+                    rx_rf=parent_entry.rx_rf, rx_if=parent_entry.rx_if,
+                    freq_unit=parent_entry.freq_unit,
+                    modulation=parent_entry.modulation,
+                    fec=parent_entry.fec,
+                    inner_code=parent_entry.inner_code,
+                    symbol_rate=parent_entry.symbol_rate,
+                    power=parent_entry.power, power_unit=parent_entry.power_unit,
+                    eb_no=None,
+                    source=None,                 # modem source must NOT copy across
+                    antenna=parent_entry.antenna,
+                    cbm_device_id=None,
+                    cbm_path=None,
+                    cbm_carrier=None,
+                    notes=parent_entry.notes,
+                ))
 
     # Copy latest log entry for the original signal — no source/modem
     latest_q = db.query(SignalLog).filter(
@@ -570,6 +681,16 @@ async def dashboard_chameleon(
     ))
     db.commit()
     return RedirectResponse(f"/?toast={quote_plus(f'Chameleon created: {new_name}')}", status_code=302)
+
+
+@router.get("/api/time")
+async def api_time(current_user: User = Depends(get_current_user)):
+    """Authoritative server time so all clients agree regardless of device clock.
+
+    Returns Unix epoch milliseconds (UTC); clients compute an offset against
+    their own clock and render Zulu/local from it.
+    """
+    return JSONResponse({"epoch_ms": int(datetime.now().timestamp() * 1000)})
 
 
 @router.get("/dashboard/fragment", response_class=HTMLResponse)
@@ -795,6 +916,18 @@ async def dashboard_quick_update(
     effective_source, package_sources_updated = _update_serial_package_signal_source(
         db, serial, signal_name, source, current_user, testing,
     )
+    if source.strip():
+        device = _cbm_source_device(db, source.strip(), testing)
+        if device:
+            _reassign_modem_source(
+                db, serial_id, testing, range_state, signal_name, device.name, current_user,
+            )
+
+    resolved_source = effective_source if source.strip() or package_sources_updated else (latest.source if latest else None)
+    # Eb/No is invalid without a modem source or when the signal is not Up.
+    resolved_eb_no = eb_no if eb_no is not None else (latest.eb_no if latest else None)
+    if not resolved_source or signal_status != "Up":
+        resolved_eb_no = None
 
     new_entry = SignalLog(
         operator_id=current_user.id,
@@ -812,9 +945,9 @@ async def dashboard_quick_update(
         fec=fec or (latest.fec if latest else None),
         power=power if power is not None else (latest.power if latest else None),
         power_unit=power_unit,
-        eb_no=eb_no if eb_no is not None else (latest.eb_no if latest else None),
+        eb_no=resolved_eb_no,
         engaged=latest.engaged if latest else False,
-        source=effective_source if source.strip() or package_sources_updated else (latest.source if latest else None),
+        source=resolved_source,
         antenna=antenna or (latest.antenna if latest else None),
         notes=notes.strip() or None,
         entry_type="Dashboard",
@@ -926,10 +1059,23 @@ async def dashboard_bulk_update(
             effective_source, _ = _update_serial_package_signal_source(
                 db, serial, upd.signal_name, upd.source or "", current_user, testing,
             )
+            # Dashboard modem-source uniqueness: if the new source is a modem,
+            # clear it from any other signal that still shows it.
+            device = _cbm_source_device(db, (upd.source or "").strip(), testing)
+            if device:
+                _reassign_modem_source(
+                    db, serial_id, testing, range_state, upd.signal_name, device.name, current_user,
+                )
 
         values = _dashboard_values_from_update(db, serial_id, latest, upd)
         if "source" in upd.changed_fields:
             values["source"] = effective_source
+            # Removing the modem source invalidates any Eb/No reading.
+            if not effective_source:
+                values["eb_no"] = None
+        # Eb/No is only meaningful while the signal is transmitting/Up.
+        if values["signal_status"] != "Up":
+            values["eb_no"] = None
 
         new_entry = SignalLog(
             operator_id=current_user.id, range_state=range_state,

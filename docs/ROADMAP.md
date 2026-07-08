@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.26.0` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.26.1` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -19,10 +19,11 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.26.0)
+## ✅ Already delivered (through 0.26.1)
 
 Core of the MVP scope is in place:
 
+- **0.26.1:** Dashboard fixes + polish — logging an **effect** no longer reloads the page (AJAX + toast) and no longer triggers the chameleon (+) button behind the open menu; **modem-source uniqueness** now applies on the dashboard (assigning a modem clears it from the signal that previously held it, immediately visible) and chameleon (+) signals are now first-class package entries that sync EBEM parameters; **Eb/No clears** when the source is removed or the signal goes off-transmit; the Zulu/local **clocks are driven by server time** so all terminals agree; the **CDA widget marks where "now" sits** (highlights the active window or draws a between-windows line).
 - **0.26.0:** "Call" button renamed to **Effects** (asterisk icon; admin list is now Effects); optional **priority** number on signal package entries + hideable dashboard column; **serial instructions** field (editable pre-close, shown on dashboard + serials list); CDA reduced-power windows entered/displayed in **W / dBW / dBm**; **PDF attachments** on documentation pages (side-panel list + inline embed); dashboard **chat widget remembers the open room** across navigation.
 
 - RF frequency calculator (TxIF/TxRF/RxRF/RxIF from one known value) + frequency templates
