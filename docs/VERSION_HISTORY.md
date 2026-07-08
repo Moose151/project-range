@@ -1,7 +1,15 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.26.3**
+Current version: **0.26.4**
+
+---
+
+## 0.26.4 — "Up" Only for Signals on Running Serials
+
+- **Only signals on a serial that is currently running can be "Up".** The dashboard "TRANSMITTING" badge and the Up-signal count are now derived strictly from signals whose latest entry belongs to a **started, open** serial. Signals in history (closed serials) or not attached to an active serial can no longer make the dashboard read transmitting or inflate the Up count — this clears the lingering "transmitting" indicator caused by stale Up entries left on old/closed serials.
+- **Ending a serial forces its signals Down.** When a serial is closed, any signal still marked Up on it gets an automatic Down entry, so historical serials never show a signal as Up.
+- Note: the wide "RANGE IS LIVE — RF TRANSMITTING" banner is unchanged — it reflects the **range state** (Live), not individual signals, and is a deliberate safety warning.
 
 ---
 

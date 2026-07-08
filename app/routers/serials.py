@@ -203,8 +203,47 @@ async def serial_end(
         return RedirectResponse("/serials", status_code=302)
 
     range_state = get_current_range_state(db)
+    testing = is_testing_state(db)
     serial.closed_at = datetime.utcnow()
     serial.closed_by_id = current_user.id
+
+    # Ending a serial stops its signals: no signal on a historical serial may
+    # remain "Up". Append a Down log for any signal currently Up in this serial.
+    up_logs = (
+        db.query(SignalLog)
+        .filter(
+            SignalLog.serial_id == serial.id,
+            SignalLog.is_deleted == False,
+            SignalLog.signal_name != "[NOTE]",
+            SignalLog.is_testing == testing,
+        )
+        .order_by(SignalLog.signal_name, SignalLog.timestamp.desc())
+        .all()
+    )
+    seen: set[str] = set()
+    for log in up_logs:
+        if log.signal_name in seen:
+            continue
+        seen.add(log.signal_name)
+        if log.signal_status == "Up":
+            db.add(SignalLog(
+                operator_id=current_user.id,
+                range_state=range_state,
+                signal_name=log.signal_name,
+                signal_status="Down",
+                tx_if=log.tx_if, tx_rf=log.tx_rf, rx_rf=log.rx_rf, rx_if=log.rx_if,
+                freq_unit=log.freq_unit, band=log.band,
+                modulation=log.modulation, symbol_rate=log.symbol_rate, fec=log.fec,
+                power=log.power, power_unit=log.power_unit,
+                eb_no=None,
+                engaged=log.engaged,
+                source=log.source, antenna=log.antenna,
+                notes=f"Auto-down: serial ended ({serial.title})",
+                entry_type="Automatic",
+                updated_by_id=current_user.id,
+                serial_id=serial.id,
+                is_testing=testing,
+            ))
 
     db.add(SignalLog(
         operator_id=current_user.id,

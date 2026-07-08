@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.26.3` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.26.4` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -19,10 +19,11 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ✅ Already delivered (through 0.26.3)
+## ✅ Already delivered (through 0.26.4)
 
 Core of the MVP scope is in place:
 
+- **0.26.4:** "Up"/transmitting is now restricted to signals on **currently running serials** — stale Up entries on closed/unassigned serials no longer light the transmitting badge or Up count; ending a serial forces its signals Down.
 - **0.26.3:** Live modem fixes — **no more false "transmitting"** (transmit status now keys off the authoritative `TX_OP` flag, not `ITT_STAT` which reads ENGAGED even with TX off); **EBEM sync LEDs go grey when stale** instead of showing an old green reading.
 - **0.26.2:** Fixed **RxRF/TxRF** on the dashboard for live modem sync — RxRF now derives from RxLO (not TxLO via TTF).
 - **0.26.1:** Dashboard fixes + polish — logging an **effect** no longer reloads the page (AJAX + toast) and no longer triggers the chameleon (+) button behind the open menu; **modem-source uniqueness** now applies on the dashboard (assigning a modem clears it from the signal that previously held it, immediately visible) and chameleon (+) signals are now first-class package entries that sync EBEM parameters; **Eb/No clears** when the source is removed or the signal goes off-transmit; the Zulu/local **clocks are driven by server time** so all terminals agree; the **CDA widget marks where "now" sits** (highlights the active window or draws a between-windows line).

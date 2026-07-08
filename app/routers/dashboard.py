@@ -75,6 +75,37 @@ def _latest_signal_status(db: Session, serial_id: int | None = None) -> list:
     return result
 
 
+def _active_serial_signals(db: Session) -> list:
+    """Latest log per signal, restricted to serials that are currently running.
+
+    A signal can only be considered "Up"/transmitting while it belongs to a
+    started, open serial. Signals whose latest log is on a closed (historical)
+    serial, or that carry no serial at all, are excluded — they must never count
+    as Up for the transmitting badge or the active-signal count.
+    """
+    active_ids = [s.id for s in get_active_serials(db)]
+    if not active_ids:
+        return []
+    logs = (
+        db.query(SignalLog)
+        .filter(
+            SignalLog.is_deleted == False,
+            SignalLog.signal_name != "[NOTE]",
+            SignalLog.is_testing == is_testing_state(db),
+            SignalLog.serial_id.in_(active_ids),
+        )
+        .order_by(SignalLog.signal_name, SignalLog.timestamp.desc())
+        .all()
+    )
+    seen: set[str] = set()
+    result = []
+    for log in logs:
+        if log.signal_name not in seen:
+            seen.add(log.signal_name)
+            result.append(log)
+    return result
+
+
 def _buzzer_active(signals: list, range_state: str) -> bool:
     """True when range is Live or Closed Loop and at least one signal is Up."""
     if range_state == "Standby/Off":
@@ -406,10 +437,11 @@ def _dashboard_ctx(db: Session) -> dict:
                 ),
             })
     else:
-        # No serials running — show all logs (legacy / no-serial mode)
+        # No serials running — show all logs for reference (legacy / no-serial mode),
+        # but nothing can be transmitting: with no active serial no signal is "Up".
         signals = _latest_signal_status(db)
-        all_buzzer = _buzzer_active(signals, range_state)
-        serial_data = [{"serial": None, "signals": signals, "buzzer_active": all_buzzer, "has_cbm_mapping": False}]
+        all_buzzer = False
+        serial_data = [{"serial": None, "signals": signals, "buzzer_active": False, "has_cbm_mapping": False}]
 
     # CDA data: map serial_id → list of {table_name, windows: [{start, end, label, max_power_dbm}]}
     cda_by_serial: dict[int, list] = {}
@@ -443,6 +475,13 @@ def _dashboard_ctx(db: Session) -> dict:
             cda_by_serial[serial.id] = tables
 
     global_signals = [s for sd in serial_data for s in sd["signals"]]
+    # Transmitting + Up/Faulted counts are authoritative from ACTIVE serials only,
+    # so a signal in a closed/historical serial (or with no serial) can never make
+    # the dashboard read "transmitting" or inflate the Up count.
+    active_signals = _active_serial_signals(db)
+    up_count = sum(1 for s in active_signals if s.signal_status == "Up")
+    faulted_count = sum(1 for s in active_signals if s.signal_status == "Faulted")
+    any_buzzer = _buzzer_active(active_signals, range_state)
     testing = is_testing_state(db)
     return {
         "serial_data": serial_data,
@@ -451,11 +490,11 @@ def _dashboard_ctx(db: Session) -> dict:
         # Flat signals list kept for the OOB buzzer swap (any signal across all serials)
         "signals": global_signals,
         # Global aggregates for the summary cards (kept fresh on every poll via OOB)
-        "up_count": sum(1 for s in global_signals if s.signal_status == "Up"),
-        "faulted_count": sum(1 for s in global_signals if s.signal_status == "Faulted"),
-        "any_buzzer": all_buzzer,
+        "up_count": up_count,
+        "faulted_count": faulted_count,
+        "any_buzzer": any_buzzer,
         "range_state": range_state,
-        "buzzer_active": all_buzzer,
+        "buzzer_active": any_buzzer,
         "mod_types": mod_types,
         "fec_types": fec_types,
         "signal_sources": signal_sources,
@@ -1208,7 +1247,7 @@ async def active_count_fragment(
     current_user: User = Depends(get_current_user),
 ):
     """Lightweight endpoint — Up-signal count for the banner badge."""
-    signals = _latest_signal_status(db)
+    signals = _active_serial_signals(db)
     up = sum(1 for s in signals if s.signal_status == "Up")
     icon = '<i class="bi bi-broadcast me-1"></i>'
     return HTMLResponse(f'{icon}{up} Up')
@@ -1221,7 +1260,7 @@ async def active_count_raw(
     current_user: User = Depends(get_current_user),
 ):
     """Just the number — for the Active Signals dashboard widget."""
-    signals = _latest_signal_status(db)
+    signals = _active_serial_signals(db)
     up = sum(1 for s in signals if s.signal_status == "Up")
     return HTMLResponse(str(up))
 
@@ -1275,7 +1314,7 @@ async def buzzer_fragment(
 ):
     """Lightweight HTMX endpoint — just the buzzer badge for the nav banner."""
     range_state = get_current_range_state(db)
-    signals = _latest_signal_status(db)
+    signals = _active_serial_signals(db)
     active = _buzzer_active(signals, range_state)
     return templates.TemplateResponse(request, "partials/buzzer_badge.html", {
         "buzzer_active": active,

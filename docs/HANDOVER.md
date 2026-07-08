@@ -13,13 +13,18 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.26.3` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.26.4` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
 **DB:** SQLite at `/app/data/range.db` (named volume). `init_db.py` runs automatically on container start and is idempotent (migrations + new tables auto-create).
 
 ### Shipped (all on `main`, in order)
+- **0.26.4 — "Up" restricted to running serials:**
+  - New `_active_serial_signals(db)` in `dashboard.py`: latest log per signal **restricted to started, open serials** (`get_active_serials`). The transmitting badge (`buzzer_fragment`), Up count (`active_count_fragment`/`active_count_raw`), and the `_dashboard_ctx` summary aggregates (`up_count`/`faulted_count`/`any_buzzer`/`buzzer_active`) all derive from it now — so signals on closed serials or with `serial_id=None` never register as Up/transmitting. The no-active-serial legacy branch forces `all_buzzer=False`.
+  - `serials.py serial_end` now appends an `Automatic` **Down** log for any signal still Up on the serial being closed, so history never shows Up.
+  - Note: the top range banner "RANGE IS LIVE — RF TRANSMITTING" ([base.html](app/templates/base.html)) is range-state-driven, not signal-driven — intentionally unchanged.
+  - Existing *already-closed* serials keep whatever last status they had (not retroactively downed); the dashboard scoping means they no longer affect the live indicators regardless.
 - **0.26.3 — Modem transmit-state + sync-LED fixes (live):**
   - **`_status_from_snapshot` (cbm_sync.py) transmit path now uses `TX_OP` as authoritative** (from `tx_cfg`, falling back to `tx_if_enabled` only when `TX_OP` is absent). `ITT_STAT`/`ita_tx_status` is **no longer** treated as a transmit indicator — a live CBM-400-4 capture showed `TX_OP=OFF` with `ITT_STAT=ENGAGED`, which the old "any positive field → Up" logic misread as transmitting, lighting the dashboard TRANSMITTING banner with no real carrier. Regression test `test_status_down_when_tx_off_despite_itt_engaged` locks this in.
   - **`_cbm_status_by_source` (dashboard.py) now gates EBEM LED state on freshness:** a device's stored `cbm_sync_state_json` is only shown when `cbm_last_sync_status == "ok"` and `cbm_last_sync_at` is within `max(30, CBM_AUTO_SYNC_SECONDS*6)`; otherwise LEDs go grey (None) instead of stale green. Fixes sync LEDs staying green after a carrier drops or the poller stops/errs.
