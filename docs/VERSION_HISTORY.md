@@ -1,7 +1,14 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.26.2**
+Current version: **0.26.3**
+
+---
+
+## 0.26.3 — Modem Transmit-State + Sync-LED Fixes (live)
+
+- **No more false "transmitting":** a signal is now marked transmitting/Up strictly from the modem's authoritative transmit-carrier flag (`TX_OP`). Previously the app also treated `ITT_STAT` as a transmit indicator, but on the CBM-400/EBEM that field reads **ENGAGED even when the carrier is off**, so any signal with a modem assigned showed as transmitting (and lit the dashboard "TRANSMITTING" banner) even though the modem's TX was off. Confirmed against a live CBM-400-4 capture (`TX_OP=OFF`, `ITT_STAT=ENGAGED`).
+- **Sync LEDs no longer stay green when stale:** the EBEM sync/carrier/bit-sync LEDs are now only shown from a modem's last poll when that poll was recent and successful. If the poller has stopped or errored, the LEDs go grey ("no data") instead of showing a stale green reading captured while a carrier was still present.
 
 ---
 

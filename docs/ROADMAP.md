@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.26.2` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.26.3` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -19,15 +19,11 @@ We use a simple semantic scheme while in beta:
 
 ---
 
-## ⚠️ Known open issues (live modem behaviour — need CBM diagnostic to fix)
-
-- **False "transmitting":** a signal can show Up/transmitting when its assigned CBM modem's TX is actually off (confirmed via the device diagnostic and modem client). Root cause is how `_status_from_snapshot` maps the modem's transmit fields (`TX_OP`/`TXIF_EN`/`ITT_STAT`) — needs the real ICC output for the affected modem to correct without breaking working detection.
-- **EBEM sync LEDs green with no/inactive source:** the sync LEDs can stay green for a signal whose source is removed or whose modem is not transmitting. Needs the modem's live state to decide the correct gating.
-
-## ✅ Already delivered (through 0.26.2)
+## ✅ Already delivered (through 0.26.3)
 
 Core of the MVP scope is in place:
 
+- **0.26.3:** Live modem fixes — **no more false "transmitting"** (transmit status now keys off the authoritative `TX_OP` flag, not `ITT_STAT` which reads ENGAGED even with TX off); **EBEM sync LEDs go grey when stale** instead of showing an old green reading.
 - **0.26.2:** Fixed **RxRF/TxRF** on the dashboard for live modem sync — RxRF now derives from RxLO (not TxLO via TTF).
 - **0.26.1:** Dashboard fixes + polish — logging an **effect** no longer reloads the page (AJAX + toast) and no longer triggers the chameleon (+) button behind the open menu; **modem-source uniqueness** now applies on the dashboard (assigning a modem clears it from the signal that previously held it, immediately visible) and chameleon (+) signals are now first-class package entries that sync EBEM parameters; **Eb/No clears** when the source is removed or the signal goes off-transmit; the Zulu/local **clocks are driven by server time** so all terminals agree; the **CDA widget marks where "now" sits** (highlights the active window or draws a between-windows line).
 - **0.26.0:** "Call" button renamed to **Effects** (asterisk icon; admin list is now Effects); optional **priority** number on signal package entries + hideable dashboard column; **serial instructions** field (editable pre-close, shown on dashboard + serials list); CDA reduced-power windows entered/displayed in **W / dBW / dBm**; **PDF attachments** on documentation pages (side-panel list + inline embed); dashboard **chat widget remembers the open room** across navigation.

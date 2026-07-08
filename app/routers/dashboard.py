@@ -1,13 +1,14 @@
 import json
 import re
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from urllib.parse import quote_plus
+from app.config import CBM_AUTO_SYNC_SECONDS
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials, is_testing_state
 from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage, SerialCDATable, CDAWindow, RFDevice, CallType, SignalPackageEntry, SerialPackage
@@ -297,6 +298,10 @@ def _cbm_status_by_source(db: Session, testing: bool) -> dict[str, dict | None]:
     Callers use this to show the EBEM LED column on the dashboard: signals whose
     source matches a device name in this dict are EBEM signals; others show N/A.
     sync_states_dict has keys: ebem_sync, carrier_lock, bit_sync (True/False/None).
+
+    Stored state is only trusted when the device's last poll was recent and OK;
+    otherwise the LEDs go grey ("no data") rather than showing a stale (possibly
+    green) reading from a poll taken while a carrier was still present.
     """
     devices = (
         db.query(RFDevice)
@@ -308,15 +313,24 @@ def _cbm_status_by_source(db: Session, testing: bool) -> dict[str, dict | None]:
         )
         .all()
     )
+    # Generous window so a normal poll cadence never flickers to grey, but a
+    # stopped/failed poller doesn't leave stale LEDs lit indefinitely.
+    stale_after = timedelta(seconds=max(30, CBM_AUTO_SYNC_SECONDS * 6))
+    now = datetime.utcnow()
     result: dict[str, dict | None] = {}
     for device in devices:
-        if device.cbm_sync_state_json:
+        fresh = (
+            device.cbm_last_sync_status == "ok"
+            and device.cbm_last_sync_at is not None
+            and (now - device.cbm_last_sync_at) <= stale_after
+        )
+        state = None
+        if fresh and device.cbm_sync_state_json:
             try:
-                result[device.name] = json.loads(device.cbm_sync_state_json)
+                state = json.loads(device.cbm_sync_state_json)
             except (ValueError, TypeError):
-                result[device.name] = None
-        else:
-            result[device.name] = None
+                state = None
+        result[device.name] = state
     return result
 
 

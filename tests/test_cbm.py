@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.cbm import parse_icc_response, CBMSnapshot  # noqa: E402
 from app.cbm_sync import (  # noqa: E402
-    _status_from_snapshot, _entry_values_from_snapshot, _ebno_changed, _changed,
+    _status_from_snapshot, _entry_values_from_snapshot, _ebno_changed, _non_ebno_changed,
 )
 
 
@@ -39,10 +39,11 @@ def test_ebno_threshold_small_change_ignored():
 
 def test_changed_ignores_small_ebno_but_catches_other_fields():
     latest = _Log(signal_status="Up", power=-10.0, eb_no=7.8)
-    # Only a tiny Eb/No drift -> not logged.
-    assert _changed(latest, {"signal_status": "Up", "power": -10.0, "eb_no": 8.5}, 3.0) is False
-    # Power change -> logged even with tiny Eb/No drift.
-    assert _changed(latest, {"signal_status": "Up", "power": -12.0, "eb_no": 8.5}, 3.0) is True
+    # Only a tiny Eb/No drift -> no non-ebno change, and the drift is within threshold.
+    assert _non_ebno_changed(latest, {"signal_status": "Up", "power": -10.0, "eb_no": 8.5}) is False
+    assert _ebno_changed(7.8, 8.5, 3.0) is False
+    # Power change -> a non-ebno change is caught regardless of Eb/No drift.
+    assert _non_ebno_changed(latest, {"signal_status": "Up", "power": -12.0, "eb_no": 8.5}) is True
 
 
 # Real format: the shell echoes "tx_cfg ?" before the "TX_CFG ..." response, and the
@@ -87,6 +88,20 @@ def test_status_up_when_tx_on():
         status=parse_icc_response(ALL_STAT_RAW, "ALL_STAT"),
     )
     assert _status_from_snapshot(snap, "tx") == "Up"
+
+
+def test_status_down_when_tx_off_despite_itt_engaged():
+    # Real CBM-400-4 capture: TX_OP=OFF, yet ITT_STAT reports ENGAGED. TX_OP is
+    # authoritative — the signal must read Down, not "transmitting".
+    snap = CBMSnapshot(
+        tx_config={"TX_OP": "OFF", "ITT_OP": "DISABLE"},
+        rx_config={"RX_OP": "OFF"},
+        status={"ITT_STAT": "ENGAGED", "ACQ_STATE": "IDLE",
+                "BSYNC_STAT": "NOSYNC", "ESYNC_STAT": "NOSYNC", "MDM_STAT": "DISABLED"},
+    )
+    assert _status_from_snapshot(snap, "tx") == "Down"
+    assert _status_from_snapshot(snap, "tx_rx") == "Down"
+    assert _status_from_snapshot(snap, "rx") == "Down"
 
 
 def test_ebno_populates_for_tx_path():

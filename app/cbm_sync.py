@@ -128,15 +128,21 @@ def _status_from_snapshot(snapshot: CBMSnapshot, path: str | None) -> str | None
         if any(_is_negative_state(value) for value in states):
             return "Down"
         return None
-    states = [
-        snapshot.tx_config.get("TX_OP"),
-        snapshot.status.get("TX_OP"),
-        snapshot.summary.get("tx_if_enabled"),
-        snapshot.summary.get("ita_tx_status"),
-    ]
-    if any(_is_positive_state(value) for value in states):
+    # Transmit: TX_OP (from tx_cfg) is the authoritative carrier on/off flag.
+    # ITT_STAT is deliberately NOT used — on the CBM-400/EBEM it reads ENGAGED even
+    # when the transmit carrier is off (it reflects the idle/inhibit-transmit state
+    # machine, not whether a carrier is being radiated), which caused signals to show
+    # "transmitting"/Up while TX_OP=OFF. Fall back to the IF-output enable only when
+    # TX_OP itself is unavailable.
+    tx_op = snapshot.tx_config.get("TX_OP") or snapshot.status.get("TX_OP")
+    if _is_positive_state(tx_op):
         return "Up"
-    if any(_is_negative_state(value) for value in states):
+    if _is_negative_state(tx_op):
+        return "Down"
+    tx_if_enabled = snapshot.summary.get("tx_if_enabled")
+    if _is_positive_state(tx_if_enabled):
+        return "Up"
+    if _is_negative_state(tx_if_enabled):
         return "Down"
     return None
 
