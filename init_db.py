@@ -156,6 +156,7 @@ def _migrate(conn):
         "ALTER TABLE signal_package_entries ADD COLUMN priority INTEGER",
         "ALTER TABLE serials ADD COLUMN instructions TEXT",
         "ALTER TABLE cda_windows ADD COLUMN max_power_unit VARCHAR(4) DEFAULT 'dBm'",
+        "ALTER TABLE doc_attachments ADD COLUMN approval_status VARCHAR(16) DEFAULT 'approved'",
     ]
     for sql in migrations:
         try:

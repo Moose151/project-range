@@ -1,7 +1,13 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.28.0**
+Current version: **0.28.1**
+
+---
+
+## 0.28.1 — PDF Uploads for Everyone (with Approval)
+
+- **Anyone can now upload a PDF to a wiki page** — administrators, users, and observers. An **administrator's** upload appears immediately; **everyone else's** upload is held as **Pending** until an administrator approves it. Pending PDFs are visible only to the uploader and administrators (with **Approve** / **Reject** controls); once approved they appear for all who can view the page. Uploaders can remove their own PDFs.
 
 ---
 

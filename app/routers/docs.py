@@ -891,21 +891,50 @@ async def docs_upload_attachment(
     stored_name = f"{doc.id}_{secrets.token_hex(8)}.pdf"
     (DOC_ATTACHMENT_DIR / stored_name).write_bytes(content)
 
+    # Administrators publish immediately; everyone else's uploads await approval.
+    is_admin = current_user.role == "administrator"
+    status = "approved" if is_admin else "pending"
     attachment = DocAttachment(
         page_id=doc.id,
         filename=original_name,
         stored_name=stored_name,
         content_type="application/pdf",
         size_bytes=len(content),
+        approval_status=status,
         uploaded_by_id=current_user.id,
     )
     db.add(attachment)
     db.add(AuditLog(
-        user_id=current_user.id, action_type="doc_attachment_add",
+        user_id=current_user.id,
+        action_type="doc_attachment_add" if is_admin else "doc_attachment_propose",
         entity_type="DocPage", entity_id=doc.id, new_value=original_name,
     ))
     db.commit()
-    return RedirectResponse(f"/docs/{doc.slug}?toast=PDF+attached", status_code=302)
+    toast = "PDF+attached" if is_admin else "PDF+uploaded+-+pending+administrator+approval"
+    return RedirectResponse(f"/docs/{doc.slug}?toast={toast}", status_code=302)
+
+
+@router.post("/{slug}/attachments/{attachment_id}/approve")
+async def docs_approve_attachment(
+    slug: str,
+    attachment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    doc = db.query(DocPage).filter(DocPage.slug == slug).first()
+    if not doc:
+        return RedirectResponse("/docs?toast=Wiki+page+not+found", status_code=302)
+    attachment = db.query(DocAttachment).filter(
+        DocAttachment.id == attachment_id, DocAttachment.page_id == doc.id,
+    ).first()
+    if attachment and attachment.approval_status != "approved":
+        attachment.approval_status = "approved"
+        db.add(AuditLog(
+            user_id=current_user.id, action_type="doc_attachment_approve",
+            entity_type="DocPage", entity_id=doc.id, new_value=attachment.filename,
+        ))
+        db.commit()
+    return RedirectResponse(f"/docs/{doc.slug}?toast=PDF+approved", status_code=302)
 
 
 @router.get("/{slug}/attachments/{attachment_id}")
@@ -924,6 +953,11 @@ async def docs_get_attachment(
     ).first()
     if not attachment:
         return RedirectResponse(f"/docs/{doc.slug}?toast=Attachment+not+found", status_code=302)
+    # Pending PDFs are only visible to an administrator or the uploader until approved.
+    if attachment.approval_status != "approved" and not (
+        current_user.role == "administrator" or attachment.uploaded_by_id == current_user.id
+    ):
+        return RedirectResponse(f"/docs/{doc.slug}?toast=Attachment+pending+approval", status_code=302)
     path = DOC_ATTACHMENT_DIR / attachment.stored_name
     if not path.exists():
         return RedirectResponse(f"/docs/{doc.slug}?toast=Attachment+file+missing", status_code=302)
@@ -947,12 +981,17 @@ async def docs_delete_attachment(
         DocAttachment.id == attachment_id, DocAttachment.page_id == doc.id,
     ).first()
     if attachment:
+        # Admins may remove/reject any attachment; others only their own uploads.
+        if current_user.role != "administrator" and attachment.uploaded_by_id != current_user.id:
+            return RedirectResponse(f"/docs/{doc.slug}?toast=Not+permitted", status_code=302)
+        was_pending = attachment.approval_status != "approved"
         try:
             (DOC_ATTACHMENT_DIR / attachment.stored_name).unlink(missing_ok=True)
         except OSError:
             pass
         db.add(AuditLog(
-            user_id=current_user.id, action_type="doc_attachment_delete",
+            user_id=current_user.id,
+            action_type="doc_attachment_reject" if (was_pending and current_user.role == "administrator") else "doc_attachment_delete",
             entity_type="DocPage", entity_id=doc.id, previous_value=attachment.filename,
         ))
         db.delete(attachment)

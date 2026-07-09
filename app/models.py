@@ -393,6 +393,9 @@ class DocAttachment(Base):
     stored_name: Mapped[str] = mapped_column(String(256), nullable=False)  # on-disk name
     content_type: Mapped[str] = mapped_column(String(128), default="application/pdf")
     size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    # approved (visible to all who can view the page) | pending (awaiting admin
+    # approval — admin uploads are auto-approved, user/observer uploads are not).
+    approval_status: Mapped[str] = mapped_column(String(16), default="approved")
     uploaded_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

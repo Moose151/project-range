@@ -47,7 +47,11 @@ def _observer_write_allowed(path: str) -> bool:
         return True
     # Observers may request documentation edits, but cannot approve, reject,
     # restore, create pages, or perform other write actions.
-    return path.startswith("/docs/") and path.endswith("/edit")
+    if path.startswith("/docs/") and path.endswith("/edit"):
+        return True
+    # Observers may upload a PDF to a wiki page, but it stays pending until an
+    # administrator approves it (see docs.docs_upload_attachment).
+    return path.startswith("/docs/") and path.endswith("/attachments")
 
 
 @app.middleware("http")

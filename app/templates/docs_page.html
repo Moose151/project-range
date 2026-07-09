@@ -38,19 +38,13 @@
     <a href="/docs/{{ doc_page.slug }}/edit" class="btn btn-sm {% if user.role == 'administrator' %}btn-outline-primary{% else %}btn-outline-secondary{% endif %}">
       <i class="bi bi-pencil me-1"></i>{% if user.role == 'administrator' %}Edit{% elif user.role == 'observer' %}Request Edit{% else %}Propose Edit{% endif %}
     </a>
-    {% if user.role != 'observer' %}
     <form method="post" action="/docs/{{ doc_page.slug }}/attachments" enctype="multipart/form-data" class="d-inline">
       <input type="file" name="file" accept="application/pdf,.pdf" class="d-none" id="headerPdfInput" onchange="this.form.submit()">
       <button type="button" class="btn btn-sm btn-danger" onclick="document.getElementById('headerPdfInput').click()"
-              title="Upload a PDF attachment to this wiki page">
+              title="{% if user.role == 'administrator' %}Upload a PDF attachment to this wiki page{% else %}Upload a PDF — an administrator must approve it before it appears{% endif %}">
         <i class="bi bi-file-earmark-pdf me-1"></i>Upload PDF
       </button>
     </form>
-    {% else %}
-    <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Observer accounts cannot upload PDFs">
-      <i class="bi bi-file-earmark-pdf me-1"></i>Upload PDF
-    </button>
-    {% endif %}
     {% if user.role == 'administrator' %}
     <div class="dropdown">
       <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
@@ -80,7 +74,7 @@
         {{ rendered | safe }}
       </div>
     </div>
-    {% for att in doc_page.attachments %}
+    {% for att in doc_page.attachments if att.approval_status == 'approved' %}
     <div class="card border-secondary mt-3">
       <div class="card-header d-flex align-items-center gap-2 py-2">
         <i class="bi bi-file-earmark-pdf text-danger"></i>
@@ -122,12 +116,15 @@
     <div class="docs-side-panel mb-3">
       <div class="docs-side-heading"><i class="bi bi-file-earmark-pdf me-1"></i>PDF Attachments</div>
       <div class="list-group list-group-flush docs-category-list">
-        {% for att in doc_page.attachments %}
+        {% set ns = namespace(shown=0) %}
+        {# Approved — visible to everyone who can see the page #}
+        {% for att in doc_page.attachments if att.approval_status == 'approved' %}
+        {% set ns.shown = ns.shown + 1 %}
         <div class="list-group-item d-flex align-items-center gap-2 py-2 small">
           <i class="bi bi-file-earmark-pdf text-danger"></i>
           <a href="/docs/{{ doc_page.slug }}/attachments/{{ att.id }}" target="_blank" class="text-decoration-none flex-grow-1 text-truncate" title="{{ att.filename }}">{{ att.filename }}</a>
           <span class="text-muted" style="font-size:0.7rem">{{ (att.size_bytes / 1024) | round(0, 'floor') | int }} KB</span>
-          {% if user.role != 'observer' %}
+          {% if user.role == 'administrator' or att.uploaded_by_id == user.id %}
           <form method="post" action="/docs/{{ doc_page.slug }}/attachments/{{ att.id }}/delete"
                 onsubmit="return confirm('Remove {{ att.filename | e }}?')">
             <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Remove PDF">
@@ -136,18 +133,38 @@
           </form>
           {% endif %}
         </div>
-        {% else %}
-        <div class="list-group-item text-muted small">No PDFs attached.</div>
         {% endfor %}
+        {# Pending approval — administrators see all; uploaders see their own #}
+        {% for att in doc_page.attachments if att.approval_status != 'approved' and (user.role == 'administrator' or att.uploaded_by_id == user.id) %}
+        {% set ns.shown = ns.shown + 1 %}
+        <div class="list-group-item d-flex align-items-center gap-2 py-2 small" style="background:rgba(var(--bs-warning-rgb),0.12)">
+          <i class="bi bi-file-earmark-pdf text-danger"></i>
+          <a href="/docs/{{ doc_page.slug }}/attachments/{{ att.id }}" target="_blank" class="text-decoration-none flex-grow-1 text-truncate" title="{{ att.filename }} (pending)">{{ att.filename }}</a>
+          <span class="badge bg-warning text-dark" style="font-size:0.6rem" title="Awaiting administrator approval">Pending</span>
+          {% if user.role == 'administrator' %}
+          <form method="post" action="/docs/{{ doc_page.slug }}/attachments/{{ att.id }}/approve">
+            <button type="submit" class="btn btn-sm btn-outline-success py-0 px-1" title="Approve PDF"><i class="bi bi-check-lg"></i></button>
+          </form>
+          {% endif %}
+          <form method="post" action="/docs/{{ doc_page.slug }}/attachments/{{ att.id }}/delete"
+                onsubmit="return confirm('{% if user.role == 'administrator' %}Reject{% else %}Remove{% endif %} {{ att.filename | e }}?')">
+            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="{% if user.role == 'administrator' %}Reject PDF{% else %}Remove PDF{% endif %}"><i class="bi bi-x-lg"></i></button>
+          </form>
+        </div>
+        {% endfor %}
+        {% if ns.shown == 0 %}
+        <div class="list-group-item text-muted small">No PDFs attached.</div>
+        {% endif %}
       </div>
-      {% if user.role != 'observer' %}
       <div class="p-2 border-top">
         <form method="post" action="/docs/{{ doc_page.slug }}/attachments" enctype="multipart/form-data" class="d-flex flex-column gap-1">
           <input type="file" class="form-control form-control-sm" name="file" accept="application/pdf,.pdf" required>
           <button type="submit" class="btn btn-sm btn-outline-primary"><i class="bi bi-upload me-1"></i>Upload PDF</button>
+          {% if user.role != 'administrator' %}
+          <div class="form-text" style="font-size:0.7rem">An administrator must approve your PDF before it appears on the page.</div>
+          {% endif %}
         </form>
       </div>
-      {% endif %}
     </div>
 
     {% if user.role == 'administrator' %}
