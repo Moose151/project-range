@@ -7,10 +7,7 @@ Signal *package* entries, so planned chameleons added to a package (e.g. 201-2,
 """
 
 import re
-
-from sqlalchemy.orm import Session
-
-from app.models import Signal, SignalPackageEntry
+from typing import Iterable
 
 
 def chameleon_base_name(signal_name: str) -> str:
@@ -19,20 +16,18 @@ def chameleon_base_name(signal_name: str) -> str:
     return m.group(1) if m else signal_name
 
 
-def next_chameleon_name(db: Session, signal_name: str) -> str:
-    """Return the next free ``{base}-{N+1}`` across registry + package entries."""
+def next_chameleon_name(signal_name: str, existing_names: Iterable[str]) -> str:
+    """Next free ``{base}-{N+1}`` for the family, counting only ``existing_names``.
+
+    Scope is the caller's responsibility (e.g. a single package's signals, or the
+    signals in one serial) so the count reflects *that* context rather than every
+    similarly-named signal in the database.
+    """
     base = chameleon_base_name(signal_name)
     pattern = re.compile(r"^" + re.escape(base) + r"(?:-(\d+))?$")
-    names: set[str] = set()
-    for (name,) in db.query(Signal.name).filter(Signal.name.like(f"{base}%")).all():
-        names.add(name)
-    for (name,) in db.query(SignalPackageEntry.signal_name).filter(
-        SignalPackageEntry.signal_name.like(f"{base}%")
-    ).all():
-        names.add(name)
     max_n = 0
-    for name in names:
-        m = pattern.match(name)
+    for name in existing_names:
+        m = pattern.match(name or "")
         if m:
             n = int(m.group(1)) if m.group(1) else 0
             max_n = max(max_n, n)

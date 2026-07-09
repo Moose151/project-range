@@ -946,7 +946,8 @@ async def package_signal_chameleon(
         SignalPackageEntry.package_id == pkg_id,
     ).first() if pkg else None
     if entry:
-        new_name = next_chameleon_name(db, entry.signal_name)
+        # Count only chameleons within THIS package, so a fresh signal starts at -1.
+        new_name = next_chameleon_name(entry.signal_name, [e.signal_name for e in pkg.signals])
         db.add(SignalPackageEntry(
             package_id=pkg_id,
             display_order=len(pkg.signals),

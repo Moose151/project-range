@@ -343,6 +343,11 @@
             <a href="/serials/{{ serial.id }}/start" class="btn btn-sm btn-success"><i class="bi bi-play-circle me-1"></i>Start</a>
             {% endif %}
             {% if user.role != 'observer' %}
+            <form method="post" action="/activities/{{ activity.id }}/serials/{{ serial.id }}/clone">
+              <button type="submit" class="btn btn-sm btn-outline-secondary" title="Duplicate this serial's packages, CDA and notes as a new pending serial in this activity">
+                <i class="bi bi-copy me-1"></i>Clone
+              </button>
+            </form>
             <form method="post" action="/activities/{{ activity.id }}/unassign-serial/{{ serial.id }}"
                   onsubmit="return confirm('Unassign this serial from the activity?')">
               <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg me-1"></i>Unassign</button>
@@ -436,6 +441,45 @@
 </div>
 
 {% if user.role != 'observer' %}
+{% if user.role != 'observer' %}
+<div class="activity-hub-panel mt-3">
+  <div class="activity-hub-heading"><i class="bi bi-plus-circle me-1"></i>New Serial in this Activity</div>
+  <div class="p-3">
+    <form method="post" action="/activities/{{ activity.id }}/serials/new" class="row g-2">
+      <div class="col-md-4">
+        <label class="form-label small mb-1">Title</label>
+        <input type="text" name="title" class="form-control form-control-sm" placeholder="e.g. Serial 1" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small mb-1">Notes <span class="text-muted">(optional)</span></label>
+        <input type="text" name="notes" class="form-control form-control-sm">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small mb-1">Instructions <span class="text-muted">(optional)</span></label>
+        <input type="text" name="instructions" class="form-control form-control-sm" placeholder="e.g. Turn on 102 at 1400Z">
+      </div>
+      {% if packages %}
+      <div class="col-12">
+        <label class="form-label small mb-1">Attach packages <span class="text-muted">(optional)</span></label>
+        <div class="d-flex flex-wrap gap-3">
+          {% for pkg in packages %}
+          <label class="form-check small mb-0">
+            <input class="form-check-input" type="checkbox" name="package_ids" value="{{ pkg.id }}">
+            {{ pkg.name }}{% if pkg.is_closed_loop %} <span class="badge bg-info text-dark" style="font-size:.6rem">CL</span>{% endif %}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      <div class="col-12">
+        <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-plus-lg me-1"></i>Create Serial (pending)</button>
+        <span class="text-muted small ms-2">Starts as pending — add CDA/packages below, then Start when ready.</span>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
 <div class="activity-hub-panel mt-3">
   <div class="activity-hub-heading"><i class="bi bi-link-45deg me-1"></i>Assign Existing Serial</div>
   <div class="p-3">

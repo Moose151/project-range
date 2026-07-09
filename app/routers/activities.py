@@ -264,6 +264,91 @@ async def activity_unassign_serial(
     return RedirectResponse(f"/activities/{activity_id}?toast=Serial+unassigned", status_code=302)
 
 
+@router.post("/{activity_id}/serials/new")
+async def activity_new_serial(
+    activity_id: int,
+    title: str = Form(...),
+    notes: str = Form(""),
+    instructions: str = Form(""),
+    package_ids: list[int] = Form(default=[]),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a new pending serial directly inside this activity — no page hop."""
+    if current_user.role == "observer":
+        raise HTTPException(status_code=403)
+    testing = is_testing_state(db)
+    activity = db.query(Activity).filter(
+        Activity.id == activity_id, Activity.is_testing == testing,
+    ).first()
+    if not activity or not title.strip():
+        return RedirectResponse(f"/activities/{activity_id}", status_code=302)
+    serial = Serial(
+        title=title.strip(),
+        notes=notes.strip() or None,
+        instructions=instructions.strip() or None,
+        opened_by_id=current_user.id,
+        is_testing=testing,
+        activity_id=activity.id,
+    )
+    db.add(serial)
+    db.flush()
+    for pid in package_ids:
+        pkg = db.query(SignalPackage).filter(
+            SignalPackage.id == pid, SignalPackage.is_testing == testing,
+        ).first()
+        if pkg:
+            db.add(SerialPackage(serial_id=serial.id, package_id=pid))
+    db.add(AuditLog(
+        user_id=current_user.id, action_type="SERIAL_CREATE",
+        entity_type="Serial", entity_id=serial.id, new_value=serial.title,
+    ))
+    db.commit()
+    return RedirectResponse(f"/activities/{activity_id}?toast=Serial+created", status_code=302)
+
+
+@router.post("/{activity_id}/serials/{serial_id}/clone")
+async def activity_clone_serial(
+    activity_id: int,
+    serial_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Duplicate a serial's setup (packages, CDA tables, notes/instructions) as a
+    new pending serial in the same activity. Signal logs / lifecycle are not copied."""
+    if current_user.role == "observer":
+        raise HTTPException(status_code=403)
+    testing = is_testing_state(db)
+    activity = db.query(Activity).filter(
+        Activity.id == activity_id, Activity.is_testing == testing,
+    ).first()
+    orig = db.query(Serial).filter(
+        Serial.id == serial_id, Serial.is_testing == testing, Serial.activity_id == activity_id,
+    ).first()
+    if not activity or not orig:
+        return RedirectResponse(f"/activities/{activity_id}", status_code=302)
+    clone = Serial(
+        title=f"{orig.title} (copy)",
+        notes=orig.notes,
+        instructions=orig.instructions,
+        opened_by_id=current_user.id,
+        is_testing=testing,
+        activity_id=activity.id,
+    )
+    db.add(clone)
+    db.flush()
+    for link in orig.package_links:
+        db.add(SerialPackage(serial_id=clone.id, package_id=link.package_id))
+    for link in orig.cda_links:
+        db.add(SerialCDATable(serial_id=clone.id, cda_table_id=link.cda_table_id))
+    db.add(AuditLog(
+        user_id=current_user.id, action_type="SERIAL_CLONE",
+        entity_type="Serial", entity_id=clone.id, new_value=clone.title,
+    ))
+    db.commit()
+    return RedirectResponse(f"/activities/{activity_id}?toast=Serial+cloned+as+pending", status_code=302)
+
+
 @router.post("/{activity_id}/serials/{serial_id}/edit")
 async def activity_serial_edit(
     activity_id: int,

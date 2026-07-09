@@ -1,7 +1,14 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.29.1**
+Current version: **0.29.2**
+
+---
+
+## 0.29.2 — Smoother Activity Workflow + Chameleon Count Fix
+
+- **Build serials without leaving the activity.** The activity page now has a **New Serial in this Activity** form — create a pending serial (with notes, instructions, and optional packages) right there, instead of hopping to the Serials page and assigning it back. Each serial also has a **Clone** button that duplicates its packages, CDA tables, and notes as a new pending serial in the same activity — handy for repetitive setups.
+- **Fixed chameleon numbering.** The package **+** button now counts only chameleons within *that package*, so a brand-new signal correctly starts at `-1` (previously it could jump to `-3` because it was counting similarly-named signals elsewhere). Planned chameleons still carry their count through to the live dashboard (e.g. a package with 201-1/2/3 → the next one spawned live is 201-4), now scoped to the serial's own signals.
 
 ---
 

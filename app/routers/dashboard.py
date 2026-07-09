@@ -367,12 +367,6 @@ def _cbm_status_by_source(db: Session, testing: bool) -> dict[str, dict | None]:
     return result
 
 
-# Chameleon naming is shared with the package editor so the -N count continues
-# across registry entries and package entries alike (see app/chameleon.py).
-_chameleon_base_name = chameleon_base_name
-_next_chameleon_name = next_chameleon_name
-
-
 def _get_exclusivity_map(db: Session) -> dict[str, list[str]]:
     """Return {signal_name: [sibling_names]} for signals in exclusivity groups."""
     sigs = db.query(Signal).filter(
@@ -631,11 +625,15 @@ async def dashboard_chameleon(
     testing = is_testing_state(db)
     range_state = get_current_range_state(db)
 
-    new_name = _next_chameleon_name(db, signal_name)
+    # Count chameleons within THIS serial's signals so the -N continues from any
+    # planned chameleons loaded from the package (e.g. 201-1/-2/-3 → 201-4), while
+    # a fresh signal in a fresh serial starts at -1.
+    existing_names = [log.signal_name for log in _latest_signal_status(db, serial_id=serial_id)]
+    new_name = next_chameleon_name(signal_name, existing_names)
 
     # Ensure the new name doesn't already exist as a Signal registry entry
     if not db.query(Signal).filter(Signal.name == new_name).first():
-        original_sig = db.query(Signal).filter(Signal.name == _chameleon_base_name(signal_name)).first()
+        original_sig = db.query(Signal).filter(Signal.name == chameleon_base_name(signal_name)).first()
         db.add(Signal(
             name=new_name,
             description=f"Chameleon of {signal_name}",

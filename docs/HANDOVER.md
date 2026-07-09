@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.29.1` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.29.2` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -68,6 +68,9 @@ Also include a global header **+ New** quick-action (activity / serial / package
 **Risks / unknowns to resolve during Phase 2:** (a) on-connect state dump vs persistent connection; (b) exact login form for `_login`; (c) EIRP scale factor; (d) TLS cert (self-signed → `verify=False`, already handled). Everything downstream (`RicsSnapshot`) is a stable interface, so the widgets/registry can be built against it once (1)–(3) are answered.
 
 ### Shipped (all on `main`, in order)
+- **0.29.2 — Activity workflow + chameleon count fix:**
+  - `activities.py`: `POST /activities/{id}/serials/new` (create a pending serial in the activity, optional packages) and `POST /activities/{id}/serials/{sid}/clone` (duplicate packages/CDA/notes as a new pending serial). UI in `activity_detail.html`: **New Serial in this Activity** panel + per-serial **Clone** button.
+  - **Chameleon scoping fix**: `app/chameleon.py` `next_chameleon_name(signal_name, existing_names)` now takes an explicit scope (was global, causing a fresh `301` to become `301-3`). Package **+** scopes to that package's signals; dashboard **+** scopes to the serial's signals (`_latest_signal_status`), so a fresh signal starts at `-1` while planned chameleons still continue (201-1/2/3 → 201-4).
 - **0.29.1 — Package & clock improvements:**
   - **Closed-loop TxIF↔RxIF mirror** in `package_edit.html` (`mirrorClosedLoopIf`, `PKG_CLOSED_LOOP`).
   - **Package chameleon +**: `POST /packages/{id}/signals/{entry_id}/chameleon` (`packages.py`) clones an entry with the next `-N` name and no modem source; **+** button per signal row. Naming moved to shared `app/chameleon.py` (`next_chameleon_name` counts Signal registry **and** package entries so the count continues onto the dashboard); `dashboard.py` now imports it.
