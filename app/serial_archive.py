@@ -63,7 +63,7 @@ def archive_closed_serial(db: Session, serial: Serial, actor_id: int | None = No
         "ID", "Timestamp (Zulu)", "Operator", "Range State", "Signal", "Status",
         "TxIF", "TxRF", "RxRF", "RxIF", "Unit", "Band",
         "Modulation", "Symbol Rate", "FEC", "Source", "Antenna",
-        "Power", "Power Unit", "Eb/No", "Engaged", "Activity Ref",
+        "Power", "Power Unit", "Eb/No", "BER", "Engaged", "Activity Ref",
         "Notes", "Type", "Deleted",
     ])
     for log in logs:
@@ -88,6 +88,7 @@ def archive_closed_serial(db: Session, serial: Serial, actor_id: int | None = No
             log.power,
             log.power_unit,
             log.eb_no,
+            log.ber_estimate,
             "yes" if log.engaged else "no",
             log.activity_ref or "",
             log.notes or "",

@@ -1,7 +1,16 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.27.0**
+Current version: **0.28.0**
+
+---
+
+## 0.28.0 — Admin-Doc Encryption, BER Estimate, Wiki Rename
+
+- **Admin-only documents are encrypted at rest.** Documentation pages set to "Administrators only" now have their body (and version snapshots) stored **encrypted** in the database instead of plain text. Decryption is transparent for admins in the app; the content is unreadable in the raw database file. (Encrypted pages aren't full-text-searchable by body text — title and tags still are — and this relies on a stable `SECRET_KEY`, same as saved device passwords.)
+- **BER (Bit Error Rate) estimate from the modem.** CBM/EBEM sync now reads the modem's **RX BER estimate** (`RX_BEREST`) and shows it on the dashboard signal table (new **BER** column, hideable) and in the EBEM Sync cell, and includes it in log exports and effect logs. A new admin setting (**Config → System**) controls whether BER changes create log rows and the change threshold — off by default, since BER drifts frequently (it still updates live on the dashboard either way). Also recognises the modem's `ACQUIRED` state as a positive carrier lock.
+- **"Documentation" → "Wiki".** The documentation module is now labelled **Wiki** throughout the UI for brevity and clarity.
+- **Effect dropdown closes on selection.** Choosing an effect on a dashboard signal now closes the dropdown menu immediately (previously it stayed open).
 
 ---
 

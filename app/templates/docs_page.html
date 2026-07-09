@@ -10,7 +10,7 @@
   <div>
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb mb-1">
-        <li class="breadcrumb-item"><a href="/docs">Documentation</a></li>
+        <li class="breadcrumb-item"><a href="/docs">Wiki</a></li>
         {% if doc_page.category %}<li class="breadcrumb-item"><a href="/docs?category={{ doc_page.category | urlencode }}">{{ doc_page.category }}</a></li>{% endif %}
         <li class="breadcrumb-item active">{{ doc_page.title }}</li>
       </ol>
@@ -41,11 +41,15 @@
     {% if user.role != 'observer' %}
     <form method="post" action="/docs/{{ doc_page.slug }}/attachments" enctype="multipart/form-data" class="d-inline">
       <input type="file" name="file" accept="application/pdf,.pdf" class="d-none" id="headerPdfInput" onchange="this.form.submit()">
-      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('headerPdfInput').click()"
-              title="Attach a PDF to this page">
-        <i class="bi bi-file-earmark-pdf me-1"></i>Attach PDF
+      <button type="button" class="btn btn-sm btn-danger" onclick="document.getElementById('headerPdfInput').click()"
+              title="Upload a PDF attachment to this wiki page">
+        <i class="bi bi-file-earmark-pdf me-1"></i>Upload PDF
       </button>
     </form>
+    {% else %}
+    <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Observer accounts cannot upload PDFs">
+      <i class="bi bi-file-earmark-pdf me-1"></i>Upload PDF
+    </button>
     {% endif %}
     {% if user.role == 'administrator' %}
     <div class="dropdown">

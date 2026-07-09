@@ -278,6 +278,7 @@ def _reassign_modem_source(
             modulation=latest.modulation, symbol_rate=latest.symbol_rate, fec=latest.fec,
             power=latest.power, power_unit=latest.power_unit,
             eb_no=None,                 # modem gone → no valid Eb/No
+            ber_estimate=None,          # modem gone → no valid BER estimate
             engaged=latest.engaged,
             source=None,                # modem reassigned elsewhere
             antenna=latest.antenna,
@@ -561,7 +562,7 @@ async def dashboard_signal_call(
     # Capture the signal's modem state at the moment of the effect. Stored as a
     # pipe-delimited "Key: Value" string so the Signal Logs view can render it as
     # a clean, readable effect row (see logs_list.html) without needing the edit
-    # panel. Order is fixed: Effect, Source, Eb/No, Carrier Lock, Channel Sync, Mod Lock.
+    # panel. Order is fixed: Effect, Source, modem metrics, and lock states.
     source = latest.source if latest else None
     cbm_status = _cbm_status_by_source(db, testing)
 
@@ -569,6 +570,7 @@ async def dashboard_signal_call(
         return "OK" if value is True else ("Fault" if value is False else "—")
 
     ebno_label = f"{latest.eb_no} dB" if (latest and latest.eb_no is not None) else "—"
+    ber_label = f"{latest.ber_estimate:g}" if (latest and latest.ber_estimate is not None) else "—"
     mod_label = (latest.modulation if latest and latest.modulation else "—")
     if latest and latest.power is not None:
         power_label = f"{latest.power} {latest.power_unit or 'dBm'}"
@@ -585,7 +587,7 @@ async def dashboard_signal_call(
     notes_text = (
         f"Effect: {call_type} | Source: {source or 'No modem assigned'} | Mod: {mod_label} "
         f"| Power: {power_label} | Eb/No: {ebno_label} "
-        f"| Carrier Lock: {carrier} | Channel Sync: {channel} | Mod Lock: {mod_lock}"
+        f"| BER Estimate: {ber_label} | Carrier Lock: {carrier} | Channel Sync: {channel} | Mod Lock: {mod_lock}"
     )
 
     new_entry = SignalLog(
@@ -605,6 +607,7 @@ async def dashboard_signal_call(
         power=latest.power if latest else None,
         power_unit=latest.power_unit if latest else "dBm",
         eb_no=latest.eb_no if latest else None,
+        ber_estimate=latest.ber_estimate if latest else None,
         engaged=latest.engaged if latest else False,
         source=latest.source if latest else None,
         antenna=latest.antenna if latest else None,
@@ -723,6 +726,7 @@ async def dashboard_chameleon(
         power=latest.power if latest else None,
         power_unit=latest.power_unit if latest else "dBm",
         eb_no=None,
+        ber_estimate=None,
         engaged=False,
         source=None,
         antenna=latest.antenna if latest else None,
@@ -833,6 +837,7 @@ def _dashboard_values_from_update(
         "power": upd.power if "power" in upd.changed_fields else (latest.power if latest else None),
         "power_unit": upd.power_unit or (latest.power_unit if latest else "dBm"),
         "eb_no": upd.eb_no if "eb_no" in upd.changed_fields else (latest.eb_no if latest else None),
+        "ber_estimate": latest.ber_estimate if latest else None,
         "source": _blank_to_none(upd.source) if "source" in upd.changed_fields else (latest.source if latest else None),
         "antenna": _blank_to_none(upd.antenna) if "antenna" in upd.changed_fields else (latest.antenna if latest else None),
     }
@@ -965,6 +970,7 @@ async def dashboard_quick_update(
                         power=sib_latest.power,
                         power_unit=sib_latest.power_unit,
                         eb_no=sib_latest.eb_no,
+                        ber_estimate=sib_latest.ber_estimate,
                         engaged=sib_latest.engaged,
                         source=sib_latest.source,
                         antenna=sib_latest.antenna,
@@ -985,10 +991,12 @@ async def dashboard_quick_update(
             )
 
     resolved_source = effective_source if source.strip() or package_sources_updated else (latest.source if latest else None)
-    # Eb/No is invalid without a modem source or when the signal is not Up.
+    # Live modem metrics are invalid without a modem source or when the signal is not Up.
     resolved_eb_no = eb_no if eb_no is not None else (latest.eb_no if latest else None)
+    resolved_ber = latest.ber_estimate if latest else None
     if not resolved_source or signal_status != "Up":
         resolved_eb_no = None
+        resolved_ber = None
 
     new_entry = SignalLog(
         operator_id=current_user.id,
@@ -1007,6 +1015,7 @@ async def dashboard_quick_update(
         power=power if power is not None else (latest.power if latest else None),
         power_unit=power_unit,
         eb_no=resolved_eb_no,
+        ber_estimate=resolved_ber,
         engaged=latest.engaged if latest else False,
         source=resolved_source,
         antenna=antenna or (latest.antenna if latest else None),
@@ -1109,6 +1118,7 @@ async def dashboard_bulk_update(
                             modulation=sib_latest.modulation, symbol_rate=sib_latest.symbol_rate,
                             fec=sib_latest.fec, power=sib_latest.power,
                             power_unit=sib_latest.power_unit, eb_no=sib_latest.eb_no,
+                            ber_estimate=sib_latest.ber_estimate,
                             engaged=sib_latest.engaged,
                             source=sib_latest.source, antenna=sib_latest.antenna,
                             notes=f"Auto-downed: {upd.signal_name} came Up (group: {sig_reg.exclusivity_group})",
@@ -1131,12 +1141,14 @@ async def dashboard_bulk_update(
         values = _dashboard_values_from_update(db, serial_id, latest, upd)
         if "source" in upd.changed_fields:
             values["source"] = effective_source
-            # Removing the modem source invalidates any Eb/No reading.
+            # Removing the modem source invalidates live modem metrics.
             if not effective_source:
                 values["eb_no"] = None
-        # Eb/No is only meaningful while the signal is transmitting/Up.
+                values["ber_estimate"] = None
+        # Live modem metrics are only meaningful while the signal is transmitting/Up.
         if values["signal_status"] != "Up":
             values["eb_no"] = None
+            values["ber_estimate"] = None
 
         new_entry = SignalLog(
             operator_id=current_user.id, range_state=range_state,
@@ -1153,6 +1165,7 @@ async def dashboard_bulk_update(
             power=values["power"],
             power_unit=values["power_unit"],
             eb_no=values["eb_no"],
+            ber_estimate=values["ber_estimate"],
             engaged=latest.engaged if latest else False,
             source=values["source"],
             antenna=values["antenna"],

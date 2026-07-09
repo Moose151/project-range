@@ -845,6 +845,28 @@ document.addEventListener('DOMContentLoaded', () => {
               When off, Eb/No still updates on the dashboard but Eb/No changes are never written as new log entries.
             </div>
           </div>
+          <div class="col-lg-3 col-md-5">
+            <label class="form-label small">BER change to log</label>
+            <input type="number" class="form-control form-control-sm" name="cbm_ber_log_threshold"
+                   value="{{ cbm_ber_log_threshold }}" min="0" step="any">
+            <div class="form-text">
+              During CBM/EBEM sync, BER estimate changes smaller than this are not logged. Default 1e-7.
+            </div>
+          </div>
+          <div class="col-lg-3 col-md-5">
+            <label class="form-label small d-block">Record BER changes in log</label>
+            <div class="form-check form-switch mt-1">
+              <input class="form-check-input" type="checkbox" role="switch" id="berLogEnabled"
+                     name="cbm_ber_log_enabled" value="1" {% if cbm_ber_log_enabled %}checked{% endif %}
+                     onchange="document.getElementById('berLogEnabledLabel').textContent=this.checked?'Enabled':'Disabled'">
+              <label class="form-check-label small" id="berLogEnabledLabel" for="berLogEnabled">
+                {% if cbm_ber_log_enabled %}Enabled{% else %}Disabled{% endif %}
+              </label>
+            </div>
+            <div class="form-text">
+              Off by default. BER still updates on the dashboard but BER-only changes do not create log rows unless enabled.
+            </div>
+          </div>
           <div class="col-lg-4 col-md-7">
             <label class="form-label small d-block">Pause hardware sync in Sandbox</label>
             <div class="form-check form-switch mt-1">

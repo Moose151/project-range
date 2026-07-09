@@ -26,6 +26,18 @@ DEFAULT_CBM_EBNO_LOG_THRESHOLD = 3.0
 CBM_EBNO_LOG_ENABLED_KEY = "cbm_ebno_log_enabled"
 DEFAULT_CBM_EBNO_LOG_ENABLED = True
 
+# Minimum BER estimate change that counts as worth logging during CBM sync.
+# BER is a unitless ratio and is typically reported in scientific notation by
+# the EBEM as RX_BEREST. It still updates in-place on the dashboard regardless
+# of whether BER change logging is enabled.
+CBM_BER_LOG_THRESHOLD_KEY = "cbm_ber_log_threshold"
+DEFAULT_CBM_BER_LOG_THRESHOLD = 1e-7
+
+# BER logging is off by default because BER can drift frequently. When False,
+# BER still updates on the dashboard but does not create new log rows by itself.
+CBM_BER_LOG_ENABLED_KEY = "cbm_ber_log_enabled"
+DEFAULT_CBM_BER_LOG_ENABLED = False
+
 # Testing/Sandbox-only pause for read-only hardware sync. When enabled, automatic
 # and active EBEM/CBM + SNMP syncs do not update Testing workspace rows, letting
 # users rehearse manual changes without modem/matrix reads immediately overriding them.
@@ -80,6 +92,11 @@ def get_cbm_ebno_log_enabled(db: Session) -> bool:
     return raw.lower() not in ("0", "false", "no", "off")
 
 
+def get_cbm_ber_log_enabled(db: Session) -> bool:
+    raw = get_setting(db, CBM_BER_LOG_ENABLED_KEY, "0")
+    return raw.lower() in ("1", "true", "yes", "on")
+
+
 def get_sandbox_hardware_sync_paused(db: Session) -> bool:
     raw = get_setting(db, SANDBOX_HARDWARE_SYNC_PAUSED_KEY, "0")
     return raw.lower() in ("1", "true", "yes", "on")
@@ -92,6 +109,15 @@ def get_cbm_ebno_log_threshold(db: Session) -> float:
     except (TypeError, ValueError):
         return DEFAULT_CBM_EBNO_LOG_THRESHOLD
     return value if value >= 0 else DEFAULT_CBM_EBNO_LOG_THRESHOLD
+
+
+def get_cbm_ber_log_threshold(db: Session) -> float:
+    raw = get_setting(db, CBM_BER_LOG_THRESHOLD_KEY, str(DEFAULT_CBM_BER_LOG_THRESHOLD))
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_CBM_BER_LOG_THRESHOLD
+    return value if value >= 0 else DEFAULT_CBM_BER_LOG_THRESHOLD
 
 
 def annotate_local_times(logs: list[SignalLog], timezone_name: str) -> None:

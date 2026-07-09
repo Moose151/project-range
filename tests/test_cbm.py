@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.cbm import parse_icc_response, CBMSnapshot  # noqa: E402
 from app.cbm_sync import (  # noqa: E402
     _status_from_snapshot, _entry_values_from_snapshot, _ebno_changed, _non_ebno_changed,
+    sync_states_from_snapshot,
 )
 
 
@@ -57,7 +58,7 @@ TX_CODE=1/2TURBO:16384,TX_DIFF=OFF,ITA_ENGAGE=AUTO
 # ALL_STAT with a receiving/locked demod (real Eb/No value present).
 ALL_STAT_RAW = """all_stat ?
 ALL_STAT ITT_NCHGS=0,AUPC_STAT=DISENGAGED,RXIF_LVL=-45.5,RX_EBNO=7.8,RX_ESNO=No
-Carrier,ACQ_STATE=ACQUIRED,BSYNC_STAT=SYNC,MDM_STAT=ONLINE,LINK_STAT=LINK_UP,FLT_STAT=NONE
+Carrier,RX_BEREST=1.2E-7,ACQ_STATE=ACQUIRED,BSYNC_STAT=SYNC,ESYNC_STAT=SYNC,MDM_STAT=ONLINE,LINK_STAT=LINK_UP,FLT_STAT=NONE
 """
 
 ALL_STAT_NO_CARRIER = """all_stat ?
@@ -78,6 +79,7 @@ def test_all_stat_first_field_and_ebno():
     st = parse_icc_response(ALL_STAT_RAW, "ALL_STAT")
     assert st.get("ITT_NCHGS") == "0", st        # first field no longer corrupted
     assert st.get("RX_EBNO") == "7.8"
+    assert st.get("RX_BEREST") == "1.2E-7"
     assert st.get("ACQ_STATE") == "ACQUIRED"
 
 
@@ -116,6 +118,21 @@ def test_ebno_populates_for_tx_path():
     values = _entry_values_from_snapshot(_Entry(), snap)
     assert values["signal_status"] == "Up"
     assert values["eb_no"] == 7.8   # read even on a tx-path mapping
+    assert values["ber_estimate"] == 1.2e-7
+
+
+def test_ber_estimate_cached_for_dashboard():
+    snap = CBMSnapshot(
+        tx_config=parse_icc_response(TX_CFG_RAW, "TX_CFG"),
+        rx_config={},
+        status=parse_icc_response(ALL_STAT_RAW, "ALL_STAT"),
+    )
+    assert snap.summary["rx_ber_estimate"] == "1.2E-7"
+    state = sync_states_from_snapshot(snap)
+    assert state["ebem_sync"] is True
+    assert state["carrier_lock"] is True
+    assert state["bit_sync"] is True
+    assert state["ber_estimate"] == 1.2e-7
 
 
 def test_ebno_none_when_no_carrier():
@@ -130,6 +147,7 @@ def test_ebno_none_when_no_carrier():
     )
     values = _entry_values_from_snapshot(_Entry(), snap)
     assert values["eb_no"] is None   # "No Carrier" -> not a number
+    assert sync_states_from_snapshot(snap)["ber_estimate"] is None
 
 
 def main():

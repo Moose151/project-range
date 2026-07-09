@@ -306,7 +306,7 @@ def _ensure_doc_link_index(db: Session) -> None:
 
 def _alias_conflict(db: Session, alias_slug: str, alias_id: int | None = None) -> str:
     if db.query(DocPage).filter(DocPage.slug == alias_slug).first():
-        return "A documentation page already uses that URL."
+        return "A wiki page already uses that URL."
     q = db.query(DocAlias).filter(DocAlias.alias_slug == alias_slug)
     if alias_id is not None:
         q = q.filter(DocAlias.id != alias_id)
@@ -623,12 +623,12 @@ async def docs_restore_deleted(
         entity_type="DocPage",
         entity_id=doc.id,
         previous_value=doc.title,
-        comment="Restored documentation page from recycle bin",
+        comment="Restored wiki page from recycle bin",
     ))
     _sync_doc_links(db, doc)
     _sync_all_doc_links(db)
     db.commit()
-    return RedirectResponse(f"/docs/{doc.slug}?toast=Documentation+page+restored", status_code=302)
+    return RedirectResponse(f"/docs/{doc.slug}?toast=Wiki+page+restored", status_code=302)
 
 
 @router.post("/deleted/{page_id}/permanent-delete")
@@ -650,10 +650,10 @@ async def docs_permanent_delete(
         entity_type="DocPage",
         entity_id=doc_id,
         previous_value=title,
-        comment="Permanently deleted documentation page",
+        comment="Permanently deleted wiki page",
     ))
     db.commit()
-    return RedirectResponse("/docs/deleted?toast=Documentation+page+permanently+deleted", status_code=302)
+    return RedirectResponse("/docs/deleted?toast=Wiki+page+permanently+deleted", status_code=302)
 
 
 def _version_has_conflict(version: DocVersion) -> bool:
@@ -781,7 +781,7 @@ async def docs_add_alias(
 ):
     doc = db.query(DocPage).filter(DocPage.slug == slug, DocPage.is_published == True).first()
     if not doc:
-        return RedirectResponse("/docs?toast=Documentation+page+not+found", status_code=302)
+        return RedirectResponse("/docs?toast=Wiki+page+not+found", status_code=302)
 
     alias_title = _normalise_wiki_title(alias_title)
     alias_slug = _slugify(alias_title)
@@ -845,7 +845,7 @@ async def docs_delete_page(
     _ensure_doc_link_index(db)
     doc = db.query(DocPage).filter(DocPage.slug == slug, DocPage.is_published == True).first()
     if not doc:
-        return RedirectResponse("/docs?toast=Documentation+page+not+found", status_code=302)
+        return RedirectResponse("/docs?toast=Wiki+page+not+found", status_code=302)
 
     doc.is_published = False
     doc.updated_by_id = current_user.id
@@ -857,10 +857,10 @@ async def docs_delete_page(
         entity_type="DocPage",
         entity_id=doc.id,
         previous_value=doc.title,
-        comment="Documentation page moved to recycle bin",
+        comment="Wiki page moved to recycle bin",
     ))
     db.commit()
-    return RedirectResponse("/docs?toast=Documentation+page+deleted", status_code=302)
+    return RedirectResponse("/docs?toast=Wiki+page+deleted", status_code=302)
 
 
 # ── PDF attachments ───────────────────────────────────────────────────────────
@@ -872,10 +872,10 @@ async def docs_upload_attachment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Attach a PDF to a documentation page."""
+    """Attach a PDF to a wiki page."""
     doc = db.query(DocPage).filter(DocPage.slug == slug, DocPage.is_published == True).first()
     if not doc or not _can_view_doc(doc, current_user):
-        return RedirectResponse("/docs?toast=Documentation+page+not+found", status_code=302)
+        return RedirectResponse("/docs?toast=Wiki+page+not+found", status_code=302)
 
     content = await file.read()
     try:
@@ -918,7 +918,7 @@ async def docs_get_attachment(
     """Serve an attached PDF inline."""
     doc = db.query(DocPage).filter(DocPage.slug == slug).first()
     if not doc or not _can_view_doc(doc, current_user):
-        return RedirectResponse("/docs?toast=Documentation+page+not+found", status_code=302)
+        return RedirectResponse("/docs?toast=Wiki+page+not+found", status_code=302)
     attachment = db.query(DocAttachment).filter(
         DocAttachment.id == attachment_id, DocAttachment.page_id == doc.id,
     ).first()
@@ -942,7 +942,7 @@ async def docs_delete_attachment(
 ):
     doc = db.query(DocPage).filter(DocPage.slug == slug).first()
     if not doc:
-        return RedirectResponse("/docs?toast=Documentation+page+not+found", status_code=302)
+        return RedirectResponse("/docs?toast=Wiki+page+not+found", status_code=302)
     attachment = db.query(DocAttachment).filter(
         DocAttachment.id == attachment_id, DocAttachment.page_id == doc.id,
     ).first()
@@ -972,7 +972,7 @@ async def docs_view(
     if not doc:
         return templates.TemplateResponse(request, "error.html", {
             "code": 404,
-            "message": "Documentation page not found.",
+            "message": "Wiki page not found.",
         }, status_code=404)
     if alias:
         return RedirectResponse(f"/docs/{doc.slug}", status_code=302)

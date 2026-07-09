@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.27.0` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.28.0` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -68,6 +68,11 @@ Also include a global header **+ New** quick-action (activity / serial / package
 **Risks / unknowns to resolve during Phase 2:** (a) on-connect state dump vs persistent connection; (b) exact login form for `_login`; (c) EIRP scale factor; (d) TLS cert (self-signed → `verify=False`, already handled). Everything downstream (`RicsSnapshot`) is a stable interface, so the widgets/registry can be built against it once (1)–(3) are answered.
 
 ### Shipped (all on `main`, in order)
+- **0.28.0 — Admin-doc encryption + BER estimate + Wiki rename + effect-dropdown fix:**
+  - **Admin-only doc encryption** (committed earlier as `bc632e5`, released here): `app/crypto.py` `encrypt_doc_content`/`decrypt_doc_content` (marker prefix `enc:fernet:v1:`, decrypt is a no-op on plaintext so legacy/mixed data is safe). `DocPage.plain_content` / `DocVersion.plain_content` / `plain_base_content` properties. Wired through create/update/proposal/approve/restore/render/link-extraction and the edit/history/approval templates. Content is encrypted only when `visibility == "admins"`. Fernet is non-deterministic so all compares decrypt first. Caveats: encrypted bodies aren't matched by content search; requires stable `SECRET_KEY`.
+  - **BER estimate** (previous assistant's work, adopted + documented here): `RX_BEREST` parsed in `cbm.py` summary (`rx_ber_estimate`, with fallbacks); `_float_text` regex now handles scientific notation; `ber_estimate` in `sync_states_from_snapshot`, `_entry_values_from_snapshot`, and every dashboard `SignalLog` write (`dashboard.py`). New `ber_estimate` column on `SignalLog` (`models.py` + `init_db.py` migration `ALTER TABLE signal_logs ADD COLUMN ber_estimate FLOAT`). Threshold logging via `_metric_changed` + settings `CBM_BER_LOG_THRESHOLD_KEY`/`CBM_BER_LOG_ENABLED_KEY` (`settings.py`, `config.py`, `config.html`, seeded in `init_db.py`, **off by default**). Dashboard: hideable **BER** column (`signal_table.html` colspan 23→24, `dashboard.html` COL_DEFS `['ber','BER']`) + BER badge in the EBEM Sync cell. Exports (`logs.py`, `history.py`). Also added `ACQUIRED` to positive states. Tests in `test_cbm.py` (43 pass).
+  - **"Documentation" → "Wiki"** UI rename across `docs.py` toasts and doc templates (`docs_home/print/deleted`, `version_history.html`, `base.html`). Endpoints/behaviour unchanged.
+  - **Effect dropdown auto-close**: `logSignalEffect` (`dashboard.html`) now manually hides the Bootstrap dropdown after selection (its `stopPropagation`, needed to stop the click bleeding to the chameleon **+** button, was also blocking Bootstrap's auto-close).
 - **0.27.0 — Usability batch (part 1 of the 2026-07-09 request):**
   - Dashboard `<h4>` title "Live Range Dashboard" → **"Range Dashboard"** (`dashboard.html`).
   - **Effect logs** (`dashboard_signal_call` in `dashboard.py`) notes now include `Mod: {modulation}` and `Power: {power} {unit}` from the signal's latest state; the `logs_list.html` effect row already renders arbitrary `key: value` chips, so they show automatically.

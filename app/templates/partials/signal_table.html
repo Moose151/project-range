@@ -41,7 +41,8 @@
       {% if not closed_loop %}<th data-col="antenna">Antenna</th>{% endif %}
       <th data-col="power">Power</th>
       <th data-col="ebno">Eb/No</th>
-      <th data-col="ebem" title="EBEM: Embedded Channel Sync / Carrier Lock / Bit Sync">EBEM Sync</th>
+      <th data-col="ber">BER</th>
+      <th data-col="ebem" title="EBEM: Embedded Channel Sync / Carrier Lock / Bit Sync / BER Estimate">EBEM Sync</th>
       <th data-col="updated">Updated</th>
       <th data-col="warn">Warn</th>
     </tr>
@@ -62,6 +63,7 @@
         data-orig-fec="{{ log.fec or '' }}"
         data-orig-antenna="{{ log.antenna or '' }}"
         data-orig-eb-no="{{ log.eb_no if log.eb_no is not none else '' }}"
+        data-orig-ber-estimate="{{ log.ber_estimate if log.ber_estimate is not none else '' }}"
         data-orig-tx-if="{{ log.tx_if if log.tx_if is not none else '' }}"
         data-orig-tx-rf="{{ log.tx_rf if log.tx_rf is not none else '' }}"
         data-orig-rx-rf="{{ log.rx_rf if log.rx_rf is not none else '' }}"
@@ -163,14 +165,16 @@
         </div>
       </td>
       <td data-col="ebno">{{ log.eb_no if log.eb_no is not none else '—' }}</td>
+      <td data-col="ber">{{ "%g"|format(log.ber_estimate) if log.ber_estimate is not none else '—' }}</td>
       <td data-col="ebem" style="min-width:90px">
         {% if cbm_status_by_source is defined and log.source and log.source in cbm_status_by_source %}
           {% set ebem = cbm_status_by_source[log.source] %}
-          <span class="d-flex align-items-center gap-1" title="Embedded Sync / Carrier Lock / Bit Sync">
+          <span class="d-flex align-items-center gap-1" title="Embedded Sync / Carrier Lock / Bit Sync / BER Estimate">
             {% if ebem is none %}
               <span class="ebem-led ebem-led-grey" title="Embedded Channel Sync: no data"></span>
               <span class="ebem-led ebem-led-grey" title="Carrier Lock: no data"></span>
               <span class="ebem-led ebem-led-grey" title="Bit Sync: no data"></span>
+              <span class="badge text-bg-secondary" style="font-size:0.65rem" title="BER Estimate: no data">BER —</span>
             {% else %}
               <span class="ebem-led ebem-led-{{ 'green' if ebem.ebem_sync == true else ('red' if ebem.ebem_sync == false else 'grey') }}"
                     title="Embedded Channel Sync: {{ 'OK' if ebem.ebem_sync == true else ('Fault' if ebem.ebem_sync == false else 'Unknown') }}"></span>
@@ -178,6 +182,8 @@
                     title="Carrier Lock: {{ 'OK' if ebem.carrier_lock == true else ('Fault' if ebem.carrier_lock == false else 'Unknown') }}"></span>
               <span class="ebem-led ebem-led-{{ 'green' if ebem.bit_sync == true else ('red' if ebem.bit_sync == false else 'grey') }}"
                     title="Bit Sync: {{ 'OK' if ebem.bit_sync == true else ('Fault' if ebem.bit_sync == false else 'Unknown') }}"></span>
+              <span class="badge text-bg-secondary" style="font-size:0.65rem"
+                    title="BER Estimate: {{ '%g'|format(ebem.ber_estimate) if ebem.ber_estimate is not none else 'no data' }}">BER {{ "%g"|format(ebem.ber_estimate) if ebem.ber_estimate is not none else '—' }}</span>
             {% endif %}
           </span>
         {% else %}
@@ -194,7 +200,7 @@
 
     <!-- Inline quick-edit row (collapsed by default) -->
     <tr class="collapse" id="{{ row_id }}-edit">
-      <td colspan="23" class="p-0">
+      <td colspan="24" class="p-0">
         <div class="p-2 bg-body-tertiary border-top border-secondary">
           <form data-dashboard-edit-form="{{ row_id }}" onsubmit="event.preventDefault(); submitAllDirty(this);">
             <input type="hidden" name="signal_name" value="{{ log.signal_name }}">

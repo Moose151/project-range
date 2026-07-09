@@ -18,6 +18,8 @@ from app.rf_config import serial_package_rf_config, recalculate_from_values, fre
 from app.settings import (
     get_cbm_ebno_log_threshold,
     get_cbm_ebno_log_enabled,
+    get_cbm_ber_log_threshold,
+    get_cbm_ber_log_enabled,
     get_sandbox_hardware_sync_paused,
 )
 from app.signal_warnings import warning_flags_for
@@ -46,7 +48,7 @@ def _float_text(value: str | None) -> float | None:
     raw = (value or "").strip()
     if raw.replace(" ", "") in {"", "NoData", "NoCarrier", "NoLock", "Unavailable", "N/A"}:
         return None
-    match = re.search(r"[-+]?\d+(?:\.\d+)?", raw)
+    match = re.search(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?", raw)
     if not match:
         return None
     try:
@@ -80,7 +82,7 @@ def _normalise_state(value: str | None) -> str:
 
 def _is_positive_state(value: str | None) -> bool:
     return _normalise_state(value) in {
-        "ON", "ENABLE", "ENABLED", "ACTIVE", "ENGAGED", "ACQ", "LINK_UP",
+        "ON", "ENABLE", "ENABLED", "ACTIVE", "ENGAGED", "ACQ", "ACQUIRED", "LINK_UP",
         "READY", "LOCK", "LOCKED", "SYNC", "INSYNC", "IN_SYNC", "OK",
         "GREEN", "TRUE", "1",
     }
@@ -110,6 +112,7 @@ def sync_states_from_snapshot(snapshot: "CBMSnapshot") -> dict:
       ebem_sync    — ESYNC_STAT (Embedded Channel Sync)
       carrier_lock — ACQ_STATE  (Carrier / acquisition lock)
       bit_sync     — BSYNC_STAT (Bit sync)
+      ber_estimate — RX_BEREST / BER estimate as a numeric ratio, when reported
     Values are True (green), False (red), or None (grey / no data).
     """
     s = snapshot.status
@@ -117,6 +120,7 @@ def sync_states_from_snapshot(snapshot: "CBMSnapshot") -> dict:
         "ebem_sync": _led_state(s.get("ESYNC_STAT")),
         "carrier_lock": _led_state(s.get("ACQ_STATE")),
         "bit_sync": _led_state(s.get("BSYNC_STAT")),
+        "ber_estimate": _float_text(snapshot.summary.get("rx_ber_estimate")),
     }
 
 
@@ -156,6 +160,7 @@ def _entry_values_from_snapshot(entry: SignalPackageEntry, snapshot: CBMSnapshot
     # value directly (including None) also stops the sync from logging a spurious change
     # every poll when the stored value and the live value disagree.
     modem_ebno = _float_text(summary.get("rx_ebno_db"))
+    modem_ber = _float_text(summary.get("rx_ber_estimate"))
     values = {
         "signal_status": _status_from_snapshot(snapshot, path),
         "modulation": entry.modulation,
@@ -163,6 +168,7 @@ def _entry_values_from_snapshot(entry: SignalPackageEntry, snapshot: CBMSnapshot
         "fec": entry.fec,
         "power": entry.power,
         "eb_no": modem_ebno,
+        "ber_estimate": modem_ber,
         "tx_if": entry.tx_if,
         "rx_if": entry.rx_if,
     }
@@ -200,13 +206,25 @@ def _ebno_changed(old, new, threshold: float) -> bool:
         return old != new
 
 
-_NON_EBNO_FIELDS = ("signal_status", "modulation", "symbol_rate", "fec", "power", "tx_if", "tx_rf", "rx_rf", "rx_if")
+def _metric_changed(old, new, threshold: float) -> bool:
+    """Generic noisy-metric change detector for modem-derived numeric values."""
+    if (old is None) != (new is None):
+        return True
+    if old is None and new is None:
+        return False
+    try:
+        return abs(float(new) - float(old)) >= threshold
+    except (TypeError, ValueError):
+        return old != new
+
+
+_NON_MODEM_METRIC_FIELDS = ("signal_status", "modulation", "symbol_rate", "fec", "power", "tx_if", "tx_rf", "rx_rf", "rx_if")
 
 
 def _non_ebno_changed(latest: SignalLog | None, values: dict) -> bool:
     if latest is None:
         return True
-    return any(getattr(latest, f) != values.get(f) for f in _NON_EBNO_FIELDS)
+    return any(getattr(latest, f) != values.get(f) for f in _NON_MODEM_METRIC_FIELDS)
 
 
 def _latest_or_entry_status(latest: SignalLog | None, entry: SignalPackageEntry) -> str:
@@ -231,6 +249,8 @@ def sync_active_cbms(db: Session, actor_id: int | None, audit_when_noop: bool = 
         return result
     ebno_threshold = get_cbm_ebno_log_threshold(db)
     ebno_log_enabled = get_cbm_ebno_log_enabled(db)
+    ber_threshold = get_cbm_ber_log_threshold(db)
+    ber_log_enabled = get_cbm_ber_log_enabled(db)
     active_serials = db.query(Serial).filter(
         Serial.closed_at == None,
         Serial.is_started == True,
@@ -323,12 +343,19 @@ def sync_active_cbms(db: Session, actor_id: int | None, audit_when_noop: bool = 
             values.get("eb_no"),
             ebno_threshold,
         )
-        should_log = latest is None or other_changed or (ebno_significant and ebno_log_enabled)
+        ber_significant = _metric_changed(
+            latest.ber_estimate if latest else None,
+            values.get("ber_estimate"),
+            ber_threshold,
+        )
+        should_log = latest is None or other_changed or (ebno_significant and ebno_log_enabled) or (ber_significant and ber_log_enabled)
         if not should_log:
-            # No new row needed. Update Eb/No in-place so the dashboard reflects the
-            # live modem reading even when the change is below the log threshold.
+            # No new row needed. Update live modem metrics in-place so the dashboard
+            # reflects readings even when changes are below logging thresholds.
             if latest is not None and latest.eb_no != values.get("eb_no"):
                 latest.eb_no = values.get("eb_no")
+            if latest is not None and latest.ber_estimate != values.get("ber_estimate"):
+                latest.ber_estimate = values.get("ber_estimate")
             continue
 
         power = values.get("power") if values.get("power") is not None else (latest.power if latest else None)
@@ -349,6 +376,7 @@ def sync_active_cbms(db: Session, actor_id: int | None, audit_when_noop: bool = 
             power=power,
             power_unit="dBm",
             eb_no=values.get("eb_no"),  # modem-authoritative; None when no carrier
+            ber_estimate=values.get("ber_estimate"),  # RX_BEREST numeric ratio
             engaged=latest.engaged if latest else False,
             source=latest.source if latest else entry.source,
             antenna=latest.antenna if latest else (entry.package.antenna or entry.antenna),

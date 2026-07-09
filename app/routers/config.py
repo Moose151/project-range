@@ -26,6 +26,12 @@ from app.settings import (
     CBM_EBNO_LOG_ENABLED_KEY,
     DEFAULT_CBM_EBNO_LOG_ENABLED,
     get_cbm_ebno_log_enabled,
+    CBM_BER_LOG_THRESHOLD_KEY,
+    DEFAULT_CBM_BER_LOG_THRESHOLD,
+    get_cbm_ber_log_threshold,
+    CBM_BER_LOG_ENABLED_KEY,
+    DEFAULT_CBM_BER_LOG_ENABLED,
+    get_cbm_ber_log_enabled,
     SANDBOX_HARDWARE_SYNC_PAUSED_KEY,
     get_sandbox_hardware_sync_paused,
 )
@@ -120,6 +126,8 @@ async def config_page(
         "audit_live_record_max": MAX_AUDIT_LIVE_RECORD_LIMIT,
         "cbm_ebno_log_threshold": get_cbm_ebno_log_threshold(db),
         "cbm_ebno_log_enabled": get_cbm_ebno_log_enabled(db),
+        "cbm_ber_log_threshold": get_cbm_ber_log_threshold(db),
+        "cbm_ber_log_enabled": get_cbm_ber_log_enabled(db),
         "sandbox_hardware_sync_paused": get_sandbox_hardware_sync_paused(db),
         "system_health": {
             "database": str(db_path) if db_path else DATABASE_URL,
@@ -212,6 +220,8 @@ async def system_settings_save(
     audit_live_record_limit: str = Form("1000"),
     cbm_ebno_log_threshold: str = Form("3"),
     cbm_ebno_log_enabled: str = Form(""),
+    cbm_ber_log_threshold: str = Form("1e-7"),
+    cbm_ber_log_enabled: str = Form(""),
     sandbox_hardware_sync_paused: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
@@ -225,6 +235,12 @@ async def system_settings_save(
         ebno_thr = DEFAULT_CBM_EBNO_LOG_THRESHOLD
     set_setting(db, CBM_EBNO_LOG_THRESHOLD_KEY, f"{ebno_thr:g}")
     set_setting(db, CBM_EBNO_LOG_ENABLED_KEY, "1" if cbm_ebno_log_enabled == "1" else "0")
+    try:
+        ber_thr = max(0.0, float(cbm_ber_log_threshold))
+    except (TypeError, ValueError):
+        ber_thr = DEFAULT_CBM_BER_LOG_THRESHOLD
+    set_setting(db, CBM_BER_LOG_THRESHOLD_KEY, f"{ber_thr:g}")
+    set_setting(db, CBM_BER_LOG_ENABLED_KEY, "1" if cbm_ber_log_enabled == "1" else "0")
     set_setting(db, SANDBOX_HARDWARE_SYNC_PAUSED_KEY, "1" if sandbox_hardware_sync_paused == "1" else "0")
     db.commit()
     return RedirectResponse("/config?toast=System+settings+saved", status_code=302)

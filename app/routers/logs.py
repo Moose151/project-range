@@ -578,7 +578,7 @@ async def export_csv(
         "ID", "Timestamp (Zulu)", "Operator", "Session", "Range State", "Signal", "Status",
         "TxIF", "TxRF", "RxRF", "RxIF", "Freq Unit", "Band",
         "Modulation", "Symbol Rate", "FEC", "Source", "Antenna",
-        "Power", "Power Unit", "Eb/No",
+        "Power", "Power Unit", "Eb/No", "BER",
         "Activity Ref", "Notes", "Entry Type", "Warnings",
     ])
     for log in logs:
@@ -588,7 +588,7 @@ async def export_csv(
             log.range_state, log.signal_name, log.signal_status,
             log.tx_if, log.tx_rf, log.rx_rf, log.rx_if, log.freq_unit, log.band,
             log.modulation, log.symbol_rate, log.fec, log.source, log.antenna,
-            log.power, log.power_unit, log.eb_no,
+            log.power, log.power_unit, log.eb_no, log.ber_estimate,
             log.activity_ref, log.notes, log.entry_type, log.warning_flags,
         ])
     output.seek(0)
@@ -621,7 +621,7 @@ async def export_xlsx(
         "ID", "Timestamp (Zulu)", "Operator", "Session", "Range State", "Signal", "Status",
         "TxIF", "TxRF", "RxRF", "RxIF", "Freq Unit", "Band",
         "Modulation", "Symbol Rate", "FEC", "Source", "Antenna",
-        "Power", "Power Unit", "Eb/No",
+        "Power", "Power Unit", "Eb/No", "BER",
         "Activity Ref", "Notes", "Entry Type", "Warnings",
     ]
     ws.append(headers)
@@ -632,7 +632,7 @@ async def export_xlsx(
             log.range_state, log.signal_name, log.signal_status,
             log.tx_if, log.tx_rf, log.rx_rf, log.rx_if, log.freq_unit, log.band,
             log.modulation, log.symbol_rate, log.fec, log.source, log.antenna,
-            log.power, log.power_unit, log.eb_no,
+            log.power, log.power_unit, log.eb_no, log.ber_estimate,
             log.activity_ref, log.notes, log.entry_type, log.warning_flags,
         ])
     buf = io.BytesIO()

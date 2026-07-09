@@ -125,7 +125,7 @@ async def history_export_csv(
         "ID", "Timestamp (Zulu)", "Operator", "Range State", "Signal", "Status",
         "TxIF", "TxRF", "RxRF", "RxIF", "Unit", "Band",
         "Modulation", "Symbol Rate", "FEC", "Source", "Antenna",
-        "Power", "Power Unit", "Eb/No", "Activity Ref", "Notes", "Type",
+        "Power", "Power Unit", "Eb/No", "BER", "Activity Ref", "Notes", "Type",
     ])
     for log in logs:
         writer.writerow([
@@ -134,7 +134,7 @@ async def history_export_csv(
             log.range_state, log.signal_name, log.signal_status,
             log.tx_if, log.tx_rf, log.rx_rf, log.rx_if, log.freq_unit, log.band,
             log.modulation, log.symbol_rate, log.fec, log.source, log.antenna,
-            log.power, log.power_unit, log.eb_no,
+            log.power, log.power_unit, log.eb_no, log.ber_estimate,
             log.activity_ref, log.notes, log.entry_type,
         ])
     output.seek(0)
@@ -170,7 +170,7 @@ async def history_export_xlsx(
         "ID", "Timestamp (Zulu)", "Operator", "Range State", "Signal", "Status",
         "TxIF", "TxRF", "RxRF", "RxIF", "Unit", "Band",
         "Modulation", "Symbol Rate", "FEC", "Source", "Antenna",
-        "Power", "Power Unit", "Eb/No", "Activity Ref", "Notes", "Type",
+        "Power", "Power Unit", "Eb/No", "BER", "Activity Ref", "Notes", "Type",
     ])
     for log in logs:
         ws.append([
@@ -178,7 +178,7 @@ async def history_export_xlsx(
             log.range_state, log.signal_name, log.signal_status,
             log.tx_if, log.tx_rf, log.rx_rf, log.rx_if, log.freq_unit, log.band,
             log.modulation, log.symbol_rate, log.fec, log.source, log.antenna,
-            log.power, log.power_unit, log.eb_no,
+            log.power, log.power_unit, log.eb_no, log.ber_estimate,
             log.activity_ref, log.notes, log.entry_type,
         ])
     buf = io.BytesIO()

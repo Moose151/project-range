@@ -268,6 +268,7 @@ class SignalLog(Base):
     power: Mapped[float | None] = mapped_column(Float, nullable=True)
     power_unit: Mapped[str] = mapped_column(String(8), default="dBm")
     eb_no: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ber_estimate: Mapped[float | None] = mapped_column(Float, nullable=True)
     engaged: Mapped[bool] = mapped_column(Boolean, default=False)
 
     source: Mapped[str | None] = mapped_column(String(128), nullable=True)

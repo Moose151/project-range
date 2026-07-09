@@ -193,6 +193,7 @@
           <th>Mod</th>
           <th>Power</th>
           <th>Eb/No</th>
+          <th>BER</th>
           <th>State</th>
           <th>Activity</th>
           <th>Notes</th>
@@ -211,7 +212,7 @@
             <a href="/logs?serial_id={{ log.serial.id }}" class="text-muted text-decoration-none">{{ log.serial.title }}</a>
             {% else %}—{% endif %}
           </td>
-          <td colspan="14" class="fst-italic">
+          <td colspan="15" class="fst-italic">
             {% if log.entry_type == 'SerialStart' %}
             <i class="bi bi-play-circle me-1"></i>
             {% elif log.entry_type == 'SerialEnd' %}
@@ -259,7 +260,7 @@
           <td class="fw-semibold">
             <a href="/logs?signal_name={{ log.signal_name }}" class="text-reset text-decoration-none">{{ log.signal_name }}</a>
           </td>
-          <td colspan="14">
+          <td colspan="15">
             <i class="bi bi-asterisk text-info me-1"></i>
             {% for part in effect_parts %}
               {% if ':' in part %}
@@ -329,6 +330,7 @@
             {% if log.power is not none %}{{ log.power }} {{ log.power_unit }}{% else %}—{% endif %}
           </td>
           <td class="{% if log.changed_fields and 'eb_no' in log.changed_fields %}log-change-cell{% endif %}" title="{{ log.change_title or '' }}">{{ log.eb_no or '—' }}</td>
+          <td class="{% if log.changed_fields and 'ber_estimate' in log.changed_fields %}log-change-cell{% endif %}" title="{{ log.change_title or '' }}">{{ "%g"|format(log.ber_estimate) if log.ber_estimate is not none else '—' }}</td>
           <td class="small text-muted">{{ log.range_state }}</td>
           <td class="small">{{ log.activity_ref or '—' }}</td>
           <td class="small text-muted" style="max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"

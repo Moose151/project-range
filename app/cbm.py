@@ -45,6 +45,15 @@ class CBMSnapshot:
                 or self.status.get("EB_NO")
             ),
             "rx_esno_db": self.status.get("RX_ESNO"),
+            "rx_ber_estimate": (
+                self.status.get("RX_BEREST")
+                or self.status.get("RX_BER_EST")
+                or self.status.get("RX_BER")
+                or self.status.get("BEREST")
+                or self.status.get("BER_EST")
+                or self.status.get("BER")
+                or self.status.get("BERT_BER")
+            ),
             "modem_status": self.status.get("MDM_STAT"),
             "link_status": self.status.get("LINK_STAT"),
             "fault_status": self.status.get("FLT_STAT"),

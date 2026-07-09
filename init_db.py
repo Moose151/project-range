@@ -85,6 +85,7 @@ def _migrate(conn):
         "ALTER TABLE signal_logs ADD COLUMN antenna VARCHAR(128)",
         "ALTER TABLE signal_logs ADD COLUMN session_id INTEGER REFERENCES log_sessions(id)",
         "ALTER TABLE signal_logs ADD COLUMN serial_id INTEGER REFERENCES serials(id)",
+        "ALTER TABLE signal_logs ADD COLUMN ber_estimate FLOAT",
         "ALTER TABLE serials ADD COLUMN is_started BOOLEAN DEFAULT 0",
         "ALTER TABLE signal_packages ADD COLUMN band VARCHAR(8)",
         "ALTER TABLE signal_packages ADD COLUMN antenna VARCHAR(128)",
@@ -700,8 +701,12 @@ def main():
             db.add(AppSetting(key="audit_live_record_limit", value="1000"))
         if not db.query(AppSetting).filter(AppSetting.key == "sandbox_hardware_sync_paused").first():
             db.add(AppSetting(key="sandbox_hardware_sync_paused", value="0"))
-            db.commit()
-            print("Seeded default audit live record limit: 1000")
+        if not db.query(AppSetting).filter(AppSetting.key == "cbm_ber_log_threshold").first():
+            db.add(AppSetting(key="cbm_ber_log_threshold", value="1e-07"))
+        if not db.query(AppSetting).filter(AppSetting.key == "cbm_ber_log_enabled").first():
+            db.add(AppSetting(key="cbm_ber_log_enabled", value="0"))
+        db.commit()
+        print("Ensured default system settings")
 
         # Seed modulation types if table is empty
         if not db.query(ModulationType).first():

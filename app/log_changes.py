@@ -24,6 +24,7 @@ CHANGE_FIELDS = [
     ("antenna", "Antenna"),
     ("power", "Power"),
     ("eb_no", "Eb/No"),
+    ("ber_estimate", "BER"),
 ]
 
 

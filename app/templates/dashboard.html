@@ -17,14 +17,13 @@
                  oninput="filterDashboardWidgetMenu(this.value)">
         </li>
         <li><h6 class="dropdown-header">Info Widgets</h6></li>
+        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="signals" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-table"></i><span>Serial / Signals</span></label></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="clock" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-clock-history"></i><span>Zulu / Local Clock</span></label></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="range-state" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-broadcast-pin"></i><span>Range State</span></label></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="active-signals" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-broadcast"></i><span>Active Signals</span></label></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="live-spectrum" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-activity"></i><span>Live Spectrum</span></label></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="last-state-change" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-clock"></i><span>Last State Change</span></label></li>
-        {% if cda_by_serial %}
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="cda" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-shield-exclamation"></i><span>CDA Timer</span></label></li>
-        {% endif %}
         <li><hr class="dropdown-divider"></li>
         <li><h6 class="dropdown-header">Calculators</h6></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="calc" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-calculator"></i><span>Basic Calculator</span></label></li>
@@ -138,8 +137,7 @@
       </div>
     </div>
   </div>
-  <!-- CDA widget — shown when any active serial has CDA tables assigned -->
-  {% if cda_by_serial %}
+  <!-- CDA widget — selectable; shows an empty state when no active CDA is assigned -->
   <div class="serial-widget-group cda-widget-group"
        data-group-id="group-cda"
        data-serial-ids="cda"
@@ -177,6 +175,12 @@
             <!-- Pass CDA data as JSON for client-side timer -->
             <script id="cdaDataJson" type="application/json">{{ cda_by_serial | tojson }}</script>
             <div id="cdaWidgetBody">
+              {% if not cda_by_serial %}
+              <div class="p-4 text-center text-muted">
+                <i class="bi bi-shield-exclamation d-block fs-3 mb-2"></i>
+                <div class="fw-semibold">No Active CDA</div>
+              </div>
+              {% endif %}
               {% for serial_id, tables in cda_by_serial.items() %}
               {% for t in tables %}
               {% if t.windows %}
@@ -240,14 +244,13 @@
       </div>
     </div>
   </div>
-  {% endif %}
 
   {% for sd in serial_data %}
   {% set serial = sd.serial %}
   {% set w_signals = sd.signals %}
   {% set w_buzzer = sd.buzzer_active %}
   {% set sval = (serial.id if serial else 'legacy') %}
-  <div class="serial-widget-group"
+  <div class="serial-widget-group serial-signal-widget-group"
        data-group-id="group-{{ sval }}"
        data-serial-ids="{{ serial.id if serial else '' }}"
        data-active-tab="{{ sval }}">
@@ -298,6 +301,10 @@
             <a href="/logs/new?serial_id={{ serial.id }}" class="btn btn-sm btn-outline-success py-0 px-2" title="Add signal log"><i class="bi bi-plus-lg"></i></a>
             {% endif %}
             <a href="/logs?serial_id={{ serial.id }}" class="btn btn-sm btn-outline-secondary py-0 px-2" title="View logs"><i class="bi bi-journal-text"></i></a>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                    title="Hide serial / signals widgets" onclick="hideSignalWidgets()">
+              <i class="bi bi-eye-slash"></i>
+            </button>
             {% if user.role != 'observer' %}
             <form method="post" action="/serials/{{ serial.id }}/end" class="d-inline"
                   onsubmit="return confirm('End serial {{ serial.title | e }}? It will be moved to history.')">
@@ -308,6 +315,10 @@
             {% if user.role != 'observer' %}
             <a href="/serials" class="btn btn-sm btn-outline-success py-0 px-2"><i class="bi bi-play-circle me-1"></i>Start Serial</a>
             {% endif %}
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                    title="Hide serial / signals widgets" onclick="hideSignalWidgets()">
+              <i class="bi bi-eye-slash"></i>
+            </button>
             {% endif %}
           </div>
           {% if serial and serial.instructions %}
@@ -346,6 +357,7 @@ function updateRefreshTime() {
 
 // ── Zulu / local clock widget ─────────────────────────────────────────────
 const CLOCK_HIDDEN_KEY = 'dashboardClockHidden';
+const SIGNAL_WIDGETS_HIDDEN_KEY = 'dashboardSignalWidgetsHidden';
 const UTILITY_WIDGETS_KEY = 'dashboardUtilityWidgets_v1';
 const DASHBOARD_DOCS = [
   {% for doc in doc_pages %}
@@ -436,6 +448,25 @@ function restoreClockVisibility() {
   let hidden = false;
   try { hidden = localStorage.getItem(CLOCK_HIDDEN_KEY) === '1'; } catch (e) {}
   setClockHidden(hidden);
+}
+
+function signalWidgetGroups() {
+  return [...document.querySelectorAll('#serialWidgetsContainer .serial-widget-group')]
+    .filter(group => group.querySelector('[id^="signalTableContainer-"]'));
+}
+function setSignalWidgetsHidden(hidden) {
+  signalWidgetGroups().forEach(group => {
+    group.style.display = hidden ? 'none' : '';
+  });
+  try { localStorage.setItem(SIGNAL_WIDGETS_HIDDEN_KEY, hidden ? '1' : '0'); } catch (e) {}
+  updateDashboardWidgetMenu();
+}
+function hideSignalWidgets() { setSignalWidgetsHidden(true); saveLayout(); }
+function showSignalWidgets() { setSignalWidgetsHidden(false); saveLayout(); }
+function restoreSignalWidgetVisibility() {
+  let hidden = false;
+  try { hidden = localStorage.getItem(SIGNAL_WIDGETS_HIDDEN_KEY) === '1'; } catch (e) {}
+  setSignalWidgetsHidden(hidden);
 }
 
 function utilityWidgets() {
@@ -713,6 +744,10 @@ function dashboardWidgetVisible(type) {
     const group = document.querySelector('.clock-widget-group');
     return Boolean(group && group.style.display !== 'none');
   }
+  if (type === 'signals') {
+    const groups = signalWidgetGroups();
+    return groups.length > 0 && groups.some(group => group.style.display !== 'none');
+  }
   if (type === 'cda') {
     const group = document.querySelector('.cda-widget-group');
     return Boolean(group && group.style.display !== 'none');
@@ -728,6 +763,8 @@ function toggleDashboardWidgetFromMenu(input) {
   const type = input.dataset.dashboardWidget;
   if (type === 'clock') {
     setClockHidden(!input.checked);
+  } else if (type === 'signals') {
+    setSignalWidgetsHidden(!input.checked);
   } else if (type === 'cda') {
     setCDAWidgetHidden(!input.checked);
   } else if (input.checked) {
@@ -1156,7 +1193,7 @@ const COL_DEFS = [
   ['tx_if','TxIF'],
   ['tx_rf','TxRF'],['rx_rf','RxRF'],['rx_if','RxIF'],['unit','Unit'],['band','Band'],
   ['mod','Mod'],['sym','Sym Rate'],['fec','FEC'],['antenna','Antenna'],['power','Power'],
-  ['ebno','Eb/No'],['ebem','EBEM Sync'],['updated','Updated'],['warn','Warn'],
+  ['ebno','Eb/No'],['ber','BER'],['ebem','EBEM Sync'],['updated','Updated'],['warn','Warn'],
 ];
 const COLS_KEY = 'dashboardHiddenCols';
 function getHiddenCols() {
@@ -1214,6 +1251,7 @@ function resetDashboardLayout() {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(UTILITY_WIDGETS_KEY);
     localStorage.removeItem(CLOCK_HIDDEN_KEY);
+    localStorage.removeItem(SIGNAL_WIDGETS_HIDDEN_KEY);
     localStorage.removeItem(CDA_WIDGET_HIDDEN_KEY);
   } catch (e) {}
   location.reload();
@@ -1564,6 +1602,7 @@ document.addEventListener('DOMContentLoaded', () => {
   restoreUtilityWidgets();
   document.querySelectorAll('.serial-widget-group').forEach(g => { registerGroupDnD(g); initGroup(g); });
   restoreLayout();
+  restoreSignalWidgetVisibility();
   restoreClockVisibility();
   restoreCDAWidgetVisibility();
   updateDashboardWidgetMenu();
@@ -1929,6 +1968,10 @@ async function onEngagedToggle(rowId) {
 // to controls (e.g. the chameleon +) sitting under the open menu.
 async function logSignalEffect(event, signalName, serialId, callType) {
   if (event) { event.preventDefault(); event.stopPropagation(); }
+  // stopPropagation (needed so the click doesn't bleed to the chameleon + button
+  // behind the menu) also prevents Bootstrap's auto-close, so close it manually.
+  const toggle = event?.target?.closest('.dropdown')?.querySelector('[data-bs-toggle="dropdown"]');
+  if (toggle && window.bootstrap) window.bootstrap.Dropdown.getOrCreateInstance(toggle).hide();
   try {
     const body = new URLSearchParams({ signal_name: signalName, call_type: callType });
     if (serialId) body.set('serial_id', serialId);

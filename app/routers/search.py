@@ -24,7 +24,7 @@ STATIC_ITEMS = [
     _item("Signal Packages", "/packages", "Page", "Package library", "bi-box-seam"),
     _item("Devices", "/devices", "Page", "Device registry", "bi-hdd-network"),
     _item("Topology", "/devices/topology", "Page", "Device connection map", "bi-diagram-3"),
-    _item("Documentation", "/docs", "Page", "Documentation home", "bi-book"),
+    _item("Wiki", "/docs", "Page", "Wiki home", "bi-book"),
     _item("RF Frequency Calculator", "/calculator/rf", "Calculator", "Tx/Rx IF/RF conversions", "bi-broadcast"),
     _item("Power Calculator", "/calculator/power", "Calculator", "dBm/dBW/W conversion", "bi-lightning-charge"),
     _item("Basic Calculator", "/calculator/basic", "Calculator", "Quick arithmetic", "bi-calculator"),
@@ -103,7 +103,7 @@ async def quick_search(
             .all()
         )
         results.extend(
-            _item(d.title, f"/docs/{d.slug}", "Doc", d.category or "Documentation page", "bi-file-earmark-text")
+            _item(d.title, f"/docs/{d.slug}", "Wiki", d.category or "Wiki page", "bi-file-earmark-text")
             for d in docs
         )
 

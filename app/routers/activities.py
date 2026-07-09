@@ -21,7 +21,7 @@ CSV_FIELDS = [
     "ID", "Timestamp (Zulu)", "Operator", "Serial", "Range State", "Signal", "Status",
     "TxIF", "TxRF", "RxRF", "RxIF", "Unit", "Band",
     "Modulation", "Symbol Rate", "FEC", "Source", "Antenna",
-    "Power", "Power Unit", "Eb/No", "Notes", "Type",
+    "Power", "Power Unit", "Eb/No", "BER", "Notes", "Type",
 ]
 
 
@@ -48,6 +48,7 @@ def _log_row(log, serial_title):
         log.power,
         log.power_unit,
         log.eb_no,
+        log.ber_estimate,
         log.notes,
         log.entry_type,
     ]

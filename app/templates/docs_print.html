@@ -21,7 +21,7 @@
 <body>
   <h1>{{ doc_page.title }}</h1>
   <div class="meta">
-    Project Range — Documentation<br>
+    Project Range — Wiki<br>
     Created: {{ doc_page.created_at.strftime('%d %B %Y') }} by {{ doc_page.created_by.display_name }}
     {% if doc_page.updated_at %}
     · Last updated: {{ doc_page.updated_at.strftime('%d %B %Y %H:%M') }} by {{ doc_page.updated_by.display_name }}
