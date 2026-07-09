@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from typing import Optional
+from app.chameleon import next_chameleon_name
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, is_testing_state
 from app.models import (
@@ -928,6 +929,46 @@ async def package_signal_delete(
         pkg.updated_at = datetime.utcnow()
         db.commit()
     return RedirectResponse(f"/packages/{pkg_id}?toast=Signal+removed", status_code=302)
+
+
+@router.post("/{pkg_id:int}/signals/{entry_id:int}/chameleon")
+async def package_signal_chameleon(
+    pkg_id: int,
+    entry_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Add a planned "chameleon" of a package signal — a clone with the next
+    ``-N`` family name and no modem source (mirrors the dashboard + button)."""
+    pkg = db.query(SignalPackage).filter(SignalPackage.id == pkg_id, SignalPackage.is_testing == is_testing_state(db)).first()
+    entry = db.query(SignalPackageEntry).filter(
+        SignalPackageEntry.id == entry_id,
+        SignalPackageEntry.package_id == pkg_id,
+    ).first() if pkg else None
+    if entry:
+        new_name = next_chameleon_name(db, entry.signal_name)
+        db.add(SignalPackageEntry(
+            package_id=pkg_id,
+            display_order=len(pkg.signals),
+            priority=entry.priority,
+            signal_name=new_name,
+            description=f"Chameleon of {entry.signal_name}",
+            band=entry.band,
+            tx_if=entry.tx_if, tx_rf=entry.tx_rf, rx_rf=entry.rx_rf, rx_if=entry.rx_if,
+            freq_unit=entry.freq_unit,
+            modulation=entry.modulation, fec=entry.fec, inner_code=entry.inner_code,
+            symbol_rate=entry.symbol_rate,
+            power=entry.power, power_unit=entry.power_unit,
+            eb_no=None,
+            source=None,                 # modem source must NOT copy across
+            antenna=entry.antenna,
+            cbm_device_id=None, cbm_path=None, cbm_carrier=None,
+            notes=entry.notes,
+        ))
+        pkg.updated_at = datetime.utcnow()
+        db.commit()
+        return RedirectResponse(f"/packages/{pkg_id}?toast=Chameleon+added:+{quote_plus(new_name)}", status_code=302)
+    return RedirectResponse(f"/packages/{pkg_id}", status_code=302)
 
 
 @router.post("/{pkg_id:int}/duplicate")

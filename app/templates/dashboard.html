@@ -31,7 +31,7 @@
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="power-conv" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-lightning-charge"></i><span>Power Converter</span></label></li>
         <li><hr class="dropdown-divider"></li>
         <li><h6 class="dropdown-header">Utilities</h6></li>
-        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="clock-extra" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-clock"></i><span>Additional Clock</span></label></li>
+        <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" onclick="addUtilityWidget('clock')"><i class="bi bi-clock"></i><span>Add Clock</span></button></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="notes" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-pencil-square"></i><span>Quick Notes</span></label></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="doc" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-file-earmark-text"></i><span>Doc Reference</span></label></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="links" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-lightning"></i><span>Quick Links</span></label></li>
@@ -403,31 +403,46 @@ function updateClockWidget() {
     document.getElementById('clockLocalDate').textContent = clockFmt('UTC', dateOpts).format(now) + ' UTC';
   }
 }
+const DEFAULT_LOCAL_TZ = {{ (local_timezone or 'UTC') | tojson }};
+let CLOCK_TZ_LIST = null;
+function clockTzList() {
+  if (CLOCK_TZ_LIST) return CLOCK_TZ_LIST;
+  let zones;
+  try { zones = Intl.supportedValuesOf('timeZone'); } catch (e) { zones = null; }
+  if (!zones || !zones.length) {
+    zones = ['UTC','Europe/London','Europe/Paris','Europe/Berlin','America/New_York',
+      'America/Chicago','America/Denver','America/Los_Angeles','Asia/Dubai','Asia/Kolkata',
+      'Asia/Singapore','Asia/Tokyo','Australia/Sydney','Pacific/Auckland'];
+  }
+  CLOCK_TZ_LIST = ['UTC', ...zones.filter(z => z !== 'UTC')];
+  return CLOCK_TZ_LIST;
+}
+function populateClockTzSelect(select, current) {
+  if (select.options.length) { select.value = current; return; }
+  select.innerHTML = clockTzList().map(z =>
+    `<option value="${z}">${z === 'UTC' ? 'UTC / Zulu' : z.replace(/_/g, ' ')}</option>`).join('');
+  select.value = current;
+}
+function onClockTzChange(select) {
+  const clock = select.closest('.utility-clock');
+  if (clock) clock.dataset.clockTz = select.value;
+  updateUtilityClocks();
+  saveUtilityWidgets();
+}
 function updateUtilityClocks() {
-  document.querySelectorAll('.utility-clock').forEach(clock => {
-    const now = serverNow();
-    const mode = clock.querySelector('[data-clock-mode]')?.value || 'both';
-    const localTz = clock.dataset.localTz || 'UTC';
-    const timeOpts = { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
-    const dateOpts = { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' };
-    const zPanel = clock.querySelector('[data-clock-panel="zulu"]');
-    const lPanel = clock.querySelector('[data-clock-panel="local"]');
-    if (zPanel) {
-      zPanel.style.display = mode === 'local' ? 'none' : '';
-      zPanel.querySelector('.clock-time').textContent = clockFmt('UTC', timeOpts).format(now);
-      zPanel.querySelector('.clock-date').textContent = clockFmt('UTC', dateOpts).format(now) + ' UTC';
-    }
-    if (lPanel) {
-      lPanel.style.display = mode === 'zulu' ? 'none' : '';
-      lPanel.querySelector('.clock-label').textContent = localTz;
-      try {
-        lPanel.querySelector('.clock-time').textContent = clockFmt(localTz, timeOpts).format(now);
-        lPanel.querySelector('.clock-date').textContent = clockFmt(localTz, dateOpts).format(now) + ' ' + localTz;
-      } catch (e) {
-        lPanel.querySelector('.clock-time').textContent = clockFmt('UTC', timeOpts).format(now);
-        lPanel.querySelector('.clock-date').textContent = clockFmt('UTC', dateOpts).format(now) + ' UTC';
-      }
-    }
+  const now = serverNow();
+  const timeOpts = { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
+  const dateOpts = { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' };
+  const fmt = (tz, opts) => { try { return clockFmt(tz, opts).format(now); } catch (e) { return clockFmt('UTC', opts).format(now); } };
+  document.querySelectorAll('.utility-clock.clock-compact').forEach(clock => {
+    const tz = clock.dataset.clockTz || DEFAULT_LOCAL_TZ;
+    const select = clock.querySelector('.clock-tz-select');
+    if (select) populateClockTzSelect(select, tz);
+    clock.querySelector('[data-clock-time]').textContent = fmt(tz, timeOpts);
+    clock.querySelector('[data-clock-date]').textContent = fmt(tz, dateOpts);
+    // Always surface Zulu as a secondary reference unless this clock *is* Zulu/UTC.
+    const sub = clock.querySelector('[data-clock-sub]');
+    sub.textContent = (tz === 'UTC') ? '' : (fmt('UTC', timeOpts) + ' Zulu');
   });
 }
 function setClockHidden(hidden) {
@@ -479,7 +494,7 @@ function saveUtilityWidgets() {
     const config = {};
     if (type === 'notes') config.text = group.querySelector('textarea')?.value || '';
     if (type === 'doc') config.slug = group.querySelector('select')?.value || '';
-    if (type === 'clock') config.mode = group.querySelector('[data-clock-mode]')?.value || 'both';
+    if (type === 'clock') config.tz = group.querySelector('.utility-clock')?.dataset.clockTz || DEFAULT_LOCAL_TZ;
     if (type === 'chat') config.selectedRoom = group.querySelector('[data-dashboard-chat-widget]')?.dataset.selectedRoom || '';
     return { id, type, config, collapsed: group.classList.contains('collapsed'), span1: group.classList.contains('span-1') };
   });
@@ -639,19 +654,13 @@ function utilityBody(id, type, config = {}) {
   if (type === 'calc') { return mathCalcBody(id); }
   if (type === 'rf-calc') { return rfCalcBody(id); }
   if (type === 'power-conv') { return powerConvBody(id); }
-  // ── Default: extra clock ──────────────────────────────────────────────────
-  return `<div class="utility-clock dashboard-clock" data-local-tz="{{ local_timezone or 'UTC' }}">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <label class="form-label small mb-0">Display</label>
-              <select class="form-select form-select-sm" data-clock-mode style="max-width:160px"
-                      onchange="updateUtilityClocks(); saveUtilityWidgets()">
-                <option value="both" ${config.mode === 'both' || !config.mode ? 'selected' : ''}>Zulu + local</option>
-                <option value="zulu" ${config.mode === 'zulu' ? 'selected' : ''}>Zulu only</option>
-                <option value="local" ${config.mode === 'local' ? 'selected' : ''}>Local only</option>
-              </select>
-            </div>
-            <div class="clock-panel" data-clock-panel="zulu"><div class="clock-label">Zulu</div><div class="clock-time">--:--:--</div><div class="clock-date">UTC</div></div>
-            <div class="clock-panel" data-clock-panel="local"><div class="clock-label">{{ local_timezone or 'UTC' }}</div><div class="clock-time">--:--:--</div><div class="clock-date">{{ local_timezone or 'UTC' }}</div></div>
+  // ── Default: extra clock (single, timezone-selectable, compact) ────────────
+  const clockTz = config.tz || DEFAULT_LOCAL_TZ;
+  return `<div class="utility-clock clock-compact" data-clock-tz="${escapeHtml(clockTz)}">
+            <select class="form-select form-select-sm clock-tz-select mb-2" onchange="onClockTzChange(this)"></select>
+            <div class="clock-time" data-clock-time>--:--:--</div>
+            <div class="clock-date" data-clock-date></div>
+            <div class="clock-sub small text-muted" data-clock-sub></div>
           </div>`;
 }
 function renderUtilityWidget(widget) {

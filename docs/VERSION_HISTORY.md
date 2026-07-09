@@ -1,7 +1,17 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.29.0**
+Current version: **0.29.1**
+
+---
+
+## 0.29.1 — Signal Package & Clock Improvements
+
+- **Closed-loop packages mirror TxIF/RxIF.** When configuring a closed-loop signal package, typing into TxIF (or RxIF) now fills the other automatically, since they're always the same in a closed loop.
+- **Add planned "chameleons" from the package editor.** Each signal row in a package now has a **+** button that creates a `-N` chameleon (a clone for a planned parameter change, without the modem source), just like the dashboard button. The `-N` count continues across the package and the dashboard — e.g. a package with 201-1, 201-2, 201-3 means the next chameleon spawned live becomes 201-4.
+- **Inner code defaults to TURBO** when adding a signal (still editable).
+- **Spectrum Plan stays open.** On the package page, the Spectrum Plan no longer collapses when you add or edit a signal — it stays open until you close it yourself.
+- **Clocks widget reworked.** You can now add **multiple** clocks, each with its **own selectable time zone**, and the clock widget is **much more compact**. Each clock also shows a small Zulu reference line.
 
 ---
 

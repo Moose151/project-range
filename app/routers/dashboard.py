@@ -8,6 +8,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from urllib.parse import quote_plus
+from app.chameleon import chameleon_base_name, next_chameleon_name
 from app.config import CBM_AUTO_SYNC_SECONDS
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials, is_testing_state
@@ -366,25 +367,10 @@ def _cbm_status_by_source(db: Session, testing: bool) -> dict[str, dict | None]:
     return result
 
 
-def _chameleon_base_name(signal_name: str) -> str:
-    """Strip trailing -N suffix to find the family base name."""
-    m = re.match(r'^(.*)-(\d+)$', signal_name)
-    return m.group(1) if m else signal_name
-
-
-def _next_chameleon_name(db: Session, signal_name: str) -> str:
-    """Return the next available chameleon name in the family (base, base-1, base-2, ...)."""
-    base = _chameleon_base_name(signal_name)
-    pattern = re.compile(r'^' + re.escape(base) + r'(?:-(\d+))?$')
-    existing = db.query(Signal).filter(Signal.name.like(f"{base}%")).all()
-    max_n = 0
-    for sig in existing:
-        m = pattern.match(sig.name)
-        if m:
-            n = int(m.group(1)) if m.group(1) else 0
-            if n > max_n:
-                max_n = n
-    return f"{base}-{max_n + 1}"
+# Chameleon naming is shared with the package editor so the -N count continues
+# across registry entries and package entries alike (see app/chameleon.py).
+_chameleon_base_name = chameleon_base_name
+_next_chameleon_name = next_chameleon_name
 
 
 def _get_exclusivity_map(db: Session) -> dict[str, list[str]]:

@@ -291,6 +291,12 @@
                         onclick="editSignalFromButton(this)" title="Edit">
                   <i class="bi bi-pencil"></i>
                 </button>
+                <form method="post" action="/packages/{{ package.id }}/signals/{{ entry.id }}/chameleon" class="d-inline">
+                  <button type="submit" class="btn btn-xs btn-outline-secondary btn-sm py-0 px-1"
+                          title="Add a chameleon of {{ entry.signal_name | e }} (a -N duplicate for a planned parameter change)">
+                    <i class="bi bi-plus-lg"></i>
+                  </button>
+                </form>
                 <form method="post" action="/packages/{{ package.id }}/signals/{{ entry.id }}/delete" class="d-inline"
                       onsubmit="return confirm('Remove {{ entry.signal_name | e }}?')">
                   <button type="submit" class="btn btn-xs btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-trash"></i></button>
@@ -405,7 +411,8 @@
             </div>
             <div class="col-sm-3">
               <label class="form-label small">TxIF</label>
-              <input type="number" class="form-control form-control-sm" name="tx_if" id="f_tx_if" step="any">
+              <input type="number" class="form-control form-control-sm" name="tx_if" id="f_tx_if" step="any"
+                     oninput="mirrorClosedLoopIf(this, 'f_rx_if')">
             </div>
             <div class="col-sm-3 rf-only">
               <label class="form-label small">TxRF</label>
@@ -417,7 +424,8 @@
             </div>
             <div class="col-sm-3">
               <label class="form-label small">RxIF</label>
-              <input type="number" class="form-control form-control-sm" name="rx_if" id="f_rx_if" step="any">
+              <input type="number" class="form-control form-control-sm" name="rx_if" id="f_rx_if" step="any"
+                     oninput="mirrorClosedLoopIf(this, 'f_tx_if')">
             </div>
             <div class="col-sm-3">
               <label class="form-label small">Modulation</label>
@@ -435,7 +443,7 @@
             </div>
             <div class="col-sm-2">
               <label class="form-label small">Inner Code</label>
-              <input type="text" class="form-control form-control-sm" name="inner_code" id="f_inner_code" placeholder="TURBO">
+              <input type="text" class="form-control form-control-sm" name="inner_code" id="f_inner_code" value="TURBO" placeholder="TURBO">
             </div>
             <div class="col-sm-3">
               <label class="form-label small">Symbol Rate <span class="text-danger">*</span></label>
@@ -651,6 +659,15 @@ function recalcSignalFreqs(changedField) {
   });
 });
 
+// Closed-loop packages transmit and receive on the same IF, so mirror TxIF↔RxIF
+// as the operator types (they are always equal in a closed loop).
+const PKG_CLOSED_LOOP = {{ 'true' if package and package.is_closed_loop else 'false' }};
+function mirrorClosedLoopIf(src, targetId) {
+  if (!PKG_CLOSED_LOOP) return;
+  const t = document.getElementById(targetId);
+  if (t) t.value = src.value;
+}
+
 // ── Spectrum Plan (package page) ──────────────────────────────────────────────
 const SPEC_PKG_ID = {{ package.id if package else 0 }};
 const rawSpecSignals = [
@@ -710,7 +727,19 @@ function clearGuardBands() {
   renderSpectrum();
 }
 
-document.getElementById('spectrumPanel')?.addEventListener('shown.bs.collapse', () => initSpectrum());
+// Remember whether the Spectrum Plan is open so it stays open across the page
+// reloads caused by adding/editing signals (only closes when the user hides it).
+const SPEC_OPEN_KEY = 'spectrum_open_pkg_' + SPEC_PKG_ID;
+const specPanel = document.getElementById('spectrumPanel');
+if (specPanel) {
+  specPanel.addEventListener('shown.bs.collapse', () => { localStorage.setItem(SPEC_OPEN_KEY, '1'); initSpectrum(); });
+  specPanel.addEventListener('hidden.bs.collapse', () => localStorage.setItem(SPEC_OPEN_KEY, '0'));
+  if (localStorage.getItem(SPEC_OPEN_KEY) === '1' && !specPanel.classList.contains('show')) {
+    specPanel.classList.add('show');
+    document.querySelector('[data-bs-target="#spectrumPanel"]')?.setAttribute('aria-expanded', 'true');
+    initSpectrum();
+  }
+}
 window.addEventListener('resize', () => {
   if (document.getElementById('spectrumPanel')?.classList.contains('show')) renderSpectrum();
 });
