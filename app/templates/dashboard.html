@@ -49,6 +49,13 @@
     </button>
     <div class="dropdown">
       <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+              data-bs-toggle="dropdown" data-bs-auto-close="outside" title="Saved dashboard presets">
+        <i class="bi bi-grid-1x2 me-1"></i>Presets
+      </button>
+      <ul class="dropdown-menu" id="presetMenu"></ul>
+    </div>
+    <div class="dropdown">
+      <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
               data-bs-toggle="dropdown" data-bs-auto-close="outside" title="Show / hide table columns">
         <i class="bi bi-layout-three-columns me-1"></i>Columns
       </button>
@@ -1269,6 +1276,56 @@ function resetDashboardLayout() {
   location.reload();
 }
 
+// ── Dashboard presets — save/restore named snapshots of the whole layout ──────
+const DASHBOARD_PRESETS_KEY = 'dashboardPresets_v1';
+// Read lazily (a function) so all the individual *_KEY consts are initialised.
+function dashboardPresetKeys() {
+  return [STORAGE_KEY, UTILITY_WIDGETS_KEY, CLOCK_HIDDEN_KEY, SIGNAL_WIDGETS_HIDDEN_KEY, CDA_WIDGET_HIDDEN_KEY, COLS_KEY];
+}
+function getDashboardPresets() {
+  try { return JSON.parse(localStorage.getItem(DASHBOARD_PRESETS_KEY) || '{}'); } catch (e) { return {}; }
+}
+function saveDashboardPreset() {
+  const name = (prompt('Save the current dashboard layout as a preset. Name:') || '').trim();
+  if (!name) return;
+  const snap = {};
+  dashboardPresetKeys().forEach(k => { const v = localStorage.getItem(k); if (v !== null) snap[k] = v; });
+  const presets = getDashboardPresets();
+  presets[name] = snap;
+  localStorage.setItem(DASHBOARD_PRESETS_KEY, JSON.stringify(presets));
+  buildPresetMenu();
+  showToast('Preset saved: ' + name, 'success');
+}
+function loadDashboardPreset(name) {
+  const snap = getDashboardPresets()[name];
+  if (!snap) return;
+  dashboardPresetKeys().forEach(k => localStorage.removeItem(k));
+  Object.entries(snap).forEach(([k, v]) => localStorage.setItem(k, v));
+  location.reload();
+}
+function deleteDashboardPreset(name, ev) {
+  if (ev) ev.stopPropagation();
+  const presets = getDashboardPresets();
+  delete presets[name];
+  localStorage.setItem(DASHBOARD_PRESETS_KEY, JSON.stringify(presets));
+  buildPresetMenu();
+}
+function buildPresetMenu() {
+  const menu = document.getElementById('presetMenu');
+  if (!menu) return;
+  const names = Object.keys(getDashboardPresets()).sort();
+  const esc = n => n.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  let html = names.length ? names.map(n =>
+    `<li><div class="dropdown-item d-flex align-items-center gap-2" style="cursor:pointer" onclick="loadDashboardPreset('${esc(n)}')">
+       <i class="bi bi-grid-1x2"></i><span class="flex-grow-1 text-truncate">${escapeHtml(n)}</span>
+       <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete preset" onclick="deleteDashboardPreset('${esc(n)}', event)"><i class="bi bi-x"></i></button>
+     </div></li>`).join('')
+    : '<li><span class="dropdown-item text-muted small">No saved presets yet</span></li>';
+  html += '<li><hr class="dropdown-divider"></li>'
+    + '<li><button type="button" class="dropdown-item" onclick="saveDashboardPreset()"><i class="bi bi-bookmark-plus me-2"></i>Save current as preset…</button></li>';
+  menu.innerHTML = html;
+}
+
 // ── CDA Widget show/hide ──────────────────────────────────────────────────
 const CDA_WIDGET_HIDDEN_KEY = 'dashboardCDAWidgetHidden';
 
@@ -1656,6 +1713,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateDashboardWidgetMenu();
   refreshAllControls();
   buildColumnMenu();
+  buildPresetMenu();
   applyColumnVisibility();
   // Sync to server time first, then tick clocks/CDA from it every second and
   // re-sync the offset periodically (covers drift + suspended tabs).

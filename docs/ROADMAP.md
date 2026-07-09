@@ -29,10 +29,10 @@ Two dashboard widgets for the Ranger terminal's **SSPB TX Power** and **antenna 
 
 User-requested 2026-07-09. Working through these systematically; each ships as a 0.30.x bump. (Colour-blind-safe status indicators were explicitly deferred.)
 
-- **[0.30.x]** **Quick wins** — consistent friendly **empty states** across lists (Activities/Serials/Packages/Devices/Incidents); **sticky table headers + filter bar** on Signal Logs & History; **form autofocus + Enter-to-submit** on common inline forms; spinner/disabled state on slow submits.
-- **[0.30.x]** **Nicer confirm modals** — replace browser `confirm()` popups (delete/remove/discard) with a shared in-app confirmation modal.
-- **[0.30.x]** **Global "＋ New" quick-action** in the top bar (serial / package / activity / log / note) + consistent **breadcrumbs** (Activity ▸ Serial ▸ Package) on the serial and package pages.
-- **[0.30.x]** **Dashboard chrome + presets** — uniform widget header height, consistent collapse/drag affordances, sensible widget min-heights, a visible **Reset Layout** button, and saved **dashboard presets** (e.g. Ops / Planning).
+- **[shipped 0.30.0]** **Quick wins** — sticky table headers on Signal Logs & History; new-signal defaults (Power −35, Inner TURBO). (Core lists already had empty states; command palette already exists.)
+- **[shipped 0.30.2]** **Nicer confirm modals** — shared in-app confirmation modal replaces browser `confirm()` on ~37 forms.
+- **[shipped 0.30.1]** **Global "＋ New" quick-action** in the top bar + breadcrumb on the package editor.
+- **[shipped 0.30.3]** **Dashboard presets** — save/switch named layouts (Reset Layout already existed; per-widget min-heights intentionally skipped as they fight the 0.29.0 masonry).
 
 ---
 

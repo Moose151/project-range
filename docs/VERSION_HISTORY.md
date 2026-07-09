@@ -1,7 +1,13 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.30.2**
+Current version: **0.30.3**
+
+---
+
+## 0.30.3 — Dashboard Presets
+
+- **Save and switch dashboard layouts.** A new **Presets** menu on the dashboard lets you save the current widget arrangement (widgets, columns, collapse state, order) under a name — e.g. "Ops" or "Planning" — and switch between them in one click. Presets are stored per terminal, alongside the existing **Reset Layout** button.
 
 ---
 
