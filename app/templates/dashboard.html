@@ -341,12 +341,15 @@
           {% endif %}
           {% if serial.instructions %}
           <div class="alert alert-info py-1 px-3 mb-0 rounded-0 border-start-0 border-end-0">
-            <button type="button" class="btn btn-link link-info text-decoration-none p-0 d-flex align-items-center gap-2 w-100"
-                    data-bs-toggle="collapse" data-bs-target="#serialInstructions-{{ serial.id }}" aria-expanded="true">
+            <div class="d-flex align-items-center gap-2">
               <i class="bi bi-card-checklist"></i>
               <span class="fw-semibold small">Instructions</span>
-              <i class="bi bi-chevron-up ms-auto small collapse-chevron"></i>
-            </button>
+              <button type="button" class="btn btn-sm btn-outline-info py-0 px-2 ms-auto"
+                      data-bs-toggle="collapse" data-bs-target="#serialInstructions-{{ serial.id }}"
+                      aria-expanded="true" title="Collapse / expand instructions">
+                <i class="bi bi-chevron-up collapse-chevron"></i>
+              </button>
+            </div>
             <div class="collapse show" id="serialInstructions-{{ serial.id }}">
               <div class="small pt-1" style="white-space:pre-wrap">{{ serial.instructions }}</div>
             </div>
