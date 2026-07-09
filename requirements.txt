@@ -13,3 +13,6 @@ markdown>=3.6
 bleach>=6.1.0
 paramiko>=3.4.0
 pysnmp>=7.1,<8
+# RICS (Ranger terminal) telemetry — Socket.IO client + HTTP login
+requests>=2.31.0
+python-socketio[client]>=5.11.0
