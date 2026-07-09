@@ -42,7 +42,7 @@
       <th data-col="power">Power</th>
       <th data-col="ebno">Eb/No</th>
       <th data-col="ber">BER</th>
-      <th data-col="ebem" title="EBEM: Embedded Channel Sync / Carrier Lock / Bit Sync / BER Estimate">EBEM Sync</th>
+      <th data-col="ebem" title="EBEM: Embedded Channel Sync / Carrier Lock / Bit Sync">EBEM Sync</th>
       <th data-col="updated">Updated</th>
       <th data-col="warn">Warn</th>
     </tr>
@@ -169,12 +169,11 @@
       <td data-col="ebem" style="min-width:90px">
         {% if cbm_status_by_source is defined and log.source and log.source in cbm_status_by_source %}
           {% set ebem = cbm_status_by_source[log.source] %}
-          <span class="d-flex align-items-center gap-1" title="Embedded Sync / Carrier Lock / Bit Sync / BER Estimate">
+          <span class="d-flex align-items-center gap-1" title="Embedded Sync / Carrier Lock / Bit Sync">
             {% if ebem is none %}
               <span class="ebem-led ebem-led-grey" title="Embedded Channel Sync: no data"></span>
               <span class="ebem-led ebem-led-grey" title="Carrier Lock: no data"></span>
               <span class="ebem-led ebem-led-grey" title="Bit Sync: no data"></span>
-              <span class="badge text-bg-secondary" style="font-size:0.65rem" title="BER Estimate: no data">BER —</span>
             {% else %}
               <span class="ebem-led ebem-led-{{ 'green' if ebem.ebem_sync == true else ('red' if ebem.ebem_sync == false else 'grey') }}"
                     title="Embedded Channel Sync: {{ 'OK' if ebem.ebem_sync == true else ('Fault' if ebem.ebem_sync == false else 'Unknown') }}"></span>
@@ -182,8 +181,6 @@
                     title="Carrier Lock: {{ 'OK' if ebem.carrier_lock == true else ('Fault' if ebem.carrier_lock == false else 'Unknown') }}"></span>
               <span class="ebem-led ebem-led-{{ 'green' if ebem.bit_sync == true else ('red' if ebem.bit_sync == false else 'grey') }}"
                     title="Bit Sync: {{ 'OK' if ebem.bit_sync == true else ('Fault' if ebem.bit_sync == false else 'Unknown') }}"></span>
-              <span class="badge text-bg-secondary" style="font-size:0.65rem"
-                    title="BER Estimate: {{ '%g'|format(ebem.ber_estimate) if ebem.ber_estimate is not none else 'no data' }}">BER {{ "%g"|format(ebem.ber_estimate) if ebem.ber_estimate is not none else '—' }}</span>
             {% endif %}
           </span>
         {% else %}

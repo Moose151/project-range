@@ -1,7 +1,13 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.28.1**
+Current version: **0.28.2**
+
+---
+
+## 0.28.2 — BER Only in Its Own Column
+
+- **BER** now shows only in its dedicated dashboard column; the redundant BER badge was removed from the **EBEM Sync** cell (which is back to the three sync/lock LEDs).
 
 ---
 
