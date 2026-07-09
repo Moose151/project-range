@@ -1389,6 +1389,15 @@ body.sidebar-collapsed .sidebar-label {
 .app-content .overflow-auto {
   max-height: calc(100vh - 210px);
 }
+/* Sticky header row for the long scrollable data tables (Signal Logs, History,
+   config lists). The wrappers scroll internally (max-height above), so the header
+   just sticks to the top of its own scroll box — no page-offset maths needed. */
+.app-content .overflow-auto thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--bs-table-bg, var(--bs-secondary-bg));
+}
 
 /* ── Dashboard widget grid (2-col, side-by-side support) ──── */
 .widget-grid {

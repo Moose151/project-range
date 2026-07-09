@@ -13,20 +13,15 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.29.2` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.30.0` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
 **DB:** SQLite at `/app/data/range.db` (named volume). `init_db.py` runs automatically on container start and is idempotent (migrations + new tables auto-create).
 
-### 🔜 Next UX work — setup flow + dashboard polish
+### 🔜 In progress — UI polish batch (0.30.x)
 
-User feedback from 2026-07-09: the app feels clunky mainly because setup is spread across pages. When the classifier/tooling recovers, first verify and commit the admin-only docs encryption work, then move to the dashboard layout track by default unless the user chooses the activity workflow instead.
-
-1. **Dashboard layout overhaul** — make widget chrome consistent, tighten half-width widget sizing so the grid tiles cleanly without dead space, add/confirm a visible layout reset, and add saved dashboard presets such as **Ops** and **Planning**.
-2. **Activity workflow overhaul** — add a guided **New Activity** wizard that creates the activity, serials, packages, and package assignments in one flow instead of forcing page hopping; include planning-page breadcrumbs (**Activity ▸ Serial ▸ Package**) and duplicate/clone actions for serials and packages.
-
-Also include a global header **+ New** quick-action (activity / serial / package / log / note) as part of whichever UX pass touches navigation first. Source of truth for planned scope is **[ROADMAP.md](ROADMAP.md) → Requested batch — usability & workflow**.
+Dashboard masonry (0.29.0) and the activity create/clone workflow (0.29.2) are **done**. Current work is the UI-polish batch the user selected on 2026-07-09, shipped as 0.30.x bumps (colour-blind status indicators deferred). Working order: (1) quick wins — empty states, sticky table headers/filters, form autofocus/Enter; (2) shared confirm modal replacing `confirm()`; (3) global **＋ New** quick-action + breadcrumbs on serial/package pages; (4) dashboard chrome (uniform headers/min-heights, Reset Layout) + presets (Ops/Planning). Source of truth: **[ROADMAP.md](ROADMAP.md) → UI polish batch**.
 
 ### 🚧 In progress — Ranger terminal (RICS) output-power tracking (NOT finished — needs live testing)
 

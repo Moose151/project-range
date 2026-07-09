@@ -1,7 +1,15 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.29.2**
+Current version: **0.30.0**
+
+---
+
+## 0.30.0 — UI Polish: Sticky Table Headers + Signal Defaults
+
+First of the UI-polish batch:
+- **Sticky headers on long tables.** The column headers on **Signal Logs** and **History** now stay pinned to the top while you scroll the table, so you never lose track of which column is which.
+- **New signals default to Power −35 dBm and Inner Code TURBO** (both still editable), matching the usual starting point.
 
 ---
 
