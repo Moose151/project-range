@@ -55,7 +55,7 @@
         <li><hr class="dropdown-divider"></li>
         <li>
           <form method="post" action="/docs/{{ doc_page.slug }}/delete"
-                onsubmit="return confirm('Delete this documentation page? This cannot be undone.')">
+                data-confirm="Delete this documentation page? This cannot be undone.">
             <button type="submit" class="dropdown-item text-danger">
               <i class="bi bi-trash me-2"></i>Delete
             </button>
@@ -126,7 +126,7 @@
           <span class="text-muted" style="font-size:0.7rem">{{ (att.size_bytes / 1024) | round(0, 'floor') | int }} KB</span>
           {% if user.role == 'administrator' or att.uploaded_by_id == user.id %}
           <form method="post" action="/docs/{{ doc_page.slug }}/attachments/{{ att.id }}/delete"
-                onsubmit="return confirm('Remove {{ att.filename | e }}?')">
+                data-confirm="Remove {{ att.filename | e }}?">
             <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Remove PDF">
               <i class="bi bi-x-lg"></i>
             </button>
@@ -147,7 +147,7 @@
           </form>
           {% endif %}
           <form method="post" action="/docs/{{ doc_page.slug }}/attachments/{{ att.id }}/delete"
-                onsubmit="return confirm('{% if user.role == 'administrator' %}Reject{% else %}Remove{% endif %} {{ att.filename | e }}?')">
+                data-confirm="{% if user.role == 'administrator' %}Reject{% else %}Remove{% endif %} {{ att.filename | e }}?">
             <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="{% if user.role == 'administrator' %}Reject PDF{% else %}Remove PDF{% endif %}"><i class="bi bi-x-lg"></i></button>
           </form>
         </div>
@@ -175,7 +175,7 @@
         <div class="list-group-item d-flex align-items-center gap-2 py-2 small">
           <a href="/docs/{{ alias.alias_slug }}" class="text-decoration-none flex-grow-1">{{ alias.alias_title }}</a>
           <form method="post" action="/docs/{{ doc_page.slug }}/aliases/{{ alias.id }}/delete"
-                onsubmit="return confirm('Remove alias {{ alias.alias_title | e }}?')">
+                data-confirm="Remove alias {{ alias.alias_title | e }}?">
             <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Remove alias">
               <i class="bi bi-x-lg"></i>
             </button>

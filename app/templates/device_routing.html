@@ -333,7 +333,7 @@
             </form>
             {% if preset %}
             <form method="post" action="/devices/{{ device.id }}/routing-presets/{{ preset.id }}/delete"
-                  onsubmit="return confirm('Delete the routing preset for {{ state | e }}?')">
+                  data-confirm="Delete the routing preset for {{ state | e }}?">
               <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete preset">
                 <i class="bi bi-trash"></i>
               </button>

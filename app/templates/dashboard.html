@@ -307,7 +307,7 @@
             </button>
             {% if user.role != 'observer' %}
             <form method="post" action="/serials/{{ serial.id }}/end" class="d-inline"
-                  onsubmit="return confirm('End serial {{ serial.title | e }}? It will be moved to history.')">
+                  data-confirm="End serial {{ serial.title | e }}? It will be moved to history.">
               <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="End serial"><i class="bi bi-stop-circle"></i></button>
             </form>
             {% endif %}

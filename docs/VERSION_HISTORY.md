@@ -1,7 +1,13 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.30.1**
+Current version: **0.30.2**
+
+---
+
+## 0.30.2 — In-App Confirmation Dialogs
+
+- **Nicer confirmation prompts.** The plain browser "OK / Cancel" pop-ups for destructive actions (delete a package, end a serial, remove a CDA/PDF, etc.) are replaced by a consistent in-app dialog that matches the rest of the UI. ~37 forms across the app now use it; behaviour is unchanged (Cancel does nothing, Confirm proceeds), and it safely falls back to the native prompt if needed.
 
 ---
 

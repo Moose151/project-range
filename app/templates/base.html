@@ -400,6 +400,51 @@
     } catch (e) { /* no-op */ }
   });
 </script>
+
+<!-- Shared confirmation modal — replaces browser confirm() for forms with data-confirm -->
+<div class="modal fade" id="appConfirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-question-circle me-2"></i>Please confirm</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="appConfirmMessage"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="appConfirmOk">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var pendingForm = null;
+  var modalEl = document.getElementById('appConfirmModal');
+  var modal = null;
+  function getModal() { if (!modal && window.bootstrap && modalEl) modal = new window.bootstrap.Modal(modalEl); return modal; }
+  // Intercept submission of any form carrying data-confirm, show the modal, and
+  // only submit once confirmed. Falls back to native confirm() if Bootstrap JS
+  // somehow isn't available.
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    var msg = form.getAttribute('data-confirm');
+    if (!msg || form.dataset.confirmed === '1') return;
+    e.preventDefault();
+    var m = getModal();
+    if (!m) { if (window.confirm(msg)) { form.dataset.confirmed = '1'; form.submit(); } return; }
+    document.getElementById('appConfirmMessage').textContent = msg;
+    pendingForm = form;
+    m.show();
+  });
+  document.getElementById('appConfirmOk') && document.getElementById('appConfirmOk').addEventListener('click', function () {
+    var f = pendingForm; pendingForm = null;
+    if (getModal()) getModal().hide();
+    if (f) { f.dataset.confirmed = '1'; if (f.requestSubmit) f.requestSubmit(); else f.submit(); }
+  });
+})();
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

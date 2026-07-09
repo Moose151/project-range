@@ -238,7 +238,7 @@
               </button>
             </form>
             <form method="post" action="/logs/{{ log.id }}/hard-delete" class="d-inline"
-                  onsubmit="return confirm('Permanently delete this entry? This cannot be undone.')">
+                  data-confirm="Permanently delete this entry? This cannot be undone.">
               <button type="submit" class="btn btn-xs btn-outline-danger btn-sm py-0 px-1" title="Delete permanently">
                 <i class="bi bi-trash3-fill"></i>
               </button>
@@ -353,7 +353,7 @@
               </button>
             </form>
             <form method="post" action="/logs/{{ log.id }}/hard-delete" class="d-inline"
-                  onsubmit="return confirm('Permanently delete the entry for {{ log.signal_name }}? This cannot be undone.')">
+                  data-confirm="Permanently delete the entry for {{ log.signal_name }}? This cannot be undone.">
               <button type="submit" class="btn btn-xs btn-outline-danger btn-sm py-0 px-1" title="Delete permanently">
                 <i class="bi bi-trash3-fill"></i>
               </button>

@@ -83,7 +83,7 @@
               </button>
             </form>
             <form method="post" action="/serials/{{ serial.id }}/delete"
-                  onsubmit="return confirm('Discard pending serial {{ serial.title | e }}?')">
+                  data-confirm="Discard pending serial {{ serial.title | e }}?">
               <button type="submit" class="btn btn-sm btn-outline-danger">
                 <i class="bi bi-trash"></i>
               </button>
@@ -187,7 +187,7 @@
               <i class="bi bi-shield-exclamation"></i>{{ link.cda_table.name }}
               {% if user.role != 'observer' %}
               <form method="post" action="/serials/{{ serial.id }}/cda/{{ link.cda_table_id }}/remove"
-                    class="d-inline ms-1" onsubmit="return confirm('Remove CDA table {{ link.cda_table.name | e }}?')">
+                    class="d-inline ms-1" data-confirm="Remove CDA table {{ link.cda_table.name | e }}?">
                 <button type="submit" class="btn btn-sm p-0 border-0 bg-transparent text-dark lh-1"
                         title="Remove CDA table" style="font-size:0.7rem">✕</button>
               </form>
@@ -226,7 +226,7 @@
           </button>
         </form>
         <form method="post" action="/serials/{{ serial.id }}/end" class="ms-auto"
-              onsubmit="return confirm('End serial {{ serial.title | e }}? It will be moved to history.')">
+              data-confirm="End serial {{ serial.title | e }}? It will be moved to history.">
           <button type="submit" class="btn btn-sm btn-danger">
             <i class="bi bi-stop-circle me-1"></i>End Serial
           </button>

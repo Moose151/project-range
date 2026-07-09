@@ -27,7 +27,7 @@
     </a>
     {% if user.role == 'administrator' and serial.closed_at %}
     <form method="post" action="/history/{{ serial.id }}/archive"
-          onsubmit="return confirm('Archive this serial to a server spreadsheet and remove it from app history?')">
+          data-confirm="Archive this serial to a server spreadsheet and remove it from app history?">
       <button type="submit" class="btn btn-sm btn-outline-warning">
         <i class="bi bi-archive me-1"></i>Archive
       </button>

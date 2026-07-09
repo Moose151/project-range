@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   </button>
                 </form>
                 <form method="post" action="/config/modulation/{{ m.id }}/delete" class="d-inline"
-                      onsubmit="return confirm('Delete modulation type {{ m.name }}?')">
+                      data-confirm="Delete modulation type {{ m.name }}?">
                   <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">
                     <i class="bi bi-trash"></i>
                   </button>
@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   </button>
                 </form>
                 <form method="post" action="/config/fec/{{ f.id }}/delete" class="d-inline"
-                      onsubmit="return confirm('Delete FEC type {{ f.name }}?')">
+                      data-confirm="Delete FEC type {{ f.name }}?">
                   <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">
                     <i class="bi bi-trash"></i>
                   </button>
@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   </button>
                 </form>
                 <form method="post" action="/config/sources/{{ s.id }}/delete" class="d-inline"
-                      onsubmit="return confirm('Delete source {{ s.name }}?')">
+                      data-confirm="Delete source {{ s.name }}?">
                   <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">
                     <i class="bi bi-trash"></i>
                   </button>
@@ -279,7 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   </button>
                 </form>
                 <form method="post" action="/config/antennas/{{ a.id }}/delete" class="d-inline"
-                      onsubmit="return confirm('Delete antenna {{ a.name }}?')">
+                      data-confirm="Delete antenna {{ a.name }}?">
                   <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">
                     <i class="bi bi-trash"></i>
                   </button>
@@ -343,7 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   <i class="bi bi-pencil"></i>
                 </button>
                 <form method="post" action="/config/freq-templates/{{ t.id }}/delete" class="d-inline"
-                      onsubmit="return confirm('Delete template {{ t.name }}?')">
+                      data-confirm="Delete template {{ t.name }}?">
                   <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">
                     <i class="bi bi-trash"></i>
                   </button>
@@ -529,7 +529,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   </button>
                 </form>
                 <form method="post" action="/config/signals/{{ sig.id }}/delete" class="d-inline"
-                      onsubmit="return confirm('Remove {{ sig.name }} from the registry? Existing log entries are unaffected.')">
+                      data-confirm="Remove {{ sig.name }} from the registry? Existing log entries are unaffected.">
                   <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">
                     <i class="bi bi-trash"></i>
                   </button>
@@ -647,7 +647,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   </button>
                 </form>
                 <form method="post" action="/config/duty-roles/{{ r.id }}/delete" class="d-inline"
-                      onsubmit="return confirm('Delete duty role {{ r.name }}? It will be removed from anyone currently wearing it.')">
+                      data-confirm="Delete duty role {{ r.name }}? It will be removed from anyone currently wearing it.">
                   <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete"><i class="bi bi-trash"></i></button>
                 </form>
               </td>
@@ -711,7 +711,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   </button>
                 </form>
                 <form method="post" action="/config/activity-type/{{ at.id }}/delete" class="d-inline"
-                      onsubmit="return confirm('Delete activity type {{ at.name }}?')">
+                      data-confirm="Delete activity type {{ at.name }}?">
                   <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">
                     <i class="bi bi-trash"></i>
                   </button>
@@ -771,7 +771,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   </button>
                 </form>
                 <form method="post" action="/config/call-type/{{ ct.id }}/delete" class="d-inline"
-                      onsubmit="return confirm('Delete effect {{ ct.name }}?')">
+                      data-confirm="Delete effect {{ ct.name }}?">
                   <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">
                     <i class="bi bi-trash"></i>
                   </button>

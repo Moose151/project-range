@@ -28,7 +28,7 @@
     </a>
     {% if user.role != 'observer' %}
     <form method="post" action="/packages/{{ package.id }}/duplicate"
-          onsubmit="return confirm('Duplicate package {{ package.name | e }}?')">
+          data-confirm="Duplicate package {{ package.name | e }}?">
       <button type="submit" class="btn btn-sm btn-outline-secondary">
         <i class="bi bi-copy me-1"></i>Duplicate
       </button>
@@ -304,7 +304,7 @@
                   </button>
                 </form>
                 <form method="post" action="/packages/{{ package.id }}/signals/{{ entry.id }}/delete" class="d-inline"
-                      onsubmit="return confirm('Remove {{ entry.signal_name | e }}?')">
+                      data-confirm="Remove {{ entry.signal_name | e }}?">
                   <button type="submit" class="btn btn-xs btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-trash"></i></button>
                 </form>
               </td>

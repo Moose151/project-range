@@ -67,7 +67,7 @@
             </button>
           </form>
           <form method="post" action="/packages/{{ pkg.id }}/delete" class="d-inline"
-                onsubmit="return confirm('Delete package {{ pkg.name | e }}? This cannot be undone.')">
+                data-confirm="Delete package {{ pkg.name | e }}? This cannot be undone.">
             <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2"><i class="bi bi-trash"></i></button>
           </form>
           {% endif %}

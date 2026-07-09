@@ -91,7 +91,7 @@
                   </button>
                 </form>
                 <form method="post" action="/users/{{ u.id }}/archive" class="d-inline"
-                      onsubmit="return confirm('Archive account {{ u.username | e }}? It will be hidden from this list and unable to log in.')">
+                      data-confirm="Archive account {{ u.username | e }}? It will be hidden from this list and unable to log in.">
                   <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Archive account">
                     <i class="bi bi-archive"></i>
                   </button>
@@ -109,7 +109,7 @@
                 </form>
                 {% endif %}
                 <form method="post" action="/users/{{ u.id }}/delete" class="d-inline"
-                      onsubmit="return confirm('Delete account {{ u.username | e }}? This only works when no operational records depend on it.')">
+                      data-confirm="Delete account {{ u.username | e }}? This only works when no operational records depend on it.">
                   <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete account">
                     <i class="bi bi-trash"></i>
                   </button>

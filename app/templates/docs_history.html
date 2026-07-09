@@ -62,7 +62,7 @@
             </button>
             {% if v.approval_status == 'approved' %}
             <form method="post" action="/docs/versions/{{ v.id }}/restore"
-                  onsubmit="return confirm('Restore page to version {{ v.version_number }}? This will create a new version with this content.')">
+                  data-confirm="Restore page to version {{ v.version_number }}? This will create a new version with this content.">
               <button type="submit" class="btn btn-sm btn-outline-warning py-0" title="Restore this version">
                 <i class="bi bi-arrow-counterclockwise"></i>
               </button>

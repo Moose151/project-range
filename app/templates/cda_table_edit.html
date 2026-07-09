@@ -59,7 +59,7 @@
                     <i class="bi bi-pencil"></i>
                   </button>
                   <form method="post" action="/cda/{{ table.id }}/windows/{{ w.id }}/delete"
-                        onsubmit="return confirm('Delete window {{ w.start_zulu }}–{{ w.end_zulu }}?')">
+                        data-confirm="Delete window {{ w.start_zulu }}–{{ w.end_zulu }}?">
                     <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Delete window">
                       <i class="bi bi-trash"></i>
                     </button>
@@ -134,7 +134,7 @@
           <span class="text-muted small ms-auto">Started {{ serial.opened_at.strftime('%d/%m/%y %H:%M') }}Z</span>
           {% if user.role != 'observer' %}
           <form method="post" action="/cda/{{ table.id }}/serials/{{ serial.id }}/remove"
-                onsubmit="return confirm('Remove CDA table {{ table.name | e }} from {{ serial.title | e }}?')">
+                data-confirm="Remove CDA table {{ table.name | e }} from {{ serial.title | e }}?">
             <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Remove from serial">
               <i class="bi bi-x-lg"></i>
             </button>
@@ -277,7 +277,7 @@
       <div class="card-body py-2 d-flex align-items-center gap-3">
         <span class="text-muted small">Permanently delete this CDA table and all its windows.</span>
         <form method="post" action="/cda/{{ table.id }}/delete" class="ms-auto"
-              onsubmit="return confirm('Delete CDA table {{ table.name | e }} and all its windows? This cannot be undone.')">
+              data-confirm="Delete CDA table {{ table.name | e }} and all its windows? This cannot be undone.">
           <button type="submit" class="btn btn-sm btn-outline-danger">
             <i class="bi bi-trash me-1"></i>Delete Table
           </button>
