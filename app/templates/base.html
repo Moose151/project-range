@@ -194,6 +194,21 @@
       <button type="button" class="topbar-btn d-none d-sm-inline-flex align-items-center gap-1 px-2" onclick="openCommandPalette()" title="Search or jump (Ctrl+K)">
         <i class="bi bi-search"></i><span class="small">Jump</span><span class="text-muted small">Ctrl+K</span>
       </button>
+      {% if user.role != 'observer' %}
+      <div class="dropdown">
+        <button type="button" class="topbar-btn d-inline-flex align-items-center gap-1 px-2" data-bs-toggle="dropdown" aria-expanded="false" title="Create new…">
+          <i class="bi bi-plus-lg"></i><span class="small d-none d-sm-inline">New</span>
+        </button>
+        <ul class="dropdown-menu">
+          <li><a class="dropdown-item" href="/serials?new=1"><i class="bi bi-collection-play me-2"></i>Serial</a></li>
+          <li><a class="dropdown-item" href="/packages/new"><i class="bi bi-box-seam me-2"></i>Signal Package</a></li>
+          <li><a class="dropdown-item" href="/activities?new=1"><i class="bi bi-calendar3-range me-2"></i>Activity</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item" href="/logs/new"><i class="bi bi-journal-plus me-2"></i>Signal Log</a></li>
+          <li><a class="dropdown-item" href="/logs/note"><i class="bi bi-sticky me-2"></i>Note</a></li>
+        </ul>
+      </div>
+      {% endif %}
       <span class="topbar-brand d-none d-lg-inline ms-1">SEW Range</span>
       <div class="ms-auto d-flex align-items-center gap-2">
         <span class="app-version-badge" title="Application version">v{{ app_version }}</span>
@@ -372,6 +387,19 @@
 <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="/static/vendor/htmx/htmx.min.js"></script>
 <script src="/static/js/app.js?v=33"></script>
+<script>
+  // Auto-open a create panel when arriving via a top-bar "+ New" link (?new=1).
+  document.addEventListener('DOMContentLoaded', function () {
+    try {
+      if (new URLSearchParams(location.search).get('new') !== '1') return;
+      var panel = document.querySelector('#newSerialPanel, #newActivityPanel');
+      if (panel && window.bootstrap) {
+        window.bootstrap.Collapse.getOrCreateInstance(panel, { toggle: false }).show();
+        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    } catch (e) { /* no-op */ }
+  });
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

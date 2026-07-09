@@ -1,7 +1,14 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.30.0**
+Current version: **0.30.1**
+
+---
+
+## 0.30.1 — Global "＋ New" + Breadcrumbs
+
+- **"＋ New" button in the top bar.** From any page you can now jump straight to creating a **Serial, Signal Package, Activity, Signal Log, or Note** — the Serial/Activity options even open the create panel for you automatically.
+- **Breadcrumb on the package editor** (Signal Packages ▸ *package*) to match the Activity page, making it clearer where you are.
 
 ---
 

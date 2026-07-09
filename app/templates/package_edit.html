@@ -2,6 +2,12 @@
 {% block title %}{% if package %}Edit: {{ package.name }}{% else %}New Signal Package{% endif %}{% endblock %}
 
 {% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb mb-1">
+    <li class="breadcrumb-item"><a href="/packages">Signal Packages</a></li>
+    <li class="breadcrumb-item active">{% if package %}{{ package.name }}{% else %}New Package{% endif %}</li>
+  </ol>
+</nav>
 <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
   <h4 class="mb-0">
     <i class="bi bi-box-seam me-2"></i>
