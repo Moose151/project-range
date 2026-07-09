@@ -1,7 +1,16 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.30.3**
+Current version: **0.31.0**
+
+---
+
+## 0.31.0 — Activity Lifecycle, Serial Editing & Spectrum Signal Toggles
+
+- **Mark activities complete.** Activities now stay **on-going until you mark them complete**. Completing one ends all its running serials (they move to serial history with their logs) and files the activity under a **Completed** section. Activities can also be **deleted** (their serials are unassigned, not deleted).
+- **Edit serials from the Serials page.** Both **pending and active** serials now have an inline edit for **title, notes, and instructions** — no need to open the activity to make quick changes.
+- **Show/hide individual signals in the Spectrum Plan.** On a signal package, tick/untick signals (with All / None shortcuts) to focus the spectrum view; the choice is remembered per package.
+- *(Signal drag‑to‑reorder in a package was already available — drag the ⠿ handle.)*
 
 ---
 

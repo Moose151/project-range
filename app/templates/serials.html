@@ -38,7 +38,8 @@
     {% for serial in pending_serials %}
     <div class="col-lg-6">
       <div class="card border-warning border-opacity-50">
-        <div class="card-body py-2 d-flex align-items-center gap-3">
+        <div class="card-body py-2">
+          <div class="d-flex align-items-center gap-3">
           <div class="flex-grow-1">
             <span class="fw-semibold">{{ serial.title }}</span>
             <span class="badge bg-warning text-dark ms-2 small">Pending</span>
@@ -73,6 +74,9 @@
           </div>
           {% if user.role != 'observer' %}
           <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#editPending{{ serial.id }}" title="Edit title / notes / instructions">
+              <i class="bi bi-pencil"></i>
+            </button>
             <a href="/serials/{{ serial.id }}/start" class="btn btn-sm btn-success">
               <i class="bi bi-play-circle me-1"></i>Start
             </a>
@@ -87,6 +91,21 @@
               <button type="submit" class="btn btn-sm btn-outline-danger">
                 <i class="bi bi-trash"></i>
               </button>
+            </form>
+          </div>
+          {% endif %}
+          </div>
+          {% if user.role != 'observer' %}
+          <div class="collapse mt-2" id="editPending{{ serial.id }}">
+            <form method="post" action="/serials/{{ serial.id }}/details">
+              <input type="hidden" name="redirect" value="/serials">
+              <label class="form-label small mb-1">Title</label>
+              <input type="text" class="form-control form-control-sm mb-2" name="title" value="{{ serial.title }}">
+              <label class="form-label small mb-1">Notes</label>
+              <textarea class="form-control form-control-sm mb-2" name="notes" rows="2" placeholder="Crew, objectives, or other context…">{{ serial.notes or '' }}</textarea>
+              <label class="form-label small mb-1"><i class="bi bi-card-checklist me-1"></i>Instructions</label>
+              <textarea class="form-control form-control-sm mb-2" name="instructions" rows="2" placeholder="e.g. 'Turn on signal 102 at 1400Z'…">{{ serial.instructions or '' }}</textarea>
+              <button type="submit" class="btn btn-sm btn-primary py-0 px-3"><i class="bi bi-check2 me-1"></i>Save</button>
             </form>
           </div>
           {% endif %}
@@ -135,6 +154,8 @@
           <div class="collapse mt-2" id="editDetails{{ serial.id }}">
             <form method="post" action="/serials/{{ serial.id }}/details">
               <input type="hidden" name="redirect" value="/serials">
+              <label class="form-label small mb-1">Title</label>
+              <input type="text" class="form-control form-control-sm mb-2" name="title" value="{{ serial.title }}">
               <label class="form-label small mb-1">Notes</label>
               <textarea class="form-control form-control-sm mb-2" name="notes" rows="2" placeholder="Crew, objectives, or other context…">{{ serial.notes or '' }}</textarea>
               <label class="form-label small mb-1"><i class="bi bi-card-checklist me-1"></i>Instructions</label>

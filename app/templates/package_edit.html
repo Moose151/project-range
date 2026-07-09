@@ -370,6 +370,23 @@
               </button>
             </div>
           </div>
+          {% if package and package.signals %}
+          <div class="mb-2 pb-2 border-bottom border-secondary">
+            <label class="form-label small mb-1 d-block">Show signals</label>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              {% for entry in package.signals %}
+              <label class="form-check form-check-inline small mb-0" style="cursor:pointer">
+                <input class="form-check-input spec-signal-toggle" type="checkbox" checked
+                       data-signal="{{ entry.signal_name }}"
+                       onchange="toggleSpecSignal({{ entry.signal_name | tojson }}, this)">
+                {{ entry.signal_name }}
+              </label>
+              {% endfor %}
+              <button type="button" class="btn btn-xs btn-outline-secondary btn-sm py-0 px-1 ms-1" onclick="setAllSpecSignals(true)">All</button>
+              <button type="button" class="btn btn-xs btn-outline-secondary btn-sm py-0 px-1" onclick="setAllSpecSignals(false)">None</button>
+            </div>
+          </div>
+          {% endif %}
           <div style="position:relative;height:300px;">
             <canvas id="spectrumCanvas" style="width:100%;height:100%;display:block;border-radius:4px;"></canvas>
           </div>
@@ -685,9 +702,35 @@ const rawSpecSignals = [
 {% endfor %}
 ];
 
+// Per-package show/hide of individual signals in the spectrum plan.
+const SPEC_HIDDEN_KEY = 'spectrum_hidden_pkg_' + SPEC_PKG_ID;
+function specHiddenSet() {
+  try { return new Set(JSON.parse(localStorage.getItem(SPEC_HIDDEN_KEY) || '[]')); } catch (e) { return new Set(); }
+}
+function visibleSpecSignals() {
+  const hidden = specHiddenSet();
+  return rawSpecSignals.filter(s => !hidden.has(s.name));
+}
+function toggleSpecSignal(name, cb) {
+  const hidden = specHiddenSet();
+  if (cb.checked) hidden.delete(name); else hidden.add(name);
+  localStorage.setItem(SPEC_HIDDEN_KEY, JSON.stringify([...hidden]));
+  renderSpectrum();
+}
+function setAllSpecSignals(show) {
+  localStorage.setItem(SPEC_HIDDEN_KEY, JSON.stringify(show ? [] : rawSpecSignals.map(s => s.name)));
+  syncSpecToggles();
+  renderSpectrum();
+}
+function syncSpecToggles() {
+  const hidden = specHiddenSet();
+  document.querySelectorAll('.spec-signal-toggle').forEach(cb => { cb.checked = !hidden.has(cb.dataset.signal); });
+}
+
 function renderSpectrum() {
   const canvas = document.getElementById('spectrumCanvas');
   if (!canvas) return;
+  const specSignals = visibleSpecSignals();
   let centreFreq = parseFloat(document.getElementById('specCentre').value);
   let span = parseFloat(document.getElementById('specSpan').value);
   const glVal = document.getElementById('specGuardLeft').value;
@@ -697,8 +740,8 @@ function renderSpectrum() {
   const view = document.getElementById('specView').value;
   const freqMode = document.getElementById('specFreqMode').value || 'if';
   if (isNaN(centreFreq) || isNaN(span) || span <= 0) return;
-  if (!specHasVisibleSignals(rawSpecSignals, centreFreq, span, view, freqMode)) {
-    const auto = specAutoSettings(rawSpecSignals, view, freqMode);
+  if (!specHasVisibleSignals(specSignals, centreFreq, span, view, freqMode)) {
+    const auto = specAutoSettings(specSignals, view, freqMode);
     centreFreq = auto.centreFreq;
     span = auto.span;
     document.getElementById('specCentre').value = centreFreq;
@@ -706,14 +749,15 @@ function renderSpectrum() {
   }
   try { localStorage.setItem('spectrum_pkg_' + SPEC_PKG_ID,
     JSON.stringify({ centreFreq, span, guardLeft, guardRight, view, freqMode })); } catch (e) {}
-  drawSpectrumChart(canvas, rawSpecSignals, centreFreq, span, guardLeft, guardRight, view, freqMode);
+  drawSpectrumChart(canvas, specSignals, centreFreq, span, guardLeft, guardRight, view, freqMode);
 }
 
 function initSpectrum() {
+  syncSpecToggles();
   let settings = null;
   try { settings = JSON.parse(localStorage.getItem('spectrum_pkg_' + SPEC_PKG_ID) || 'null'); } catch (e) {}
   if (!settings) {
-    const auto = specAutoSettings(rawSpecSignals, 'both', 'if');
+    const auto = specAutoSettings(visibleSpecSignals(), 'both', 'if');
     settings = { centreFreq: auto.centreFreq, span: auto.span, guardLeft: null, guardRight: null, view: 'both', freqMode: 'if' };
   }
   document.getElementById('specCentre').value = settings.centreFreq ?? '';

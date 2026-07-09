@@ -586,9 +586,14 @@ class Activity(Base):
     is_testing: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Explicit completion — an activity stays on-going until a user marks it complete,
+    # at which point it moves to the Completed/history section (its serials are ended).
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     activity_type: Mapped["ActivityType | None"] = relationship("ActivityType")
     created_by: Mapped["User"] = relationship("User", foreign_keys="Activity.created_by_id")
+    completed_by: Mapped["User | None"] = relationship("User", foreign_keys="Activity.completed_by_id")
     serials: Mapped[list["Serial"]] = relationship("Serial", back_populates="activity", foreign_keys="Serial.activity_id")
 
     @property
@@ -606,12 +611,14 @@ class Activity(Base):
 
     @property
     def status(self) -> str:
+        # A user-completed activity is Completed regardless of serial state; otherwise
+        # it stays on-going (Planned/Active) until explicitly marked complete.
+        if self.completed_at is not None:
+            return "Completed"
         started = [s for s in self.serials if s.is_started]
         if not started:
             return "Planned"
-        if any(s.closed_at is None for s in started):
-            return "Active"
-        return "Completed"
+        return "Active"
 
 
 class RFDevice(Base):

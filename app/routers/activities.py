@@ -223,6 +223,66 @@ async def activity_edit(
     return RedirectResponse(f"/activities/{activity_id}?toast=Activity+updated", status_code=302)
 
 
+@router.post("/{activity_id}/complete")
+async def activity_complete(
+    activity_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Mark an activity complete: end all its open serials (→ serial history with
+    their logs) and move the activity to the Completed/history section."""
+    from app.routers.serials import end_serial
+    if current_user.role == "observer":
+        raise HTTPException(status_code=403)
+    testing = is_testing_state(db)
+    activity = db.query(Activity).filter(
+        Activity.id == activity_id, Activity.is_testing == testing,
+    ).first()
+    if not activity:
+        return RedirectResponse("/activities", status_code=302)
+    ended = 0
+    for serial in list(activity.serials or []):
+        if serial.is_started and serial.closed_at is None:
+            if end_serial(db, serial, current_user):
+                ended += 1
+    activity.completed_at = datetime.utcnow()
+    activity.completed_by_id = current_user.id
+    db.add(AuditLog(
+        user_id=current_user.id, action_type="ACTIVITY_COMPLETE",
+        entity_type="Activity", entity_id=activity.id, new_value=activity.name,
+        comment=f"Completed; ended {ended} running serial(s).",
+    ))
+    db.commit()
+    return RedirectResponse(f"/activities/{activity_id}?toast=Activity+completed", status_code=302)
+
+
+@router.post("/{activity_id}/delete")
+async def activity_delete(
+    activity_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete an activity. Its serials are unassigned (kept), not deleted."""
+    if current_user.role == "observer":
+        raise HTTPException(status_code=403)
+    testing = is_testing_state(db)
+    activity = db.query(Activity).filter(
+        Activity.id == activity_id, Activity.is_testing == testing,
+    ).first()
+    if not activity:
+        return RedirectResponse("/activities", status_code=302)
+    for serial in list(activity.serials or []):
+        serial.activity_id = None
+    name = activity.name
+    db.add(AuditLog(
+        user_id=current_user.id, action_type="ACTIVITY_DELETE",
+        entity_type="Activity", entity_id=activity.id, previous_value=name,
+    ))
+    db.delete(activity)
+    db.commit()
+    return RedirectResponse("/activities?toast=Activity+deleted", status_code=302)
+
+
 @router.post("/{activity_id}/assign-serial")
 async def activity_assign_serial(
     activity_id: int,

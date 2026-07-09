@@ -104,6 +104,12 @@
       <a href="/activities/{{ act.id }}" class="btn btn-sm btn-outline-primary py-0 px-2">
         <i class="bi bi-eye me-1"></i>View
       </a>
+      {% if user.role != 'observer' %}
+      <form method="post" action="/activities/{{ act.id }}/delete"
+            data-confirm="Delete activity '{{ act.name | e }}'? Its serials will be unassigned (not deleted).">
+        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Delete activity"><i class="bi bi-trash"></i></button>
+      </form>
+      {% endif %}
     </div>
   </div>
 </div>

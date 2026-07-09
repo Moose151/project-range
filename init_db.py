@@ -157,6 +157,8 @@ def _migrate(conn):
         "ALTER TABLE serials ADD COLUMN instructions TEXT",
         "ALTER TABLE cda_windows ADD COLUMN max_power_unit VARCHAR(4) DEFAULT 'dBm'",
         "ALTER TABLE doc_attachments ADD COLUMN approval_status VARCHAR(16) DEFAULT 'approved'",
+        "ALTER TABLE activities ADD COLUMN completed_at DATETIME",
+        "ALTER TABLE activities ADD COLUMN completed_by_id INTEGER REFERENCES users(id)",
     ]
     for sql in migrations:
         try:

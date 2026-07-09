@@ -192,18 +192,13 @@ async def serial_start(
     return RedirectResponse(f"/?toast=Serial+started%3A+{serial.title}", status_code=302)
 
 
-@router.post("/{serial_id}/end")
-async def serial_end(
-    serial_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == is_testing_state(db)).first()
+def end_serial(db: Session, serial: Serial, current_user: User) -> bool:
+    """Close a serial: down any Up signals, write the SerialEnd marker, audit.
+    Does not commit (the caller does). Returns False if already closed / no-op."""
     if not serial or serial.closed_at:
-        return RedirectResponse("/serials", status_code=302)
-
+        return False
     range_state = get_current_range_state(db)
-    testing = is_testing_state(db)
+    testing = serial.is_testing
     serial.closed_at = datetime.utcnow()
     serial.closed_by_id = current_user.id
 
@@ -256,11 +251,22 @@ async def serial_end(
         entry_type="SerialEnd",
         serial_id=serial.id,
     ))
-
     db.add(AuditLog(
         user_id=current_user.id, action_type="SERIAL_END",
         entity_type="Serial", entity_id=serial.id,
     ))
+    return True
+
+
+@router.post("/{serial_id}/end")
+async def serial_end(
+    serial_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == is_testing_state(db)).first()
+    if not end_serial(db, serial, current_user):
+        return RedirectResponse("/serials", status_code=302)
     db.commit()
     return RedirectResponse("/?toast=Serial+closed", status_code=302)
 
@@ -289,23 +295,26 @@ async def serial_delete(
 @router.post("/{serial_id}/details")
 async def serial_update_details(
     serial_id: int,
+    title: str = Form(""),
     notes: str = Form(""),
     instructions: str = Form(""),
     redirect: str = Form("/serials"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update a serial's notes and operational instructions (any time before close)."""
+    """Update a serial's title, notes and operational instructions (before close)."""
     serial = db.query(Serial).filter(
         Serial.id == serial_id, Serial.is_testing == is_testing_state(db),
     ).first()
     if serial and serial.closed_at is None:
+        if title.strip():
+            serial.title = title.strip()
         serial.notes = notes.strip() or None
         serial.instructions = instructions.strip() or None
         db.add(AuditLog(
             user_id=current_user.id, action_type="SERIAL_UPDATE",
             entity_type="Serial", entity_id=serial_id, new_value=serial.title,
-            comment="Updated serial notes/instructions",
+            comment="Updated serial title/notes/instructions",
         ))
         db.commit()
     target = redirect if redirect.startswith("/") else "/serials"

@@ -33,6 +33,7 @@ User-requested 2026-07-09. Working through these systematically; each ships as a
 - **[shipped 0.30.2]** **Nicer confirm modals** — shared in-app confirmation modal replaces browser `confirm()` on ~37 forms.
 - **[shipped 0.30.1]** **Global "＋ New" quick-action** in the top bar + breadcrumb on the package editor.
 - **[shipped 0.30.3]** **Dashboard presets** — save/switch named layouts (Reset Layout already existed; per-widget min-heights intentionally skipped as they fight the 0.29.0 masonry).
+- **[shipped 0.31.0]** Activity **complete/delete** lifecycle (complete ends serials → history); **edit pending/active serials** (title/notes/instructions) from the Serials page; **show/hide signals** in the package Spectrum Plan. (Signal drag-reorder already existed.)
 
 ---
 
