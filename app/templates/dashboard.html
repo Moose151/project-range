@@ -54,13 +54,6 @@
       </button>
       <ul class="dropdown-menu" id="presetMenu"></ul>
     </div>
-    <div class="dropdown">
-      <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
-              data-bs-toggle="dropdown" data-bs-auto-close="outside" title="Show / hide table columns">
-        <i class="bi bi-layout-three-columns me-1"></i>Columns
-      </button>
-      <ul class="dropdown-menu dropdown-menu-end p-2" id="columnMenu" style="max-height:60vh;overflow:auto"></ul>
-    </div>
     <a href="/logs/note" class="btn btn-sm btn-outline-warning">
       <i class="bi bi-sticky me-1"></i>Note
     </a>
@@ -159,6 +152,13 @@
         </div>
         <div class="serial-group-controls d-flex gap-1 align-items-center"></div>
         <div class="serial-actions ms-auto d-flex gap-1 align-items-center"></div>
+        <div class="dropdown">
+          <button class="btn btn-sm btn-link link-secondary p-0 me-1" type="button" data-bs-toggle="dropdown"
+                  data-bs-auto-close="outside" title="Show / hide CDA columns">
+            <i class="bi bi-layout-three-columns"></i>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end p-2 cda-column-menu" style="max-height:60vh;overflow:auto"></ul>
+        </div>
         <button type="button" class="widget-span-btn btn btn-sm btn-link link-secondary p-0"
                 title="Toggle half / full width" onclick="toggleWidgetSpan(this)">
           <i class="bi bi-arrows-angle-expand ico-expand"></i>
@@ -200,19 +200,19 @@
                 <table class="table table-sm table-borderless mb-2" style="font-size:0.82rem">
                   <thead class="table-secondary">
                     <tr>
-                      <th class="py-1">Start (Z)</th>
-                      <th class="py-1">End (Z)</th>
-                      <th class="py-1">Label</th>
-                      <th class="py-1">Type</th>
+                      <th class="py-1" data-cda-col="start">Start (Z)</th>
+                      <th class="py-1" data-cda-col="end">End (Z)</th>
+                      <th class="py-1" data-cda-col="label">Label</th>
+                      <th class="py-1" data-cda-col="type">Type</th>
                     </tr>
                   </thead>
                   <tbody>
                     {% for w in t.windows %}
                     <tr data-cda-window data-start="{{ w.start }}" data-end="{{ w.end }}">
-                      <td class="font-monospace py-1">{{ w.start }}</td>
-                      <td class="font-monospace py-1">{{ w.end }}</td>
-                      <td class="text-muted py-1">{{ w.label or '—' }}</td>
-                      <td class="py-1">
+                      <td class="font-monospace py-1" data-cda-col="start">{{ w.start }}</td>
+                      <td class="font-monospace py-1" data-cda-col="end">{{ w.end }}</td>
+                      <td class="text-muted py-1" data-cda-col="label">{{ w.label or '—' }}</td>
+                      <td class="py-1" data-cda-col="type">
                         {% if w.max_power_dbm is not none %}
                         <span class="badge bg-warning text-dark" style="font-size:0.7rem" title="{{ w.max_power_all }}">
                           ≤{{ w.max_power_all }}
@@ -280,6 +280,13 @@
         </div>
         <div class="serial-group-controls d-flex gap-1 align-items-center"></div>
         <div class="serial-actions ms-auto d-flex gap-1 align-items-center"></div>
+        <div class="dropdown">
+          <button class="btn btn-sm btn-link link-secondary p-0 me-1" type="button" data-bs-toggle="dropdown"
+                  data-bs-auto-close="outside" title="Show / hide table columns">
+            <i class="bi bi-layout-three-columns"></i>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end p-2 signal-column-menu" style="max-height:60vh;overflow:auto"></ul>
+        </div>
         <button type="button" class="widget-span-btn btn btn-sm btn-link link-secondary p-0"
                 title="Toggle half / full width" onclick="toggleWidgetSpan(this)">
           <i class="bi bi-arrows-angle-expand ico-expand"></i>
@@ -328,11 +335,37 @@
             </button>
             {% endif %}
           </div>
-          {% if serial and serial.instructions %}
+          {% if serial %}
+          {% if serial.notes %}
+          <div class="px-3 pt-2 pb-0 text-muted small" style="white-space:pre-wrap"><i class="bi bi-journal-text me-1"></i>{{ serial.notes }}</div>
+          {% endif %}
+          {% if serial.instructions %}
           <div class="alert alert-info py-2 px-3 mb-0 rounded-0 d-flex gap-2 border-start-0 border-end-0">
             <i class="bi bi-card-checklist mt-1"></i>
             <div class="small" style="white-space:pre-wrap"><span class="fw-semibold">Instructions:</span> {{ serial.instructions }}</div>
           </div>
+          {% endif %}
+          {% if user.role != 'observer' %}
+          <div class="px-3 py-1 border-bottom border-secondary">
+            <button type="button" class="btn btn-sm btn-link link-secondary p-0 text-decoration-none"
+                    data-bs-toggle="collapse" data-bs-target="#editSerialDetails-{{ serial.id }}">
+              <i class="bi bi-pencil me-1"></i>{{ 'Edit' if serial.instructions or serial.notes else 'Add' }} notes / instructions
+            </button>
+            <div class="collapse mt-2" id="editSerialDetails-{{ serial.id }}">
+              <form method="post" action="/serials/{{ serial.id }}/details">
+                <input type="hidden" name="redirect" value="/">
+                <input type="hidden" name="title" value="{{ serial.title }}">
+                <label class="form-label small mb-1">Notes</label>
+                <textarea class="form-control form-control-sm mb-2" name="notes" rows="2"
+                          placeholder="Crew, objectives, or other context…">{{ serial.notes or '' }}</textarea>
+                <label class="form-label small mb-1"><i class="bi bi-card-checklist me-1"></i>Instructions</label>
+                <textarea class="form-control form-control-sm mb-2" name="instructions" rows="3"
+                          placeholder="e.g. 'Turn on signal 102 at 1400Z'…">{{ serial.instructions or '' }}</textarea>
+                <button type="submit" class="btn btn-sm btn-primary py-0 px-3"><i class="bi bi-check2 me-1"></i>Save</button>
+              </form>
+            </div>
+          </div>
+          {% endif %}
           {% endif %}
           <div class="card-body p-0 overflow-auto serial-table-body"
                id="signalTableContainer-{{ sval }}"
@@ -1229,19 +1262,50 @@ function onColToggle(cb) {
   if (cb.checked) hidden.delete(cb.value); else hidden.add(cb.value);
   localStorage.setItem(COLS_KEY, JSON.stringify([...hidden]));
   applyColumnVisibility();
+  buildColumnMenu();   // keep every widget's column menu in sync
 }
+// Each signal widget carries its own Columns dropdown; they share one saved
+// preference, so build them all from the same COL_DEFS / stored hidden set.
 function buildColumnMenu() {
-  const menu = document.getElementById('columnMenu');
-  if (!menu) return;
   const hidden = getHiddenCols();
-  menu.innerHTML = COL_DEFS.map(([k, label]) =>
+  const html = COL_DEFS.map(([k, label]) =>
     `<li><label class="dropdown-item d-flex gap-2 align-items-center mb-0" style="cursor:pointer">
        <input type="checkbox" class="form-check-input mt-0" value="${k}" ${hidden.has(k) ? '' : 'checked'} onchange="onColToggle(this)">
        ${label}
      </label></li>`).join('');
+  document.querySelectorAll('.signal-column-menu').forEach(menu => { menu.innerHTML = html; });
 }
 // Re-apply after every HTMX swap (the 10s poll rebuilds the table rows).
 document.body.addEventListener('htmx:afterSwap', applyColumnVisibility);
+
+// ── CDA widget column show/hide (its own preference, same UX as signals) ──────
+const CDA_COL_DEFS = [['start', 'Start (Z)'], ['end', 'End (Z)'], ['label', 'Label'], ['type', 'Type']];
+const CDA_COLS_KEY = 'dashboardCDAHiddenCols';
+function getCDAHiddenCols() {
+  try { return new Set(JSON.parse(localStorage.getItem(CDA_COLS_KEY) || '[]')); } catch (e) { return new Set(); }
+}
+function applyCDAColumnVisibility() {
+  const hidden = getCDAHiddenCols();
+  document.querySelectorAll('#cdaWidgetBody [data-cda-col]').forEach(el => {
+    el.style.display = hidden.has(el.dataset.cdaCol) ? 'none' : '';
+  });
+}
+function onCDAColToggle(cb) {
+  const hidden = getCDAHiddenCols();
+  if (cb.checked) hidden.delete(cb.value); else hidden.add(cb.value);
+  localStorage.setItem(CDA_COLS_KEY, JSON.stringify([...hidden]));
+  applyCDAColumnVisibility();
+  buildCDAColumnMenu();
+}
+function buildCDAColumnMenu() {
+  const hidden = getCDAHiddenCols();
+  const html = CDA_COL_DEFS.map(([k, label]) =>
+    `<li><label class="dropdown-item d-flex gap-2 align-items-center mb-0" style="cursor:pointer">
+       <input type="checkbox" class="form-check-input mt-0" value="${k}" ${hidden.has(k) ? '' : 'checked'} onchange="onCDAColToggle(this)">
+       ${label}
+     </label></li>`).join('');
+  document.querySelectorAll('.cda-column-menu').forEach(menu => { menu.innerHTML = html; });
+}
 
 // ── Minimise / expand a widget ──────────────────────────────────────────────
 // Sets display directly (not only via CSS) so it works even if app.css is cached.
@@ -1280,7 +1344,7 @@ function resetDashboardLayout() {
 const DASHBOARD_PRESETS_KEY = 'dashboardPresets_v1';
 // Read lazily (a function) so all the individual *_KEY consts are initialised.
 function dashboardPresetKeys() {
-  return [STORAGE_KEY, UTILITY_WIDGETS_KEY, CLOCK_HIDDEN_KEY, SIGNAL_WIDGETS_HIDDEN_KEY, CDA_WIDGET_HIDDEN_KEY, COLS_KEY];
+  return [STORAGE_KEY, UTILITY_WIDGETS_KEY, CLOCK_HIDDEN_KEY, SIGNAL_WIDGETS_HIDDEN_KEY, CDA_WIDGET_HIDDEN_KEY, COLS_KEY, CDA_COLS_KEY];
 }
 function getDashboardPresets() {
   try { return JSON.parse(localStorage.getItem(DASHBOARD_PRESETS_KEY) || '{}'); } catch (e) { return {}; }
@@ -1663,6 +1727,7 @@ function liveSpecInit(id) {
 document.body.addEventListener('htmx:afterSwap', (event) => {
   if (event.target?.id?.startsWith('signalTableContainer-')) {
     liveSpecFetchAll();
+    initSignalReorder(event.target);
   }
 });
 
@@ -1713,8 +1778,11 @@ document.addEventListener('DOMContentLoaded', () => {
   updateDashboardWidgetMenu();
   refreshAllControls();
   buildColumnMenu();
+  buildCDAColumnMenu();
   buildPresetMenu();
   applyColumnVisibility();
+  applyCDAColumnVisibility();
+  initSignalReorder();
   // Sync to server time first, then tick clocks/CDA from it every second and
   // re-sync the offset periodically (covers drift + suspended tabs).
   syncServerClock().finally(() => {
@@ -1883,6 +1951,7 @@ async function submitAllDirty(btn) {
     applyColumnVisibility();
     updateRefreshTime();
     liveSpecFetchAll();
+    initSignalReorder(container);
     showToast(`${updates.length} signal${updates.length > 1 ? 's' : ''} updated`, 'success');
   } catch (_) {
     showToast('Update failed — please try again', 'danger');
@@ -2094,6 +2163,70 @@ async function logSignalEffect(event, signalName, serialId, callType) {
   } catch (_) {
     showToast('Could not log effect — please try again', 'danger');
   }
+}
+
+// ── Signal drag-to-reorder (within a serial's widget) ────────────────────────
+// Mirrors the package screen: dragging the grip reorders the rows and persists
+// the new order to the package entries' display_order via /dashboard/signals/reorder.
+// The endpoint returns the re-rendered table fragment (with OOB indicators),
+// which we swap in so the order — and its paired quick-edit rows — stay correct.
+function applyDashboardFragment(container, html) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  [...tmp.querySelectorAll('[hx-swap-oob]')].forEach(oob => {
+    const tgt = document.getElementById(oob.id);
+    oob.removeAttribute('hx-swap-oob');
+    if (tgt) tgt.outerHTML = oob.outerHTML;
+    oob.remove();
+  });
+  container.innerHTML = tmp.innerHTML;
+  applyColumnVisibility();
+  updateRefreshTime();
+  liveSpecFetchAll();
+  initSignalReorder(container);
+}
+
+async function submitSignalOrder(table) {
+  if (!table) return;
+  const serialId = table.dataset.serialId;
+  if (!serialId) return;   // legacy / no-serial mode has nowhere to persist order
+  const names = [...table.querySelectorAll('tbody > tr.signal-row[data-signal-name]')]
+    .map(r => r.dataset.signalName);
+  const container = table.closest('[id^="signalTableContainer-"]');
+  const body = new URLSearchParams();
+  body.set('serial_id', serialId);
+  names.forEach(n => body.append('order', n));
+  try {
+    const resp = await fetch('/dashboard/signals/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    if (!resp.ok) throw new Error();
+    const html = await resp.text();
+    if (container) applyDashboardFragment(container, html);
+    showToast('Signal order saved', 'success');
+  } catch (_) {
+    showToast('Could not save order — please try again', 'danger');
+  }
+}
+
+function initSignalReorder(root = document) {
+  if (!window.Sortable) return;
+  const scope = root.querySelectorAll ? root : document;
+  scope.querySelectorAll('.signal-table[data-serial-id]').forEach(table => {
+    if (!table.dataset.serialId) return;              // only serial-backed widgets
+    const tbody = table.querySelector('tbody');
+    if (!tbody || tbody._signalSortable) return;
+    if (!tbody.querySelector('.signal-drag-handle')) return;
+    tbody._signalSortable = Sortable.create(tbody, {
+      handle: '.signal-drag-handle',
+      draggable: 'tr.signal-row',
+      animation: 150,
+      ghostClass: 'opacity-50',
+      onEnd() { submitSignalOrder(table); },
+    });
+  });
 }
 
 </script>

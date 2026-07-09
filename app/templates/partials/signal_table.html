@@ -16,11 +16,14 @@
   {% endif %}
 {% endmacro %}
 
+{% set can_manage = (can_edit is defined and can_edit and serial_id is not none) %}
 {% if signals %}
 <table class="table table-dark table-hover table-sm align-middle mb-0 signal-table"
-       id="signalTable-{{ serial_id if serial_id is not none else 'legacy' }}">
+       id="signalTable-{{ serial_id if serial_id is not none else 'legacy' }}"
+       data-serial-id="{{ serial_id if serial_id is not none else '' }}">
   <thead class="table-secondary">
     <tr>
+      {% if can_manage %}<th style="width:26px" title="Drag to reorder signals"></th>{% endif %}
       <th></th>
       <th data-col="call" class="text-nowrap">Effects</th>
       <th data-col="chameleon"></th>
@@ -45,6 +48,7 @@
       <th data-col="ebem" title="EBEM: Embedded Channel Sync / Carrier Lock / Bit Sync">EBEM Sync</th>
       <th data-col="updated">Updated</th>
       <th data-col="warn">Warn</th>
+      {% if can_manage %}<th style="width:32px"></th>{% endif %}
     </tr>
   </thead>
   <tbody>
@@ -74,6 +78,10 @@
         data-rf-ttf="{{ signal_pkg_rf.ttf if signal_pkg_rf and signal_pkg_rf.ttf is not none else '' }}"
         data-rf-ttf-direction="{{ signal_pkg_rf.ttf_direction if signal_pkg_rf else '+' }}"
         class="signal-row{% if log.signal_status == 'Faulted' %} status-faulted{% elif log.signal_status == 'Standby' %} status-standby{% elif log.signal_status == 'Up' %} status-up{% elif log.signal_status == 'Down' %} status-down{% endif %}">
+      {% if can_manage %}
+      <td class="signal-drag-handle text-muted ps-2 pe-0" style="cursor:grab;width:26px"
+          title="Drag to reorder signals"><i class="bi bi-grip-vertical"></i></td>
+      {% endif %}
       <td class="ps-2 pe-1" style="width:30px">
         <button type="button"
                 class="btn btn-sm btn-outline-secondary border-0 py-0 px-1 dashboard-edit-btn"
@@ -193,11 +201,29 @@
           <span class="text-warning" title="{{ log.warning_flags }}"><i class="bi bi-exclamation-triangle-fill"></i></span>
         {% endif %}
       </td>
+      {% if can_manage %}
+      <td class="pe-2 text-end" style="width:32px">
+        {% if log.signal_status == 'Up' %}
+        <button type="button" class="btn btn-sm btn-outline-secondary border-0 py-0 px-1 disabled"
+                title="Bring {{ log.signal_name }} Down before removing it" disabled>
+          <i class="bi bi-lock"></i>
+        </button>
+        {% else %}
+        <form method="post" action="/dashboard/signals/delete" class="d-inline"
+              data-confirm="Remove {{ log.signal_name | e }} from the dashboard? Its logs are archived and it can be re-added from its package.">
+          <input type="hidden" name="signal_name" value="{{ log.signal_name }}">
+          {% if serial_id is not none %}<input type="hidden" name="serial_id" value="{{ serial_id }}">{% endif %}
+          <button type="submit" class="btn btn-sm btn-outline-danger border-0 py-0 px-1"
+                  title="Remove {{ log.signal_name }} from the dashboard"><i class="bi bi-trash"></i></button>
+        </form>
+        {% endif %}
+      </td>
+      {% endif %}
     </tr>
 
     <!-- Inline quick-edit row (collapsed by default) -->
     <tr class="collapse" id="{{ row_id }}-edit">
-      <td colspan="24" class="p-0">
+      <td colspan="26" class="p-0">
         <div class="p-2 bg-body-tertiary border-top border-secondary">
           <form data-dashboard-edit-form="{{ row_id }}" onsubmit="event.preventDefault(); submitAllDirty(this);">
             <input type="hidden" name="signal_name" value="{{ log.signal_name }}">

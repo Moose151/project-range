@@ -384,7 +384,46 @@ def _get_exclusivity_map(db: Session) -> dict[str, list[str]]:
     return result
 
 
-def _dashboard_ctx(db: Session) -> dict:
+def _display_order_by_signal(db: Session, serial_id: int | None, signals: list) -> dict:
+    """Map each displayed signal name to its package-entry display_order (if any).
+
+    Mirrors _priority_by_signal: display_order lives on the signal package entry,
+    so we resolve it by name across the packages assigned to the serial. This is
+    what the dashboard widget's drag-to-reorder persists to.
+    """
+    if serial_id is None:
+        return {}
+    names = {log.signal_name.strip().casefold() for log in signals}
+    if not names:
+        return {}
+    rows = (
+        db.query(SignalPackageEntry.signal_name, SignalPackageEntry.display_order)
+        .join(SerialPackage, SerialPackage.package_id == SignalPackageEntry.package_id)
+        .filter(SerialPackage.serial_id == serial_id)
+        .order_by(SignalPackageEntry.display_order)
+        .all()
+    )
+    out: dict[str, int] = {}
+    for name, order in rows:
+        if name.strip().casefold() in names and name not in out:
+            out[name] = order if order is not None else 0
+    return out
+
+
+def _order_signals(db: Session, serial_id: int | None, signals: list) -> list:
+    """Sort a serial's signals by their package display_order, then name.
+
+    Signals with no package entry (or an unreordered serial where every entry is
+    display_order 0) fall back to the alphabetical order they arrive in — the sort
+    is stable, so name order from _latest_signal_status is preserved for ties.
+    """
+    if serial_id is None or not signals:
+        return signals
+    order = _display_order_by_signal(db, serial_id, signals)
+    return sorted(signals, key=lambda log: order.get(log.signal_name, 10 ** 6))
+
+
+def _dashboard_ctx(db: Session, current_user: User | None = None) -> dict:
     """Shared context dict for dashboard + fragment endpoints."""
     range_state = get_current_range_state(db)
     last_state_change = db.query(RangeStateLog).order_by(RangeStateLog.id.desc()).first()
@@ -401,7 +440,7 @@ def _dashboard_ctx(db: Session) -> dict:
         serial_data = []
         all_buzzer = False
         for serial in active_serials:
-            signals = _latest_signal_status(db, serial_id=serial.id)
+            signals = _order_signals(db, serial.id, _latest_signal_status(db, serial_id=serial.id))
             buzzer = _buzzer_active(signals, range_state)
             if buzzer:
                 all_buzzer = True
@@ -485,6 +524,7 @@ def _dashboard_ctx(db: Session) -> dict:
         "local_timezone": get_local_timezone(db),
         "cda_by_serial": cda_by_serial,
         "call_types": call_types,
+        "can_edit": bool(current_user and current_user.role != "observer"),
     }
 
 
@@ -495,7 +535,7 @@ async def dashboard(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    ctx = _dashboard_ctx(db)
+    ctx = _dashboard_ctx(db, current_user)
     ctx.update({
         "user": current_user,
         "toast": toast,
@@ -749,7 +789,7 @@ async def dashboard_fragment_legacy(
     current_user: User = Depends(get_current_user),
 ):
     """HTMX polling — fallback when no serial is active (all signals)."""
-    ctx = _dashboard_ctx(db)
+    ctx = _dashboard_ctx(db, current_user)
     signals = _latest_signal_status(db)
     range_state = ctx["range_state"]
     return templates.TemplateResponse(request, "partials/dashboard_fragment.html", {
@@ -846,8 +886,8 @@ async def dashboard_fragment(
     serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == is_testing_state(db)).first()
     if not serial:
         return HTMLResponse("")
-    ctx = _dashboard_ctx(db)
-    signals = _latest_signal_status(db, serial_id=serial_id)
+    ctx = _dashboard_ctx(db, current_user)
+    signals = _order_signals(db, serial_id, _latest_signal_status(db, serial_id=serial_id))
     range_state = ctx["range_state"]
     return templates.TemplateResponse(request, "partials/dashboard_fragment.html", {
         **ctx,
@@ -1031,9 +1071,9 @@ async def dashboard_quick_update(
     ))
     db.commit()
 
-    ctx = _dashboard_ctx(db)
+    ctx = _dashboard_ctx(db, current_user)
     effective_serial_id = serial_id if serial_id is not None else None
-    signals = _latest_signal_status(db, serial_id=effective_serial_id)
+    signals = _order_signals(db, effective_serial_id, _latest_signal_status(db, serial_id=effective_serial_id))
     return templates.TemplateResponse(request, "partials/dashboard_fragment.html", {
         **ctx,
         "signals": signals,
@@ -1178,8 +1218,8 @@ async def dashboard_bulk_update(
         ))
     db.commit()
 
-    ctx = _dashboard_ctx(db)
-    signals = _latest_signal_status(db, serial_id=serial_id)
+    ctx = _dashboard_ctx(db, current_user)
+    signals = _order_signals(db, serial_id, _latest_signal_status(db, serial_id=serial_id))
     return templates.TemplateResponse(request, "partials/dashboard_fragment.html", {
         **ctx,
         "signals": signals,
@@ -1230,6 +1270,116 @@ async def dashboard_engaged_toggle(
     ))
     db.commit()
     return {"engaged": bool(latest.engaged)}
+
+
+def _render_serial_fragment(request: Request, db: Session, current_user: User, serial_id: int | None):
+    """Re-render a serial's signal table fragment (with OOB indicators)."""
+    ctx = _dashboard_ctx(db, current_user)
+    signals = _order_signals(db, serial_id, _latest_signal_status(db, serial_id=serial_id))
+    serial = None
+    if serial_id is not None:
+        serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == is_testing_state(db)).first()
+    return templates.TemplateResponse(request, "partials/dashboard_fragment.html", {
+        **ctx,
+        "signals": signals,
+        "buzzer_active": _buzzer_active(signals, ctx["range_state"]),
+        "serial_id": serial_id,
+        "closed_loop": bool(serial and serial.is_closed_loop),
+        "pkg_rf": _pkg_rf_for_serial(db, serial_id) if serial_id else None,
+        "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial_id, signals) if serial_id else {},
+        "priority_by_signal": _priority_by_signal(db, serial_id, signals) if serial_id else {},
+    })
+
+
+@router.post("/dashboard/signals/reorder", response_class=HTMLResponse)
+async def dashboard_signals_reorder(
+    request: Request,
+    serial_id: int = Form(...),
+    order: list[str] = Form(default=[]),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Persist a drag-to-reorder of a serial's signals onto the package entries.
+
+    The dashboard widget mirrors the package screen's reorder: the new ordinal of
+    each signal name is written to the display_order of the matching package
+    entries across the serial's assigned packages, so it survives reloads.
+    """
+    testing = is_testing_state(db)
+    serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
+    if not serial or current_user.role == "observer":
+        return HTMLResponse("", status_code=403)
+    order_map = {name: i for i, name in enumerate(order)}
+    package_ids = [link.package_id for link in serial.package_links]
+    changed = 0
+    if package_ids:
+        entries = db.query(SignalPackageEntry).filter(
+            SignalPackageEntry.package_id.in_(package_ids)
+        ).all()
+        for entry in entries:
+            if entry.signal_name in order_map and entry.display_order != order_map[entry.signal_name]:
+                entry.display_order = order_map[entry.signal_name]
+                entry.package.updated_at = datetime.utcnow()
+                changed += 1
+    if changed:
+        db.add(AuditLog(
+            user_id=current_user.id, action_type="DASHBOARD_SIGNAL_REORDER",
+            entity_type="Serial", entity_id=serial_id,
+            new_value=f"Reordered {changed} signal(s) in serial {serial.display_title}",
+        ))
+        db.commit()
+    return _render_serial_fragment(request, db, current_user, serial_id)
+
+
+@router.post("/dashboard/signals/delete")
+async def dashboard_signal_delete(
+    signal_name: str = Form(...),
+    serial_id: Optional[int] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove a signal from the dashboard widget by soft-deleting its logs.
+
+    Refused for signals that are currently Up (transmitting): an active signal must
+    be brought Down before it can be removed. The underlying package entry is left
+    intact — this only clears the signal from the live widget/log view.
+    """
+    testing = is_testing_state(db)
+    if current_user.role == "observer":
+        return RedirectResponse("/", status_code=302)
+    if serial_id is not None:
+        serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
+        if not serial:
+            serial_id = None
+
+    q = db.query(SignalLog).filter(
+        SignalLog.signal_name == signal_name,
+        SignalLog.signal_name != "[NOTE]",
+        SignalLog.is_deleted == False,
+        SignalLog.is_testing == testing,
+    )
+    if serial_id is not None:
+        q = q.filter(SignalLog.serial_id == serial_id)
+    logs = q.order_by(SignalLog.timestamp.desc()).all()
+    if not logs:
+        return RedirectResponse("/", status_code=302)
+
+    # An Up (transmitting) signal must be brought Down before removal.
+    if logs[0].signal_status == "Up":
+        msg = f"Cannot remove {signal_name} while it is Up — bring it Down first."
+        return RedirectResponse(f"/?toast={quote_plus(msg)}", status_code=302)
+
+    for log in logs:
+        log.is_deleted = True
+        log.updated_by_id = current_user.id
+    db.add(AuditLog(
+        user_id=current_user.id, action_type="DASHBOARD_SIGNAL_DELETE",
+        entity_type="SignalLog", entity_id=logs[0].id,
+        new_value=f"Removed {signal_name} from dashboard"
+                  + (f" (serial {serial_id})" if serial_id is not None else ""),
+    ))
+    db.commit()
+    return RedirectResponse(f"/?toast={quote_plus(f'Removed {signal_name} from dashboard')}", status_code=302)
 
 
 @router.get("/status/serials", response_class=HTMLResponse)

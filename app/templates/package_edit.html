@@ -740,13 +740,10 @@ function renderSpectrum() {
   const view = document.getElementById('specView').value;
   const freqMode = document.getElementById('specFreqMode').value || 'if';
   if (isNaN(centreFreq) || isNaN(span) || span <= 0) return;
-  if (!specHasVisibleSignals(specSignals, centreFreq, span, view, freqMode)) {
-    const auto = specAutoSettings(specSignals, view, freqMode);
-    centreFreq = auto.centreFreq;
-    span = auto.span;
-    document.getElementById('specCentre').value = centreFreq;
-    document.getElementById('specSpan').value = span;
-  }
+  // NB: the centre/span are treated as user-owned. Showing/hiding signals or
+  // clicking All/None only redraws at the current view — it must never move the
+  // parameters. Auto-fitting happens once in initSpectrum() (first open / no saved
+  // settings); after that only editing the inputs or pressing Redraw changes them.
   try { localStorage.setItem('spectrum_pkg_' + SPEC_PKG_ID,
     JSON.stringify({ centreFreq, span, guardLeft, guardRight, view, freqMode })); } catch (e) {}
   drawSpectrumChart(canvas, specSignals, centreFreq, span, guardLeft, guardRight, view, freqMode);
