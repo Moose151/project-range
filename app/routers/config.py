@@ -99,11 +99,27 @@ async def config_page(
     duty_roles = db.query(DutyRole).order_by(DutyRole.display_order, DutyRole.name).all()
     activity_types = db.query(ActivityType).order_by(ActivityType.display_order, ActivityType.name).all()
     call_types = db.query(CallType).order_by(CallType.display_order, CallType.name).all()
+    # System-health / filesystem inspection is diagnostic only — never let a
+    # permission or stat error (e.g. differing ownership under Docker) 500 the
+    # whole configuration page. Each probe degrades to a safe placeholder.
+    def _safe(fn, default=None):
+        try:
+            return fn()
+        except Exception:  # noqa: BLE001 - health probes must not break the page
+            return default
+
+    _unknown_perms = {"exists": None, "secure": None, "mode": "unknown", "note": "Could not read permissions."}
     db_path = _sqlite_db_path()
-    db_permissions = permission_status(db_path) if db_path else {"mode": "n/a", "secure": None, "note": "Non-SQLite database."}
-    audit_dir_permissions = permission_status(AUDIT_ARCHIVE_DIR, directory=True)
-    serial_dir_permissions = permission_status(SERIAL_ARCHIVE_DIR, directory=True)
-    archive_files = _archive_files(AUDIT_ARCHIVE_DIR, "audit") + _archive_files(SERIAL_ARCHIVE_DIR, "serial")
+    db_permissions = (_safe(lambda: permission_status(db_path), _unknown_perms) if db_path
+                      else {"mode": "n/a", "secure": None, "note": "Non-SQLite database."})
+    audit_dir_permissions = _safe(lambda: permission_status(AUDIT_ARCHIVE_DIR, directory=True), _unknown_perms)
+    serial_dir_permissions = _safe(lambda: permission_status(SERIAL_ARCHIVE_DIR, directory=True), _unknown_perms)
+    archive_files = _safe(lambda: _archive_files(AUDIT_ARCHIVE_DIR, "audit") + _archive_files(SERIAL_ARCHIVE_DIR, "serial"), [])
+    database_size_mb = _safe(lambda: round(db_path.stat().st_size / (1024 * 1024), 2) if db_path and db_path.exists() else None)
+    audit_archive_count = _safe(lambda: len(_archive_files(AUDIT_ARCHIVE_DIR, "audit")), 0)
+    serial_archive_count = _safe(lambda: len(_archive_files(SERIAL_ARCHIVE_DIR, "serial")), 0)
+    live_audit_count = _safe(lambda: db.query(AuditLog).filter(AuditLog.is_testing == False).count(), 0)
+    testing_audit_count = _safe(lambda: db.query(AuditLog).filter(AuditLog.is_testing == True).count(), 0)
     return templates.TemplateResponse(request, "config.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
@@ -128,16 +144,20 @@ async def config_page(
         "cbm_ebno_log_enabled": get_cbm_ebno_log_enabled(db),
         "cbm_ber_log_threshold": get_cbm_ber_log_threshold(db),
         "cbm_ber_log_enabled": get_cbm_ber_log_enabled(db),
-        "sandbox_hardware_sync_paused": get_sandbox_hardware_sync_paused(db),
+        # NOTE: do not name this "sandbox_hardware_sync_paused" — that is a global
+        # template *function* (see app/templating.py) which base.html calls as
+        # sandbox_hardware_sync_paused() in Testing mode. A same-named context bool
+        # shadows it and makes the call fail ('bool' object is not callable').
+        "sandbox_sync_paused_cfg": get_sandbox_hardware_sync_paused(db),
         "system_health": {
             "database": str(db_path) if db_path else DATABASE_URL,
-            "database_size_mb": round(db_path.stat().st_size / (1024 * 1024), 2) if db_path and db_path.exists() else None,
-            "live_audit_count": db.query(AuditLog).filter(AuditLog.is_testing == False).count(),
-            "testing_audit_count": db.query(AuditLog).filter(AuditLog.is_testing == True).count(),
+            "database_size_mb": database_size_mb,
+            "live_audit_count": live_audit_count,
+            "testing_audit_count": testing_audit_count,
             "audit_archive_dir": str(AUDIT_ARCHIVE_DIR),
             "serial_archive_dir": str(SERIAL_ARCHIVE_DIR),
-            "audit_archive_count": len(_archive_files(AUDIT_ARCHIVE_DIR, "audit")),
-            "serial_archive_count": len(_archive_files(SERIAL_ARCHIVE_DIR, "serial")),
+            "audit_archive_count": audit_archive_count,
+            "serial_archive_count": serial_archive_count,
             "database_permissions": db_permissions,
             "audit_archive_permissions": audit_dir_permissions,
             "serial_archive_permissions": serial_dir_permissions,

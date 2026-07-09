@@ -871,10 +871,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <label class="form-label small d-block">Pause hardware sync in Sandbox</label>
             <div class="form-check form-switch mt-1">
               <input class="form-check-input" type="checkbox" role="switch" id="sandboxSyncPaused"
-                     name="sandbox_hardware_sync_paused" value="1" {% if sandbox_hardware_sync_paused %}checked{% endif %}
+                     name="sandbox_hardware_sync_paused" value="1" {% if sandbox_sync_paused_cfg %}checked{% endif %}
                      onchange="document.getElementById('sandboxSyncPausedLabel').textContent=this.checked?'Paused':'Enabled'">
               <label class="form-check-label small" id="sandboxSyncPausedLabel" for="sandboxSyncPaused">
-                {% if sandbox_hardware_sync_paused %}Paused{% else %}Enabled{% endif %}
+                {% if sandbox_sync_paused_cfg %}Paused{% else %}Enabled{% endif %}
               </label>
             </div>
             <div class="form-text">

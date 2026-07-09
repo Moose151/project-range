@@ -1,7 +1,13 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.28.2**
+Current version: **0.28.3**
+
+---
+
+## 0.28.3 — Fix: Configuration page error in Sandbox mode
+
+- **Fixed a server error opening Configuration while the range was in Testing/Sandbox mode.** The page context reused the name of a shared template helper, which broke the sandbox banner's use of that helper. The System-health panel is also now defensive so a filesystem/permission quirk can never take the whole page down.
 
 ---
 
