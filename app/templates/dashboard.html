@@ -340,9 +340,16 @@
           <div class="px-3 pt-2 pb-0 text-muted small" style="white-space:pre-wrap"><i class="bi bi-journal-text me-1"></i>{{ serial.notes }}</div>
           {% endif %}
           {% if serial.instructions %}
-          <div class="alert alert-info py-2 px-3 mb-0 rounded-0 d-flex gap-2 border-start-0 border-end-0">
-            <i class="bi bi-card-checklist mt-1"></i>
-            <div class="small" style="white-space:pre-wrap"><span class="fw-semibold">Instructions:</span> {{ serial.instructions }}</div>
+          <div class="alert alert-info py-1 px-3 mb-0 rounded-0 border-start-0 border-end-0">
+            <button type="button" class="btn btn-link link-info text-decoration-none p-0 d-flex align-items-center gap-2 w-100"
+                    data-bs-toggle="collapse" data-bs-target="#serialInstructions-{{ serial.id }}" aria-expanded="true">
+              <i class="bi bi-card-checklist"></i>
+              <span class="fw-semibold small">Instructions</span>
+              <i class="bi bi-chevron-up ms-auto small collapse-chevron"></i>
+            </button>
+            <div class="collapse show" id="serialInstructions-{{ serial.id }}">
+              <div class="small pt-1" style="white-space:pre-wrap">{{ serial.instructions }}</div>
+            </div>
           </div>
           {% endif %}
           {% if user.role != 'observer' %}
@@ -365,6 +372,86 @@
               </form>
             </div>
           </div>
+          <div class="px-3 py-1 border-bottom border-secondary">
+            <button type="button" class="btn btn-sm btn-link link-success text-decoration-none p-0"
+                    data-bs-toggle="collapse" data-bs-target="#addSignal-{{ serial.id }}">
+              <i class="bi bi-plus-lg me-1"></i>Add signal
+            </button>
+            <div class="collapse mt-2" id="addSignal-{{ serial.id }}">
+              <form data-add-signal-form onsubmit="event.preventDefault(); submitAddSignal(this);">
+                <input type="hidden" name="serial_id" value="{{ serial.id }}">
+                <input type="hidden" name="freq_unit" value="MHz">
+                <div class="d-flex gap-2 flex-wrap align-items-end">
+                  <div>
+                    <label class="form-label small mb-1">Signal name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-sm" name="signal_name" list="registrySignals"
+                           required style="width:130px" placeholder="e.g. 101" autocomplete="off">
+                  </div>
+                  <div>
+                    <label class="form-label small mb-1">Status</label>
+                    <select class="form-select form-select-sm" name="signal_status" style="width:110px">
+                      {% for s in ['Planned','Configured','Standby','Down','Up'] %}
+                      <option value="{{ s }}"{% if s == 'Planned' %} selected{% endif %}>{{ s }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="form-label small mb-1">Source</label>
+                    <select class="form-select form-select-sm" name="source" style="width:130px">
+                      <option value="">No modem assigned</option>
+                      {% for src in signal_sources %}<option value="{{ src }}">{{ src }}</option>{% endfor %}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="form-label small mb-1">Mod</label>
+                    <select class="form-select form-select-sm" name="modulation" style="width:100px">
+                      <option value="">—</option>
+                      {% for m in mod_types %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="form-label small mb-1">Sym Rate</label>
+                    <input type="text" class="form-control form-control-sm" name="symbol_rate" style="width:90px" placeholder="ksps">
+                  </div>
+                  <div>
+                    <label class="form-label small mb-1">FEC</label>
+                    <select class="form-select form-select-sm" name="fec" style="width:90px">
+                      <option value="">—</option>
+                      {% for f in fec_types %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="form-label small mb-1">TxIF</label>
+                    <input type="text" inputmode="decimal" class="form-control form-control-sm" name="tx_if" style="width:90px">
+                  </div>
+                  {% if not serial.is_closed_loop %}
+                  <div>
+                    <label class="form-label small mb-1">RxIF</label>
+                    <input type="text" inputmode="decimal" class="form-control form-control-sm" name="rx_if" style="width:90px">
+                  </div>
+                  {% endif %}
+                  <div>
+                    <label class="form-label small mb-1">Power</label>
+                    <div class="input-group input-group-sm" style="width:140px">
+                      <input type="text" inputmode="decimal" class="form-control form-control-sm" name="power" value="-35">
+                      <select class="form-select form-select-sm" name="power_unit" style="max-width:60px">
+                        {% for u in ['dBm','dBW','W'] %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+                      </select>
+                    </div>
+                  </div>
+                  <div class="flex-grow-1" style="min-width:140px">
+                    <label class="form-label small mb-1">Note</label>
+                    <input type="text" class="form-control form-control-sm" name="notes" placeholder="optional">
+                  </div>
+                  <div class="d-flex gap-1">
+                    <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-plus-lg me-1"></i>Add</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            data-bs-toggle="collapse" data-bs-target="#addSignal-{{ serial.id }}">Cancel</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
           {% endif %}
           {% endif %}
           <div class="card-body p-0 overflow-auto serial-table-body"
@@ -382,6 +469,13 @@
   </div>
   {% endfor %}
 </div>
+
+<!-- Shared signal-name suggestions for the dashboard "Add signal" forms -->
+<datalist id="registrySignals">
+  {% for name in (registry_signals if registry_signals is defined else []) %}
+  <option value="{{ name }}"></option>
+  {% endfor %}
+</datalist>
 
 {% endblock %}
 
@@ -2205,9 +2299,36 @@ async function submitSignalOrder(table) {
     if (!resp.ok) throw new Error();
     const html = await resp.text();
     if (container) applyDashboardFragment(container, html);
-    showToast('Signal order saved', 'success');
   } catch (_) {
     showToast('Could not save order — please try again', 'danger');
+  }
+}
+
+// Add a brand-new signal to a serial's widget from the inline "Add signal" form.
+// The endpoint returns the re-rendered table fragment, swapped in place.
+async function submitAddSignal(form) {
+  const wrap = form.closest('.serial-body-wrap');
+  const container = wrap ? wrap.querySelector('[id^="signalTableContainer-"]') : null;
+  const btn = form.querySelector('button[type="submit"]');
+  const body = new URLSearchParams(new FormData(form));
+  if (btn) btn.disabled = true;
+  try {
+    const resp = await fetch('/dashboard/signals/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    if (!resp.ok) throw new Error();
+    const html = await resp.text();
+    if (container) applyDashboardFragment(container, html);
+    form.reset();
+    const collapseEl = form.closest('.collapse');
+    if (collapseEl && window.bootstrap) window.bootstrap.Collapse.getOrCreateInstance(collapseEl).hide();
+    showToast('Signal added', 'success');
+  } catch (_) {
+    showToast('Could not add signal — please try again', 'danger');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 

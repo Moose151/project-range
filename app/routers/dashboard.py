@@ -541,6 +541,10 @@ async def dashboard(
         "toast": toast,
         "page": "dashboard",
         "doc_pages": db.query(DocPage).filter(DocPage.is_published == True).order_by(DocPage.title).all(),
+        "registry_signals": [
+            s.name for s in db.query(Signal)
+            .filter(Signal.is_active == True).order_by(Signal.name).all()
+        ],
     })
     return templates.TemplateResponse(request, "dashboard.html", ctx)
 
@@ -1328,6 +1332,136 @@ async def dashboard_signals_reorder(
             new_value=f"Reordered {changed} signal(s) in serial {serial.display_title}",
         ))
         db.commit()
+    return _render_serial_fragment(request, db, current_user, serial_id)
+
+
+def _auto_down_exclusivity(db: Session, signal_name: str, serial_id: int | None,
+                           testing: bool, range_state: str, current_user: User) -> None:
+    """Bringing a signal Up auto-downs any Up siblings in its exclusivity group."""
+    sig_reg = db.query(Signal).filter(Signal.name == signal_name).first()
+    if not (sig_reg and sig_reg.exclusivity_group):
+        return
+    siblings = db.query(Signal).filter(
+        Signal.exclusivity_group == sig_reg.exclusivity_group,
+        Signal.name != signal_name,
+    ).all()
+    for sib in siblings:
+        q = db.query(SignalLog).filter(
+            SignalLog.signal_name == sib.name,
+            SignalLog.is_deleted == False,
+            SignalLog.is_testing == testing,
+        )
+        if serial_id is not None:
+            q = q.filter(SignalLog.serial_id == serial_id)
+        latest = q.order_by(SignalLog.timestamp.desc()).first()
+        if latest and latest.signal_status == "Up":
+            db.add(SignalLog(
+                operator_id=current_user.id, range_state=range_state,
+                signal_name=sib.name, signal_status="Down",
+                tx_if=latest.tx_if, tx_rf=latest.tx_rf, rx_rf=latest.rx_rf, rx_if=latest.rx_if,
+                freq_unit=latest.freq_unit, band=latest.band,
+                modulation=latest.modulation, symbol_rate=latest.symbol_rate, fec=latest.fec,
+                power=latest.power, power_unit=latest.power_unit,
+                eb_no=latest.eb_no, ber_estimate=latest.ber_estimate,
+                engaged=latest.engaged, source=latest.source, antenna=latest.antenna,
+                notes=f"Auto-downed: {signal_name} added Up (group: {sig_reg.exclusivity_group})",
+                entry_type="Automatic", updated_by_id=current_user.id, serial_id=serial_id,
+            ))
+
+
+@router.post("/dashboard/signals/add", response_class=HTMLResponse)
+async def dashboard_signal_add(
+    request: Request,
+    signal_name: str = Form(...),
+    serial_id: Optional[int] = Form(None),
+    signal_status: str = Form("Planned"),
+    source: str = Form(""),
+    modulation: str = Form(""),
+    fec: str = Form(""),
+    symbol_rate: str = Form(""),
+    antenna: str = Form(""),
+    power: Optional[float] = Form(None),
+    power_unit: str = Form("dBm"),
+    eb_no: Optional[float] = Form(None),
+    tx_if: Optional[float] = Form(None),
+    tx_rf: Optional[float] = Form(None),
+    rx_rf: Optional[float] = Form(None),
+    rx_if: Optional[float] = Form(None),
+    freq_unit: str = Form("MHz"),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Add a new signal to a serial's dashboard widget as a fresh log entry.
+
+    This is the live, in-widget counterpart to the full New Log form: it creates a
+    SignalLog for the serial so the signal appears in the widget immediately, then
+    returns the re-rendered fragment. Frequencies are stored as entered; if the
+    serial's package supplies RF config for this name, the missing legs are filled.
+    """
+    testing = is_testing_state(db)
+    if current_user.role == "observer":
+        return HTMLResponse("", status_code=403)
+    name = signal_name.strip()
+    if serial_id is not None:
+        serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
+        if not serial:
+            serial_id = None
+    if not name:
+        return _render_serial_fragment(request, db, current_user, serial_id)
+
+    range_state = get_current_range_state(db)
+
+    # Complete the RF legs from the serial's package config where possible.
+    values = {"tx_if": tx_if, "tx_rf": tx_rf, "rx_rf": rx_rf, "rx_if": rx_if,
+              "freq_unit": freq_unit or "MHz", "band": None, "antenna": antenna.strip() or None}
+    if serial_id is not None:
+        rf = serial_package_rf_config(db, serial_id, name)
+        if rf:
+            preferred = [f for f in ("tx_if", "tx_rf", "rx_rf", "rx_if")
+                         if values[f] is not None]
+            values = recalculate_from_values(values, rf, preferred=preferred or None)
+            values["band"] = values.get("band") or rf.get("band")
+            values["antenna"] = values.get("antenna") or rf.get("antenna")
+
+    if signal_status == "Up":
+        _auto_down_exclusivity(db, name, serial_id, testing, range_state, current_user)
+
+    resolved_source = source.strip() or None
+    resolved_eb_no = eb_no if (resolved_source and signal_status == "Up") else None
+
+    entry = SignalLog(
+        operator_id=current_user.id,
+        range_state=range_state,
+        signal_name=name,
+        signal_status=signal_status,
+        tx_if=values["tx_if"], tx_rf=values["tx_rf"], rx_rf=values["rx_rf"], rx_if=values["rx_if"],
+        freq_unit=values["freq_unit"], band=values["band"],
+        modulation=modulation.strip() or None,
+        symbol_rate=symbol_rate.strip() or None,
+        fec=fec.strip() or None,
+        power=power, power_unit=power_unit or "dBm",
+        eb_no=resolved_eb_no,
+        source=resolved_source,
+        antenna=values["antenna"],
+        notes=notes.strip() or None,
+        entry_type="Dashboard",
+        updated_by_id=current_user.id,
+        serial_id=serial_id,
+        warning_flags=warning_flags_for(
+            db, name, power, power_unit or "dBm",
+            tx_rf=values["tx_rf"], rx_rf=values["rx_rf"],
+            freq_unit=values["freq_unit"], band=values["band"],
+        ),
+    )
+    db.add(entry)
+    db.flush()
+    db.add(AuditLog(
+        user_id=current_user.id, action_type="DASHBOARD_SIGNAL_ADD",
+        entity_type="SignalLog", entity_id=entry.id,
+        new_value=f"{name}: {signal_status}",
+    ))
+    db.commit()
     return _render_serial_fragment(request, db, current_user, serial_id)
 
 

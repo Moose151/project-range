@@ -1607,3 +1607,7 @@ body.sidebar-collapsed .cease-btn { letter-spacing: 0; padding-left: 0; padding-
 .ebem-led-green  { background-color: #28a745; box-shadow: 0 0 4px #28a745aa; }
 .ebem-led-red    { background-color: #dc3545; box-shadow: 0 0 4px #dc3545aa; }
 .ebem-led-grey   { background-color: #6c757d; }
+
+/* ── Collapse chevron: flips when its Bootstrap toggler is collapsed ───────── */
+.collapse-chevron { transition: transform 0.15s ease; }
+[data-bs-toggle="collapse"].collapsed .collapse-chevron { transform: rotate(180deg); }

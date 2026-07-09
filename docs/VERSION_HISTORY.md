@@ -1,7 +1,20 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.31.0**
+Current version: **0.31.1**
+
+---
+
+## 0.31.1 — Dashboard Signal Management
+
+Managing a serial's signals no longer means leaving the dashboard:
+
+- **Drag‑to‑reorder signals in the widget.** Drag the ⠿ handle on a signal row to reorder it, just like in the signal package editor. The order is saved to the serial's package and sticks across refreshes. (No pop‑up — it just saves.)
+- **Add a signal from the dashboard.** Each serial widget has an **Add signal** form (name, status, source, modulation, symbol rate, FEC, TxIF/RxIF, power, note). It appears in the widget immediately; if the serial's package has RF config, the other frequency legs are filled in for you.
+- **Remove a signal from the dashboard.** A trash button on each row removes a signal from the widget (its logs are archived, and it can be re‑added from its package). Signals that are currently **Up** are locked — bring them Down first.
+- **Add / edit serial notes & instructions inline.** The active serial's **notes and instructions** can now be added or edited directly on the dashboard, and the **Instructions** panel is **collapsible**.
+- **Per‑widget column controls.** The single global **Columns** menu has moved onto each widget that has a table: the **signals** widgets and the **CDA** widget each get their own show/hide‑columns menu (CDA columns: Start / End / Label / Type).
+- **Spectrum Plan fixes (package editor).** Showing/hiding an individual signal now works reliably, and toggling signals or **All / None** no longer resets your Centre/Span/Guard view — those change only when you edit them or press **Redraw**.
 
 ---
 
