@@ -18,6 +18,7 @@
         </li>
         <li><h6 class="dropdown-header">Info Widgets</h6></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="signals" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-table"></i><span>Serial / Signals</span></label></li>
+        <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="serial-details" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-card-checklist"></i><span>Serial Notes / Instructions</span></label></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="clock" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-clock-history"></i><span>Zulu / Local Clock</span></label></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="range-state" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-broadcast-pin"></i><span>Range State</span></label></li>
         <li><label class="dropdown-item d-flex align-items-center gap-2 mb-0"><input class="form-check-input m-0 dashboard-widget-toggle" type="checkbox" data-dashboard-widget="active-signals" onchange="toggleDashboardWidgetFromMenu(this)"><i class="bi bi-broadcast"></i><span>Active Signals</span></label></li>
@@ -257,6 +258,82 @@
   {% set w_signals = sd.signals %}
   {% set w_buzzer = sd.buzzer_active %}
   {% set sval = (serial.id if serial else 'legacy') %}
+  {% if serial %}
+  {% set detail_id = 'serial-details-' ~ serial.id %}
+  <div class="serial-widget-group serial-details-widget-group"
+       data-group-id="group-{{ detail_id }}"
+       data-serial-ids="{{ detail_id }}"
+       data-active-tab="{{ detail_id }}">
+    <div class="serial-widget card border-info" data-widget-kind="serial-details" data-serial-id="{{ serial.id }}">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-grip-vertical text-muted widget-drag-handle" style="cursor:grab"
+           title="Drag to reorder widgets"></i>
+        <div class="fw-semibold d-flex align-items-center gap-2">
+          <i class="bi bi-card-checklist text-info"></i>
+          <span>{{ serial.title }} Notes / Instructions</span>
+        </div>
+        <div class="serial-group-controls d-flex gap-1 align-items-center"></div>
+        <div class="serial-actions ms-auto d-flex gap-1 align-items-center"></div>
+        <button type="button" class="widget-span-btn btn btn-sm btn-link link-secondary p-0"
+                title="Toggle half / full width" onclick="toggleWidgetSpan(this)">
+          <i class="bi bi-arrows-angle-expand ico-expand"></i>
+          <i class="bi bi-arrows-angle-contract ico-contract"></i>
+        </button>
+        <button type="button" class="widget-collapse-btn btn btn-sm btn-link link-secondary p-0"
+                title="Minimise / expand" onclick="toggleCollapse(this)"><i class="bi bi-chevron-up"></i></button>
+      </div>
+      <div class="serial-bodies">
+        <div class="serial-body-wrap" data-serial-body="{{ detail_id }}" data-serial-title="{{ serial.title }} Notes / Instructions">
+          <div class="serial-actions-store d-none">
+            {% if user.role != 'observer' %}
+            <button type="button" class="btn btn-sm btn-outline-info py-0 px-2"
+                    data-bs-toggle="collapse" data-bs-target="#editSerialDetails-{{ serial.id }}"
+                    title="{{ 'Edit' if serial.instructions or serial.notes else 'Add' }} notes / instructions">
+              <i class="bi bi-pencil"></i>
+            </button>
+            {% endif %}
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                    title="Hide serial notes / instructions widgets" onclick="hideSerialDetailsWidgets()">
+              <i class="bi bi-eye-slash"></i>
+            </button>
+          </div>
+          <div class="card-body">
+            {% if serial.notes %}
+            <div class="mb-3">
+              <div class="text-muted small fw-semibold mb-1"><i class="bi bi-journal-text me-1"></i>Notes</div>
+              <div class="small" style="white-space:pre-wrap">{{ serial.notes }}</div>
+            </div>
+            {% endif %}
+            {% if serial.instructions %}
+            <div class="alert alert-info py-2 px-3 mb-0">
+              <div class="fw-semibold small mb-1"><i class="bi bi-card-checklist me-1"></i>Instructions</div>
+              <div class="small" style="white-space:pre-wrap">{{ serial.instructions }}</div>
+            </div>
+            {% endif %}
+            {% if not serial.notes and not serial.instructions %}
+            <div class="text-muted small fst-italic">No notes or instructions recorded.</div>
+            {% endif %}
+            {% if user.role != 'observer' %}
+            <div class="collapse mt-3" id="editSerialDetails-{{ serial.id }}">
+              <form method="post" action="/serials/{{ serial.id }}/details">
+                <input type="hidden" name="redirect" value="/">
+                <input type="hidden" name="title" value="{{ serial.title }}">
+                <label class="form-label small mb-1">Notes</label>
+                <textarea class="form-control form-control-sm mb-2" name="notes" rows="3"
+                          placeholder="Crew, objectives, or other context...">{{ serial.notes or '' }}</textarea>
+                <label class="form-label small mb-1"><i class="bi bi-card-checklist me-1"></i>Instructions</label>
+                <textarea class="form-control form-control-sm mb-2" name="instructions" rows="4"
+                          placeholder="e.g. 'Turn on signal 102 at 1400Z'...">{{ serial.instructions or '' }}</textarea>
+                <button type="submit" class="btn btn-sm btn-primary py-0 px-3"><i class="bi bi-check2 me-1"></i>Save</button>
+              </form>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
   <div class="serial-widget-group serial-signal-widget-group"
        data-group-id="group-{{ sval }}"
        data-serial-ids="{{ serial.id if serial else '' }}"
@@ -336,45 +413,7 @@
             {% endif %}
           </div>
           {% if serial %}
-          {% if serial.notes %}
-          <div class="px-3 pt-2 pb-0 text-muted small" style="white-space:pre-wrap"><i class="bi bi-journal-text me-1"></i>{{ serial.notes }}</div>
-          {% endif %}
-          {% if serial.instructions %}
-          <div class="alert alert-info py-1 px-3 mb-0 rounded-0 border-start-0 border-end-0">
-            <div class="d-flex align-items-center gap-2">
-              <i class="bi bi-card-checklist"></i>
-              <span class="fw-semibold small">Instructions</span>
-              <button type="button" class="btn btn-sm btn-outline-info py-0 px-2 ms-auto"
-                      data-bs-toggle="collapse" data-bs-target="#serialInstructions-{{ serial.id }}"
-                      aria-expanded="true" title="Collapse / expand instructions">
-                <i class="bi bi-chevron-up collapse-chevron"></i>
-              </button>
-            </div>
-            <div class="collapse show" id="serialInstructions-{{ serial.id }}">
-              <div class="small pt-1" style="white-space:pre-wrap">{{ serial.instructions }}</div>
-            </div>
-          </div>
-          {% endif %}
           {% if user.role != 'observer' %}
-          <div class="px-3 py-1 border-bottom border-secondary">
-            <button type="button" class="btn btn-sm btn-link link-secondary p-0 text-decoration-none"
-                    data-bs-toggle="collapse" data-bs-target="#editSerialDetails-{{ serial.id }}">
-              <i class="bi bi-pencil me-1"></i>{{ 'Edit' if serial.instructions or serial.notes else 'Add' }} notes / instructions
-            </button>
-            <div class="collapse mt-2" id="editSerialDetails-{{ serial.id }}">
-              <form method="post" action="/serials/{{ serial.id }}/details">
-                <input type="hidden" name="redirect" value="/">
-                <input type="hidden" name="title" value="{{ serial.title }}">
-                <label class="form-label small mb-1">Notes</label>
-                <textarea class="form-control form-control-sm mb-2" name="notes" rows="2"
-                          placeholder="Crew, objectives, or other context…">{{ serial.notes or '' }}</textarea>
-                <label class="form-label small mb-1"><i class="bi bi-card-checklist me-1"></i>Instructions</label>
-                <textarea class="form-control form-control-sm mb-2" name="instructions" rows="3"
-                          placeholder="e.g. 'Turn on signal 102 at 1400Z'…">{{ serial.instructions or '' }}</textarea>
-                <button type="submit" class="btn btn-sm btn-primary py-0 px-3"><i class="bi bi-check2 me-1"></i>Save</button>
-              </form>
-            </div>
-          </div>
           <div class="px-3 py-1 border-bottom border-secondary">
             <button type="button" class="btn btn-sm btn-link link-success text-decoration-none p-0"
                     data-bs-toggle="collapse" data-bs-target="#addSignal-{{ serial.id }}">
@@ -495,6 +534,7 @@ function updateRefreshTime() {
 // ── Zulu / local clock widget ─────────────────────────────────────────────
 const CLOCK_HIDDEN_KEY = 'dashboardClockHidden';
 const SIGNAL_WIDGETS_HIDDEN_KEY = 'dashboardSignalWidgetsHidden';
+const SERIAL_DETAILS_WIDGETS_HIDDEN_KEY = 'dashboardSerialDetailsWidgetsHidden';
 const UTILITY_WIDGETS_KEY = 'dashboardUtilityWidgets_v1';
 const DASHBOARD_DOCS = [
   {% for doc in doc_pages %}
@@ -619,6 +659,24 @@ function restoreSignalWidgetVisibility() {
   let hidden = false;
   try { hidden = localStorage.getItem(SIGNAL_WIDGETS_HIDDEN_KEY) === '1'; } catch (e) {}
   setSignalWidgetsHidden(hidden);
+}
+
+function serialDetailsWidgetGroups() {
+  return [...document.querySelectorAll('#serialWidgetsContainer .serial-details-widget-group')];
+}
+function setSerialDetailsWidgetsHidden(hidden) {
+  serialDetailsWidgetGroups().forEach(group => {
+    group.style.display = hidden ? 'none' : '';
+  });
+  try { localStorage.setItem(SERIAL_DETAILS_WIDGETS_HIDDEN_KEY, hidden ? '1' : '0'); } catch (e) {}
+  updateDashboardWidgetMenu();
+}
+function hideSerialDetailsWidgets() { setSerialDetailsWidgetsHidden(true); saveLayout(); }
+function showSerialDetailsWidgets() { setSerialDetailsWidgetsHidden(false); saveLayout(); }
+function restoreSerialDetailsWidgetVisibility() {
+  let hidden = false;
+  try { hidden = localStorage.getItem(SERIAL_DETAILS_WIDGETS_HIDDEN_KEY) === '1'; } catch (e) {}
+  setSerialDetailsWidgetsHidden(hidden);
 }
 
 function utilityWidgets() {
@@ -895,6 +953,10 @@ function dashboardWidgetVisible(type) {
     const groups = signalWidgetGroups();
     return groups.length > 0 && groups.some(group => group.style.display !== 'none');
   }
+  if (type === 'serial-details') {
+    const groups = serialDetailsWidgetGroups();
+    return groups.length > 0 && groups.some(group => group.style.display !== 'none');
+  }
   if (type === 'cda') {
     const group = document.querySelector('.cda-widget-group');
     return Boolean(group && group.style.display !== 'none');
@@ -912,6 +974,8 @@ function toggleDashboardWidgetFromMenu(input) {
     setClockHidden(!input.checked);
   } else if (type === 'signals') {
     setSignalWidgetsHidden(!input.checked);
+  } else if (type === 'serial-details') {
+    setSerialDetailsWidgetsHidden(!input.checked);
   } else if (type === 'cda') {
     setCDAWidgetHidden(!input.checked);
   } else if (input.checked) {
@@ -1432,6 +1496,7 @@ function resetDashboardLayout() {
     localStorage.removeItem(UTILITY_WIDGETS_KEY);
     localStorage.removeItem(CLOCK_HIDDEN_KEY);
     localStorage.removeItem(SIGNAL_WIDGETS_HIDDEN_KEY);
+    localStorage.removeItem(SERIAL_DETAILS_WIDGETS_HIDDEN_KEY);
     localStorage.removeItem(CDA_WIDGET_HIDDEN_KEY);
   } catch (e) {}
   location.reload();
@@ -1441,7 +1506,7 @@ function resetDashboardLayout() {
 const DASHBOARD_PRESETS_KEY = 'dashboardPresets_v1';
 // Read lazily (a function) so all the individual *_KEY consts are initialised.
 function dashboardPresetKeys() {
-  return [STORAGE_KEY, UTILITY_WIDGETS_KEY, CLOCK_HIDDEN_KEY, SIGNAL_WIDGETS_HIDDEN_KEY, CDA_WIDGET_HIDDEN_KEY, COLS_KEY, CDA_COLS_KEY];
+  return [STORAGE_KEY, UTILITY_WIDGETS_KEY, CLOCK_HIDDEN_KEY, SIGNAL_WIDGETS_HIDDEN_KEY, SERIAL_DETAILS_WIDGETS_HIDDEN_KEY, CDA_WIDGET_HIDDEN_KEY, COLS_KEY, CDA_COLS_KEY];
 }
 function getDashboardPresets() {
   try { return JSON.parse(localStorage.getItem(DASHBOARD_PRESETS_KEY) || '{}'); } catch (e) { return {}; }
@@ -1870,6 +1935,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.serial-widget-group').forEach(g => { registerGroupDnD(g); initGroup(g); });
   restoreLayout();
   restoreSignalWidgetVisibility();
+  restoreSerialDetailsWidgetVisibility();
   restoreClockVisibility();
   restoreCDAWidgetVisibility();
   updateDashboardWidgetMenu();
