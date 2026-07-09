@@ -19,6 +19,45 @@
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
 **DB:** SQLite at `/app/data/range.db` (named volume). `init_db.py` runs automatically on container start and is idempotent (migrations + new tables auto-create).
 
+### 🚧 In progress — Ranger terminal (RICS) output-power tracking (NOT finished — needs live testing)
+
+**Goal:** two dashboard widgets showing the Ranger terminal's **SSPB TX Power** and **antenna EIRP**, backed by a device in the registry. The terminal has no API, but its control system (**RICS**, Airbus "Ranger Integrated Control System") has a LAN web GUI we read.
+
+**What is DONE (committed, `main`, commit `80343cc`):**
+- `app/rics.py` — a **read-only** poller. Logs in, connects to the RICS Socket.IO server as a client, collects one telemetry snapshot, returns a `RicsSnapshot` (tx_power_dbm, tx_power_w, eirp_dbw, temperature_c, tx_enable, sspb_connected, fault, model, lo_freq_ghz, raw{}). Never emits control events.
+- Deps added to `requirements.txt`: `requests`, `python-socketio[client]`. Install with `pip install -r requirements.txt`.
+- Offline-verified: the snapshot parsing matches real captured values (see scalings below).
+
+**What is NOT done (Phase 2 — build after the poller is confirmed live):**
+1. **Device registry entry** — a `device_type` like `"terminal"` (RICS) on `RFDevice`, reusing `host` + `cbm_username` + `cbm_password_encrypted` (encrypted via `app/crypto.py` `decrypt_secret`), or add clean `rics_*` fields. Add/edit/test UI in `app/routers/devices.py` + `devices.html`, mirroring the CBM/SNMP device panels. A "Test / Refresh" button that calls `poll_rics` and shows the result + any error.
+2. **History table** — e.g. `TerminalReading(device_id, tx_power_dbm, eirp_dbw, temperature_c, tx_enable, sspb_connected, fault, timestamp)` for trend lines. Auto-created by `Base.metadata.create_all`; add to `init_db.py` imports.
+3. **Background poll** — same pattern as CBM sync (`CBM_AUTO_SYNC_SECONDS`), respecting the sandbox pause (`get_sandbox_hardware_sync_paused`). Store a reading each cycle. **Architecture note:** decide connect-collect-disconnect per poll (current `poll_rics` design) **vs** a persistent Socket.IO connection — this depends on whether RICS pushes current state on connect (see test step 2 below).
+4. **Two dashboard widgets** — "SSPB TX Power" and "EIRP", each current value + trend. Chart.js is already vendored (used by the spectrum widgets). Follow the utility-widget pattern in `dashboard.html` (localStorage `dashboardUtilityWidgets_v1`) or the server-rendered widget pattern (CDA/clock).
+
+**What was decoded about RICS (from live DevTools captures):**
+- Host in this deployment: **`https://10.74.10.100`** (self-signed cert → `verify=False`). Reachable on the **10.74.10.x** LAN (same subnet as the CBM modems, so the app host can already route to it).
+- Stack: **Flask + Socket.IO v4** behind nginx. Auth = a Flask **`session` cookie** (default login `admin` / `admin`).
+- Live metrics arrive as **Socket.IO events on the `/index` namespace** (the sidebar uses `/app`; both carry the same data). Each event is `[name, value]`, value is a **string**. Key events:
+  - `sspb.0.TXPower` → **raw ÷ 10 = dBm** (`"303"` → 30.3 dBm; Watts = 10^((dBm−30)/10))
+  - `antenna.EIRP` → EIRP in dBW (**scaling UNCONFIRMED** — was `"0"` because antenna details weren't set in RICS; see test step 3)
+  - `sspb.0.Temperature` → raw ÷ 10 = °C (`"421"` → 42.1)
+  - `sspb.0.LOFreq` → raw ÷ 100 = GHz (`"1280"` → 12.8)
+  - context: `sspb.0.TXEnable` (`"1"`/`"0"`), `sspb.0.ConnectionStatus` (`"1"`/`"0"`), `sspb.0.Fault` (`"OK"`/…), `sspb.0.Model`
+- Source ref: RICS `static/js/app.js` (the `/app` sidebar) registers `socket.on('sspb.0.TXPower', …)` etc.; the `/index` page JS drives the dashboard boxes. `handle_message` in app.js divides TX power by 10 — consistent with the ÷10 scaling.
+
+**HOW TO TEST THE POLLER (do this on a machine that can reach `10.74.10.100`):**
+1. `cd` to the repo root (folder containing `app/`), `git pull`, then `pip install -r requirements.txt` (or at least `pip install "python-socketio[client]" requests`). Run **by file path** (avoids `-m` package-path issues):
+   - Fastest, skips login — grab the RICS `session` cookie from the browser (DevTools → Application → Cookies → `https://10.74.10.100` → `session`):
+     `python app/rics.py 10.74.10.100 --cookie "PASTE_SESSION_VALUE"`
+   - Full path incl. login: `python app/rics.py 10.74.10.100 --user admin --password admin`
+2. **Confirm/record:**
+   - Does it print a real **TX power** (e.g. `30.3 dBm`)? → the Socket.IO read path + `/index` namespace + on-connect state dump all work. If it connects but returns *no* events, RICS likely does **not** dump state on connect → switch to a persistent connection (Phase 2 architecture note) or try `--namespace /app`.
+   - Did **login** work, or only the `--cookie` path? If login failed, capture the RICS **login request** (DevTools → Network → the POST when logging in: URL + form field names) and update `_login()` in `app/rics.py` (currently assumes `POST /login` with `username`/`password`, optional `csrf_token`).
+3. **EIRP scaling:** in RICS set the antenna details (Setup Guide → Antenna: band + dish size) so the EIRP gauge shows a real `dBW` value. Re-run the poller and compare the **raw `antenna.EIRP`** value (printed under "all events seen") to the gauge's dBW. Set `eirp_scale` in `poll_rics` accordingly (default assumes ÷10 like the others — **verify**).
+4. **Connectivity from the app host:** confirm the box actually running SEW Range can reach `10.74.10.100:443` (it polls CBMs on 10.74.10.x, so it usually can). If the app runs in Docker, ensure the container's network route reaches that subnet.
+
+**Risks / unknowns to resolve during Phase 2:** (a) on-connect state dump vs persistent connection; (b) exact login form for `_login`; (c) EIRP scale factor; (d) TLS cert (self-signed → `verify=False`, already handled). Everything downstream (`RicsSnapshot`) is a stable interface, so the widgets/registry can be built against it once (1)–(3) are answered.
+
 ### Shipped (all on `main`, in order)
 - **0.26.6 — Readable effect log rows:**
   - `dashboard_signal_call` (dashboard.py) now writes the effect `notes` in a fixed, splittable order: `Effect: {type} | Source: {src} | Eb/No: {x} | Carrier Lock: {ok} | Channel Sync: {ok} | Mod Lock: {ok}`.

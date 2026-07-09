@@ -19,6 +19,12 @@ We use a simple semantic scheme while in beta:
 
 ---
 
+## 🚧 In progress — Ranger terminal (RICS) output-power tracking
+
+Two dashboard widgets for the Ranger terminal's **SSPB TX Power** and **antenna EIRP**, read from the RICS web GUI over the LAN (the terminal has no API). **Phase 1 done:** the read-only Socket.IO poller `app/rics.py` (committed). **Blocked on live testing** before Phase 2 (device-registry entry + history table + the two widgets). Full step-by-step test + build instructions are in **[HANDOVER.md](HANDOVER.md) → "In progress — Ranger terminal (RICS)"**.
+
+---
+
 ## ✅ Already delivered (through 0.26.6)
 
 Core of the MVP scope is in place:
