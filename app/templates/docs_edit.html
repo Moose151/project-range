@@ -56,7 +56,7 @@
       <div class="mb-3">
         <label class="form-label fw-semibold">Content <span class="text-muted fw-normal">(Markdown)</span></label>
         <textarea class="form-control font-monospace" name="content" rows="28"
-                  placeholder="Write your content using Markdown…">{{ doc_page.content if doc_page else (draft_content if draft_content is defined else '') }}</textarea>
+                  placeholder="Write your content using Markdown…">{{ doc_page.plain_content if doc_page else (draft_content if draft_content is defined else '') }}</textarea>
         <div class="form-text">
           Supports Markdown plus wiki links: [[Page Title]] or [[Page Title|label]].
         </div>

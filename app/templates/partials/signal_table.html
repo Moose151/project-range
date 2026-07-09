@@ -152,7 +152,7 @@
         <div class="input-group input-group-sm flex-nowrap" style="width:160px">
           <button type="button" class="btn btn-outline-secondary px-1" title="Decrease power by 1"
                   onclick="stepQuickPower('{{ row_id }}', -1)"><i class="bi bi-dash-lg"></i></button>
-          <input type="number" step="any" inputmode="decimal"
+          <input type="text" inputmode="decimal" autocomplete="off"
                  class="form-control form-control-sm text-center px-1" id="power-val-{{ row_id }}"
                  value="{{ log.power if log.power is not none else '' }}"
                  title="Type a power value, or use −/+"
@@ -296,7 +296,8 @@
               <div>
                 <label class="form-label small mb-1">Power</label>
                 <div class="input-group input-group-sm" style="width:145px">
-                  <input type="number" class="form-control form-control-sm" name="power" step="any"
+                  <input type="text" inputmode="decimal" autocomplete="off"
+                         class="form-control form-control-sm" name="power"
                          value="{{ log.power if log.power is not none else '' }}"
                          data-stage-field="power" oninput="stageQuickEditField('{{ row_id }}', this)">
                   <select class="form-select form-select-sm" name="power_unit" style="width:60px"
@@ -310,35 +311,40 @@
 
               <div>
                 <label class="form-label small mb-1">Eb/No (dB)</label>
-                <input type="number" class="form-control form-control-sm" name="eb_no" step="any"
+                <input type="text" inputmode="decimal" autocomplete="off"
+                       class="form-control form-control-sm" name="eb_no"
                        value="{{ log.eb_no if log.eb_no is not none else '' }}" style="width:75px"
                        data-stage-field="ebNo" oninput="stageQuickEditField('{{ row_id }}', this)">
               </div>
 
               <div>
                 <label class="form-label small mb-1">TxIF</label>
-                <input type="number" class="form-control form-control-sm" name="tx_if" step="any"
+                <input type="text" inputmode="decimal" autocomplete="off"
+                       class="form-control form-control-sm" name="tx_if"
                        value="{{ log.tx_if if log.tx_if is not none else '' }}" style="width:90px"
                        data-stage-field="txIf" oninput="stageQuickEditField('{{ row_id }}', this)">
               </div>
 
               <div>
                 <label class="form-label small mb-1">TxRF</label>
-                <input type="number" class="form-control form-control-sm" name="tx_rf" step="any"
+                <input type="text" inputmode="decimal" autocomplete="off"
+                       class="form-control form-control-sm" name="tx_rf"
                        value="{{ log.tx_rf if log.tx_rf is not none else '' }}" style="width:90px"
                        data-stage-field="txRf" oninput="stageQuickEditField('{{ row_id }}', this)">
               </div>
 
               <div>
                 <label class="form-label small mb-1">RxRF</label>
-                <input type="number" class="form-control form-control-sm" name="rx_rf" step="any"
+                <input type="text" inputmode="decimal" autocomplete="off"
+                       class="form-control form-control-sm" name="rx_rf"
                        value="{{ log.rx_rf if log.rx_rf is not none else '' }}" style="width:90px"
                        data-stage-field="rxRf" oninput="stageQuickEditField('{{ row_id }}', this)">
               </div>
 
               <div>
                 <label class="form-label small mb-1">RxIF</label>
-                <input type="number" class="form-control form-control-sm" name="rx_if" step="any"
+                <input type="text" inputmode="decimal" autocomplete="off"
+                       class="form-control form-control-sm" name="rx_if"
                        value="{{ log.rx_if if log.rx_if is not none else '' }}" style="width:90px"
                        data-stage-field="rxIf" oninput="stageQuickEditField('{{ row_id }}', this)">
               </div>

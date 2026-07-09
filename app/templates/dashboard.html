@@ -1815,7 +1815,13 @@ function setQuickFormValue(rowId, name, value) {
   if (field) field.value = value ?? '';
 }
 
+function isCompleteDecimalInput(rawValue) {
+  const value = String(rawValue ?? '').trim();
+  return value !== '' && value !== '-' && value !== '.' && value !== '-.' && !value.endsWith('.');
+}
+
 function recalcDashboardFreqs(row, changedField, rawValue) {
+  if (!isCompleteDecimalInput(rawValue)) return;
   const txLo = parseFloat(row.dataset.rfTxLo);
   const rxLo = parseFloat(row.dataset.rfRxLo);
   const ttf = parseFloat(row.dataset.rfTtf);

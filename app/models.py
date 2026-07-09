@@ -6,6 +6,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, Session as SASession, mapped_column, relationship
 from app.database import Base
+from app.crypto import decrypt_doc_content
 
 
 class Role(str, enum.Enum):
@@ -374,6 +375,11 @@ class DocPage(Base):
         order_by="DocAttachment.uploaded_at.desc()",
     )
 
+    @property
+    def plain_content(self) -> str:
+        """Body as plaintext (decrypts admin-only pages stored encrypted at rest)."""
+        return decrypt_doc_content(self.content) or ""
+
 
 class DocAttachment(Base):
     """A file (e.g. PDF) attached to a documentation page. Bytes live on disk
@@ -452,6 +458,14 @@ class DocVersion(Base):
     page: Mapped[DocPage] = relationship("DocPage", back_populates="versions")
     created_by: Mapped[User] = relationship("User", foreign_keys="DocVersion.created_by_id")
     approved_by: Mapped[User | None] = relationship("User", foreign_keys="DocVersion.approved_by_id")
+
+    @property
+    def plain_content(self) -> str:
+        return decrypt_doc_content(self.content) or ""
+
+    @property
+    def plain_base_content(self) -> str | None:
+        return decrypt_doc_content(self.base_content)
 
 
 class AuditLog(Base):

@@ -15,6 +15,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.config import DATA_DIR, MAX_DOC_ATTACHMENT_BYTES
+from app.crypto import encrypt_doc_content
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, require_supervisor
 from app.models import AuditLog, DocAlias, DocAttachment, DocLink, DocPage, DocVersion, User
@@ -280,7 +281,7 @@ def _render_doc_content(content: str, db: Session, current_user: User | None = N
 
 def _sync_doc_links(db: Session, page: DocPage) -> None:
     db.query(DocLink).filter(DocLink.from_page_id == page.id).delete()
-    for title in _extract_wiki_links(page.content):
+    for title in _extract_wiki_links(page.plain_content):
         target = _resolve_wiki_page(db, title)
         db.add(DocLink(
             from_page_id=page.id,
@@ -470,13 +471,15 @@ async def docs_create_page(
         counter += 1
 
     now = datetime.utcnow()
+    vis = _normalise_visibility(visibility)
+    stored_content = encrypt_doc_content(content, vis)
     doc = DocPage(
         title=title,
         slug=slug,
-        content=content,
+        content=stored_content,
         category=category.strip() or None,
         tags=tags.strip() or None,
-        visibility=_normalise_visibility(visibility),
+        visibility=vis,
         is_published=True,
         created_by_id=current_user.id,
     )
@@ -485,7 +488,7 @@ async def docs_create_page(
     db.add(DocVersion(
         page_id=doc.id,
         version_number=1,
-        content=content,
+        content=stored_content,
         change_summary=change_summary.strip() or "Page created",
         approval_status="approved",
         created_by_id=current_user.id,
@@ -524,7 +527,7 @@ async def docs_proposals(
     # conflicts (page changed since the edit was drafted).
     for v in proposals:
         v.conflict = _version_has_conflict(v)
-        v.current_content = v.page.content
+        v.current_content = v.page.plain_content
     return templates.TemplateResponse(request, "docs_approval.html", {
         "user": current_user,
         "range_state": get_current_range_state(db),
@@ -658,7 +661,7 @@ def _version_has_conflict(version: DocVersion) -> bool:
     drafted — approving it would overwrite those newer changes."""
     if version.base_content is None:
         return False
-    return version.base_content != version.page.content
+    return version.plain_base_content != version.page.plain_content
 
 
 @router.post("/versions/{vid}/approve")
@@ -683,9 +686,10 @@ async def docs_approve(
         version.approved_by_id = current_user.id
         version.approved_at = now
 
-        # Apply the approved content to the page
+        # Apply the approved content to the page (re-normalise encryption to the
+        # page's current visibility).
         page = version.page
-        page.content = version.content
+        page.content = encrypt_doc_content(version.plain_content, page.visibility)
         page.updated_by_id = current_user.id
         page.updated_at = now
         _sync_doc_links(db, page)
@@ -739,17 +743,18 @@ async def docs_restore_version(
     page = version.page
     now = datetime.utcnow()
     next_ver = _next_version(db, page.id)
+    restored = encrypt_doc_content(version.plain_content, page.visibility)
     db.add(DocVersion(
         page_id=page.id,
         version_number=next_ver,
-        content=version.content,
+        content=restored,
         change_summary=f"Restored from version {version.version_number}",
         approval_status="approved",
         created_by_id=current_user.id,
         approved_by_id=current_user.id,
         approved_at=now,
     ))
-    page.content = version.content
+    page.content = restored
     page.updated_by_id = current_user.id
     page.updated_at = now
     _sync_doc_links(db, page)
@@ -972,7 +977,7 @@ async def docs_view(
     if alias:
         return RedirectResponse(f"/docs/{doc.slug}", status_code=302)
 
-    rendered = _render_doc_content(doc.content, db, current_user=current_user)
+    rendered = _render_doc_content(doc.plain_content, db, current_user=current_user)
     backlinks = (
         db.query(DocPage)
         .join(DocLink, DocLink.from_page_id == DocPage.id)
@@ -1026,7 +1031,7 @@ async def docs_print(
         return RedirectResponse("/docs", status_code=302)
     if alias:
         return RedirectResponse(f"/docs/{doc.slug}/print", status_code=302)
-    rendered = _render_doc_content(doc.content, db, current_user=current_user)
+    rendered = _render_doc_content(doc.plain_content, db, current_user=current_user)
     return templates.TemplateResponse(request, "docs_print.html", {
         "doc_page": doc,
         "rendered": rendered,
@@ -1089,7 +1094,8 @@ async def docs_submit_edit(
         doc.category = category.strip() or None
         doc.tags = tags.strip() or None
         doc.visibility = _normalise_visibility(visibility)
-        doc.content = content
+        stored_content = encrypt_doc_content(content, doc.visibility)
+        doc.content = stored_content
         doc.updated_by_id = current_user.id
         doc.updated_at = now
         _sync_doc_links(db, doc)
@@ -1097,7 +1103,7 @@ async def docs_submit_edit(
         db.add(DocVersion(
             page_id=doc.id,
             version_number=next_ver,
-            content=content,
+            content=stored_content,
             base_content=base_content,
             change_summary=change_summary.strip() or "Direct edit",
             approval_status="approved",
@@ -1115,11 +1121,12 @@ async def docs_submit_edit(
         db.commit()
         return RedirectResponse(f"/docs/{slug}?toast=Page+updated", status_code=302)
     else:
-        # User — goes to approval queue
+        # User — goes to approval queue. Encrypt per the page's current visibility
+        # so a proposal on an admin-only page isn't stored in plain text either.
         db.add(DocVersion(
             page_id=doc.id,
             version_number=next_ver,
-            content=content,
+            content=encrypt_doc_content(content, doc.visibility),
             base_content=base_content,
             change_summary=change_summary.strip() or "Proposed edit",
             approval_status="pending",

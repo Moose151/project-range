@@ -5,7 +5,7 @@
 
 ---
 
-## ⚑ Current Status & Handover — 2026-07-08 (READ THIS FIRST)
+## ⚑ Current Status & Handover — 2026-07-09 (READ THIS FIRST)
 
 > The detailed sections **below this block predate a large body of work** and are
 > partially stale (e.g. port, model/router lists, "dark only", **top navbar** —
@@ -18,6 +18,15 @@
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
 **DB:** SQLite at `/app/data/range.db` (named volume). `init_db.py` runs automatically on container start and is idempotent (migrations + new tables auto-create).
+
+### 🔜 Next UX work — setup flow + dashboard polish
+
+User feedback from 2026-07-09: the app feels clunky mainly because setup is spread across pages. When the classifier/tooling recovers, first verify and commit the admin-only docs encryption work, then move to the dashboard layout track by default unless the user chooses the activity workflow instead.
+
+1. **Dashboard layout overhaul** — make widget chrome consistent, tighten half-width widget sizing so the grid tiles cleanly without dead space, add/confirm a visible layout reset, and add saved dashboard presets such as **Ops** and **Planning**.
+2. **Activity workflow overhaul** — add a guided **New Activity** wizard that creates the activity, serials, packages, and package assignments in one flow instead of forcing page hopping; include planning-page breadcrumbs (**Activity ▸ Serial ▸ Package**) and duplicate/clone actions for serials and packages.
+
+Also include a global header **+ New** quick-action (activity / serial / package / log / note) as part of whichever UX pass touches navigation first. Source of truth for planned scope is **[ROADMAP.md](ROADMAP.md) → Requested batch — usability & workflow**.
 
 ### 🚧 In progress — Ranger terminal (RICS) output-power tracking (NOT finished — needs live testing)
 

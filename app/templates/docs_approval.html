@@ -44,7 +44,7 @@
       <div class="{% if v.conflict %}col-lg-6{% else %}col-lg-8{% endif %}">
         <div class="small text-muted mb-1">Proposed content{% if v.conflict %} (would be published){% endif %}</div>
         <div class="border border-secondary rounded p-3 bg-body-secondary" style="max-height:400px;overflow-y:auto;">
-          <pre class="mb-0 small" style="white-space:pre-wrap;font-family:monospace">{{ v.content }}</pre>
+          <pre class="mb-0 small" style="white-space:pre-wrap;font-family:monospace">{{ v.plain_content }}</pre>
         </div>
       </div>
       {% if v.conflict %}

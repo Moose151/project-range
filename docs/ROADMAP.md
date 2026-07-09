@@ -27,24 +27,24 @@ Two dashboard widgets for the Ranger terminal's **SSPB TX Power** and **antenna 
 
 ## 📋 Requested batch — usability & workflow (in progress)
 
-User-requested (2026-07-09). Smaller items shipped in **0.27.0**; the two larger overhauls are staged.
+User-requested (2026-07-09). Smaller items shipped in **0.27.0**. Current recovery order: when the classifier/tooling recovers, **verify the admin-only docs encryption, commit it, then start the dashboard layout track first** unless the user explicitly chooses the activity workflow instead.
 
 - **[shipped 0.27.0]** Dashboard title changed from "Live Range Dashboard" → **"Range Dashboard"** (avoids confusion with range *state*).
 - **[shipped 0.27.0]** **Effect logs** now also capture **Mod type** and **Power** alongside source/Eb/No/locks.
 - **[shipped 0.27.0]** **Live Spectrum** parameters (centre, span, guards, view) are now **collapsible** to reclaim space.
 - **[shipped 0.27.0]** **PDF upload discoverability** — added a prominent **Attach PDF** button in the doc-page header (the feature existed since 0.26.0 but was buried in the right sidebar).
-- **[next]** **Encrypt admin-only documents at rest** — Fernet-encrypt `DocPage.content` (and version snapshots) for `visibility == 'admins'` so they aren't plaintext in `range.db`. Trade-off: encrypted docs won't be full-text-searchable by content (title/tags still work); SECRET_KEY must be stable (same caveat as modem passwords). Plan/decision points in HANDOVER.
-- **[planned — larger]** **Dashboard visual/layout overhaul** — consistent widget sizing so half-width widgets tile cleanly in columns without dead space; general polish and easier use.
-- **[planned — larger]** **Activity → Serial → Package workflow** — a smoother, more intuitive single-screen flow inside an activity to add/modify serials and packages. See usability notes below.
+- **[next]** **Encrypt admin-only documents at rest** — Fernet-encrypt `DocPage.content` (and version snapshots) for `visibility == 'admins'` so they aren't plaintext in `range.db`. Trade-off: encrypted docs won't be full-text-searchable by content (title/tags still work); SECRET_KEY must be stable (same caveat as modem passwords). Plan/decision points in HANDOVER. Before moving on: verify encryption/decryption behaviour, run the relevant docs tests/smokes, then commit.
+- **[planned — larger, default next after encryption]** **Dashboard visual/layout overhaul** — consistent widget chrome and sizing so half-width widgets tile cleanly in columns without dead space; add/confirm a visible **layout reset**; add saved dashboard presets such as **Ops** and **Planning** so users can switch quickly between operating and setup views.
+- **[planned — larger]** **Activity → Serial → Package workflow** — a guided **New Activity** wizard that creates the activity, serials, and package assignments/creation in one flow, instead of forcing users to hop between pages. Include planning-page breadcrumbs (**Activity ▸ Serial ▸ Package**) and duplicate/clone actions for serials and packages.
+- **[planned — navigation]** **Global "+ New" quick-action** in the header/sidebar shell for common creation actions: activity, serial, package, log, and note.
 
-### Usability ideas (proposed — to prioritise with the user)
-- **Guided "new activity" wizard**: one flow that creates the activity, its serials, and attaches/creates packages, instead of hopping between pages.
+### Usability ideas (supporting details)
 - **Inline package signal editing** everywhere a package appears (already partially on the activity hub) — consistent edit affordances.
-- **Global "＋ New" quick-action** in the header (new serial / package / activity / log / note) to cut navigation.
-- **Breadcrumbs + "where am I"** context on planning pages (Activity ▸ Serial ▸ Package).
-- **Consistent widget chrome** on the dashboard (uniform headers, collapse/expand, drag handles) and a **layout reset**.
-- **Saved dashboard presets** (e.g. "Ops", "Planning") to switch widget sets quickly.
-- **Duplicate/clone** buttons on serials & packages to speed repetitive setup.
+- **Wizard save semantics:** allow saving as planned/pending before starting anything; avoid forcing range-affecting actions during setup.
+- **Package choice path:** let users attach existing packages, clone an existing package, or create a new package inline from the wizard.
+- **Serial clone path:** clone title/notes/instructions/CDA/package assignments, but keep lifecycle state pending and do not copy live signal logs.
+- **Package clone path:** clone RF config and signal rows, but require a new package name and preserve CBM source mappings only when the user explicitly confirms.
+- **Dashboard presets:** keep terminal-local storage acceptable for v1, unless shared presets become an explicit requirement later.
 
 ---
 
