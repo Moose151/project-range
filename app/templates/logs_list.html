@@ -245,6 +245,55 @@
             {% endif %}
           </td>
         </tr>
+        {% elif log.entry_type == 'Effect' %}
+        {% set effect_parts = (log.notes or '').split(' | ') %}
+        <tr class="log-event-row log-event-effect {% if log.is_deleted %}opacity-50{% endif %}">
+          <td class="small">{{ time_cell(log) }}</td>
+          <td class="small">{{ log.operator.username if log.operator else '—' }}</td>
+          <td class="small text-muted" style="max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+              title="{{ log.serial.title if log.serial else '' }}">
+            {% if log.serial %}
+            <a href="/logs?serial_id={{ log.serial.id }}" class="text-muted text-decoration-none">{{ log.serial.title }}</a>
+            {% else %}—{% endif %}
+          </td>
+          <td class="fw-semibold">
+            <a href="/logs?signal_name={{ log.signal_name }}" class="text-reset text-decoration-none">{{ log.signal_name }}</a>
+          </td>
+          <td colspan="14">
+            <i class="bi bi-asterisk text-info me-1"></i>
+            {% for part in effect_parts %}
+              {% if ':' in part %}
+                {% set key = part.split(':', 1)[0].strip() %}
+                {% set val = part.split(':', 1)[1].strip() %}
+                {% if loop.first %}
+                  <span class="badge bg-info text-dark me-2" title="Effect">{{ val }}</span>
+                {% else %}
+                  <span class="me-3 small"><span class="text-muted">{{ key }}:</span>
+                    {% if val == 'OK' %}<span class="text-success fw-semibold">OK</span>
+                    {% elif val == 'Fault' %}<span class="text-danger fw-semibold">Fault</span>
+                    {% else %}<span class="fw-semibold">{{ val }}</span>{% endif %}
+                  </span>
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {% if log.is_deleted %}<span class="badge bg-secondary ms-1">deleted</span>{% endif %}
+          </td>
+          <td class="text-nowrap">
+            {% if not log.is_deleted %}
+            <button type="button" class="btn btn-xs btn-outline-danger btn-sm py-0 px-1"
+                    data-delete-id="{{ log.id }}" data-delete-name="Effect log"
+                    onclick="confirmDelete(this)">
+              <i class="bi bi-trash"></i>
+            </button>
+            {% elif user.role == 'administrator' %}
+            <form method="post" action="/logs/{{ log.id }}/restore" class="d-inline">
+              <button type="submit" class="btn btn-xs btn-outline-warning btn-sm py-0 px-1" title="Restore">
+                <i class="bi bi-arrow-counterclockwise"></i>
+              </button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
         {% else %}
         <tr class="{% if log.is_deleted %}text-muted opacity-50{% elif log.signal_status == 'Faulted' %}status-faulted{% elif log.signal_status == 'Up' %}status-up{% endif %}">
           <td class="small">{{ time_cell(log) }}</td>

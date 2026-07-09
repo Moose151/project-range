@@ -558,27 +558,29 @@ async def dashboard_signal_call(
         latest_q = latest_q.filter(SignalLog.serial_id == serial_id)
     latest = latest_q.order_by(SignalLog.timestamp.desc()).first()
 
-    # Build modem state string from EBEM status if the signal has a CBM source
-    modem_parts = []
-    if latest and latest.eb_no is not None:
-        modem_parts.append(f"Eb/No: {latest.eb_no} dB")
-    else:
-        modem_parts.append("Eb/No: —")
-
-    cbm_status = _cbm_status_by_source(db, testing)
+    # Capture the signal's modem state at the moment of the effect. Stored as a
+    # pipe-delimited "Key: Value" string so the Signal Logs view can render it as
+    # a clean, readable effect row (see logs_list.html) without needing the edit
+    # panel. Order is fixed: Effect, Source, Eb/No, Carrier Lock, Channel Sync, Mod Lock.
     source = latest.source if latest else None
-    if source and source in cbm_status:
-        ebem = cbm_status[source]
-        if ebem:
-            modem_parts.append(f"Channel Sync: {'OK' if ebem.get('ebem_sync') == True else ('Fault' if ebem.get('ebem_sync') == False else '—')}")
-            modem_parts.append(f"Carrier Lock: {'OK' if ebem.get('carrier_lock') == True else ('Fault' if ebem.get('carrier_lock') == False else '—')}")
-            modem_parts.append(f"Mod Lock: {'OK' if ebem.get('bit_sync') == True else ('Fault' if ebem.get('bit_sync') == False else '—')}")
-        else:
-            modem_parts += ["Channel Sync: —", "Carrier Lock: —", "Mod Lock: —"]
-    else:
-        modem_parts += ["Channel Sync: —", "Carrier Lock: —", "Mod Lock: —"]
+    cbm_status = _cbm_status_by_source(db, testing)
 
-    notes_text = f"Effect: {call_type} | " + " | ".join(modem_parts)
+    def _lock(value) -> str:
+        return "OK" if value is True else ("Fault" if value is False else "—")
+
+    ebno_label = f"{latest.eb_no} dB" if (latest and latest.eb_no is not None) else "—"
+    if source and source in cbm_status and cbm_status[source]:
+        ebem = cbm_status[source]
+        carrier = _lock(ebem.get("carrier_lock"))
+        channel = _lock(ebem.get("ebem_sync"))
+        mod_lock = _lock(ebem.get("bit_sync"))
+    else:
+        carrier = channel = mod_lock = "—"
+
+    notes_text = (
+        f"Effect: {call_type} | Source: {source or 'No modem assigned'} | Eb/No: {ebno_label} "
+        f"| Carrier Lock: {carrier} | Channel Sync: {channel} | Mod Lock: {mod_lock}"
+    )
 
     new_entry = SignalLog(
         operator_id=current_user.id,

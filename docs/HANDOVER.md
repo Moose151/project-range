@@ -13,13 +13,16 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.26.5` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.26.6` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
 **DB:** SQLite at `/app/data/range.db` (named volume). `init_db.py` runs automatically on container start and is idempotent (migrations + new tables auto-create).
 
 ### Shipped (all on `main`, in order)
+- **0.26.6 — Readable effect log rows:**
+  - `dashboard_signal_call` (dashboard.py) now writes the effect `notes` in a fixed, splittable order: `Effect: {type} | Source: {src} | Eb/No: {x} | Carrier Lock: {ok} | Channel Sync: {ok} | Mod Lock: {ok}`.
+  - `logs_list.html` renders `entry_type == 'Effect'` as a distinct `log-event-effect` event row (own branch before the normal signal row): signal name + effect badge + the `key: value` chips parsed from notes, with OK green / Fault red. New `.log-event-effect` style in `app.css` (cache bumped `app.css?v=35`). Backward-compatible with old-format effect notes (just no Source chip).
 - **0.26.5 — Cleanup of stale Up signals on old serials:**
   - `_down_up_signals_on_closed_serials(db)` in `init_db.py` (run from `main()` on every startup): for each serial with `closed_at != None`, appends an `Automatic` **Down** log (timestamped `utcnow()` so it's authoritative — some closed serials had Up logs dated *after* `closed_at`) for any signal whose latest entry in that serial is still Up. Idempotent. Verified on the dev DB: 2 stale Up signals (S101/S102 on closed serial 3) → 0 after run, re-run is a no-op.
 - **0.26.4 — "Up" restricted to running serials:**

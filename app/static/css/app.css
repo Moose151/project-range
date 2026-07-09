@@ -105,6 +105,10 @@ tr.status-down    { --bs-table-bg: rgba(108, 117, 125, 0.12); }
   --bs-table-bg: rgba(108, 117, 125, 0.14);
   box-shadow: inset 4px 0 0 rgba(173, 181, 189, 0.58);
 }
+.log-event-effect {
+  --bs-table-bg: rgba(13, 202, 240, 0.10);
+  box-shadow: inset 4px 0 0 rgba(13, 202, 240, 0.6);
+}
 
 /* Darker grey secondary badges — the default #6c757d is ~3.4:1 with white
    text (below AA); this lifts it to a readable level. */

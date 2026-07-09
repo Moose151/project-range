@@ -1,7 +1,13 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.26.5**
+Current version: **0.26.6**
+
+---
+
+## 0.26.6 — Readable Effect Log Rows
+
+- **Effect entries in Signal Logs are now readable at a glance.** Instead of looking like a normal signal row with the details buried in the Notes field (only visible via the edit panel), an effect now renders as a distinct, colour-accented row showing the **signal**, the **effect** (as a badge), the **source**, and the captured modem state — **Eb/No, Carrier Lock, Channel Sync, Mod Lock** — inline, with OK shown green and Fault shown red.
 
 ---
 
