@@ -1396,6 +1396,13 @@ body.sidebar-collapsed .sidebar-label {
 .widget-grid > .serial-widget-group.span-1 {
   grid-column: span 1;
 }
+/* Masonry tiling (JS-driven). When active, rows become a fine unit and each
+   widget's row span is computed from its content height, so half-width widgets
+   of different heights pack tightly with no dead space. Falls back to the plain
+   auto-row grid if JS/ResizeObserver is unavailable. */
+.widget-grid.masonry-ready {
+  grid-auto-rows: 6px;
+}
 
 /* Span toggle button icon swap */
 .widget-span-btn .ico-expand   { display: inline-block; }

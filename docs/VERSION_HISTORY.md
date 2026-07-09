@@ -1,7 +1,13 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.28.3**
+Current version: **0.29.0**
+
+---
+
+## 0.29.0 — Dashboard Widgets Tile Tightly (Masonry)
+
+- **Half-width dashboard widgets now pack together without the big gaps.** Previously, two side-by-side widgets of different heights left a lot of empty space under the shorter one. The dashboard now uses a masonry layout that sizes each widget to its content, so columns stay tightly packed. It adjusts automatically as widgets are collapsed/expanded, toggled half/full width, reordered, or as live tables update, and falls back to the old grid on very old browsers.
 
 ---
 

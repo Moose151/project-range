@@ -704,6 +704,7 @@ function renderUtilityWidget(widget) {
   document.getElementById('serialWidgetsContainer').appendChild(group);
   registerGroupDnD(group);
   initGroup(group);
+  observeWidgetGroup(group);
   if (widget.collapsed) setCollapsed(group, true);
   if (type === 'doc' && widget.config?.slug) loadDocWidget(id, widget.config.slug);
   if (type === 'clock') updateUtilityClocks();
@@ -1128,6 +1129,8 @@ function splitSerialOut(serialId) {
   initGroup(sourceGroup);
   registerGroupDnD(group);
   initGroup(group);
+  observeWidgetGroup(group);
+  setWidgetSpan(sourceGroup);
   refreshAllControls();
   saveLayout();
 }
@@ -1597,6 +1600,42 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
   }
 });
 
+// ── Masonry tiling: half-width widgets pack tightly without dead space ───────
+// A ResizeObserver watches each widget card; whenever its content height changes
+// (collapse, half/full toggle, live-table poll, window resize, async content) we
+// recompute its CSS-grid row span so the two columns stay tightly packed.
+const MASONRY_ROW = 6;
+let widgetResizeObserver = null;
+function widgetGridGap() {
+  const g = document.getElementById('serialWidgetsContainer');
+  return g ? (parseFloat(getComputedStyle(g).rowGap) || 14) : 14;
+}
+function setWidgetSpan(group) {
+  const grid = document.getElementById('serialWidgetsContainer');
+  if (!grid || !grid.classList.contains('masonry-ready') || !group) return;
+  const card = group.querySelector('.serial-widget');
+  if (!card) return;
+  const gap = widgetGridGap();
+  const h = card.getBoundingClientRect().height;   // content height (align-items:start)
+  if (h > 0) group.style.gridRowEnd = 'span ' + Math.max(1, Math.ceil((h + gap) / (MASONRY_ROW + gap)));
+}
+function observeWidgetGroup(group) {
+  const card = group?.querySelector('.serial-widget');
+  if (card && widgetResizeObserver) widgetResizeObserver.observe(card);
+  setWidgetSpan(group);
+}
+function initWidgetMasonry() {
+  const grid = document.getElementById('serialWidgetsContainer');
+  if (!grid || !window.ResizeObserver) return;   // graceful fallback to plain grid
+  if (!widgetResizeObserver) {
+    widgetResizeObserver = new ResizeObserver(entries => {
+      for (const e of entries) setWidgetSpan(e.target.closest('.serial-widget-group'));
+    });
+  }
+  grid.classList.add('masonry-ready');
+  grid.querySelectorAll(':scope > .serial-widget-group').forEach(observeWidgetGroup);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   {% if toast %}showToast({{ toast | tojson }}, 'success');{% endif %}
   restoreUtilityWidgets();
@@ -1619,6 +1658,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   setInterval(() => { updateClockWidget(); updateUtilityClocks(); updateCDATimers(); updateCDANowIndicator(); }, 1000);
   setInterval(syncServerClock, 60000);
+  // Enable masonry tiling once all widgets are rendered (next frame so heights settle).
+  requestAnimationFrame(() => requestAnimationFrame(initWidgetMasonry));
 });
 
 function restoreLayout() {
