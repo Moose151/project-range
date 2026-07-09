@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-  <h4 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Live Range Dashboard</h4>
+  <h4 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Range Dashboard</h4>
   <div class="d-flex gap-2 align-items-center flex-wrap">
     <span class="text-muted small" id="lastRefresh">Auto-refreshing every 5s</span>
     <div class="dropdown">
@@ -529,6 +529,14 @@ function utilityBody(id, type, config = {}) {
   }
   if (type === 'live-spectrum') {
     return `<div class="live-spectrum-widget" id="liveSpec-${id}" data-spec-id="${id}">
+              <div class="d-flex justify-content-end mb-1">
+                <button class="btn btn-sm btn-outline-secondary py-0 px-2" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#specParams-${id}"
+                        title="Show / hide spectrum parameters">
+                  <i class="bi bi-sliders me-1"></i>Parameters
+                </button>
+              </div>
+              <div class="collapse show" id="specParams-${id}">
               <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
                 <div>
                   <label class="form-label small mb-1 d-block">Centre (MHz)</label>
@@ -573,6 +581,7 @@ function utilityBody(id, type, config = {}) {
                     <i class="bi bi-x-lg"></i>
                   </button>
                 </div>
+              </div>
               </div>
               <div style="position:relative;height:270px;">
                 <canvas class="spec-canvas" style="width:100%;height:100%;display:block;border-radius:4px;"></canvas>

@@ -1,7 +1,16 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.26.6**
+Current version: **0.27.0**
+
+---
+
+## 0.27.0 — Usability Batch (title, effect logs, spectrum, PDF discoverability)
+
+- **"Range Dashboard"** — dropped "Live" from the dashboard title so it isn't confused with the range *state*.
+- **Effect logs now include Mod type and Power** — an effect entry captures the signal's modulation and power at the moment, alongside source, Eb/No, and the carrier/channel/mod lock states.
+- **Live Spectrum parameters are collapsible** — the centre/span/guard/view controls can be hidden with a **Parameters** toggle to give the trace more room.
+- **Attach PDF is now easy to find** — a prominent **Attach PDF** button sits in the documentation page header. (PDF attachments have existed since 0.26.0 but were tucked in the right sidebar.)
 
 ---
 

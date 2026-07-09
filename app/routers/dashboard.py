@@ -569,6 +569,11 @@ async def dashboard_signal_call(
         return "OK" if value is True else ("Fault" if value is False else "—")
 
     ebno_label = f"{latest.eb_no} dB" if (latest and latest.eb_no is not None) else "—"
+    mod_label = (latest.modulation if latest and latest.modulation else "—")
+    if latest and latest.power is not None:
+        power_label = f"{latest.power} {latest.power_unit or 'dBm'}"
+    else:
+        power_label = "—"
     if source and source in cbm_status and cbm_status[source]:
         ebem = cbm_status[source]
         carrier = _lock(ebem.get("carrier_lock"))
@@ -578,7 +583,8 @@ async def dashboard_signal_call(
         carrier = channel = mod_lock = "—"
 
     notes_text = (
-        f"Effect: {call_type} | Source: {source or 'No modem assigned'} | Eb/No: {ebno_label} "
+        f"Effect: {call_type} | Source: {source or 'No modem assigned'} | Mod: {mod_label} "
+        f"| Power: {power_label} | Eb/No: {ebno_label} "
         f"| Carrier Lock: {carrier} | Channel Sync: {channel} | Mod Lock: {mod_lock}"
     )
 

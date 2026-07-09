@@ -38,6 +38,15 @@
     <a href="/docs/{{ doc_page.slug }}/edit" class="btn btn-sm {% if user.role == 'administrator' %}btn-outline-primary{% else %}btn-outline-secondary{% endif %}">
       <i class="bi bi-pencil me-1"></i>{% if user.role == 'administrator' %}Edit{% elif user.role == 'observer' %}Request Edit{% else %}Propose Edit{% endif %}
     </a>
+    {% if user.role != 'observer' %}
+    <form method="post" action="/docs/{{ doc_page.slug }}/attachments" enctype="multipart/form-data" class="d-inline">
+      <input type="file" name="file" accept="application/pdf,.pdf" class="d-none" id="headerPdfInput" onchange="this.form.submit()">
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('headerPdfInput').click()"
+              title="Attach a PDF to this page">
+        <i class="bi bi-file-earmark-pdf me-1"></i>Attach PDF
+      </button>
+    </form>
+    {% endif %}
     {% if user.role == 'administrator' %}
     <div class="dropdown">
       <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">

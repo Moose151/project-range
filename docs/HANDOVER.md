@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.26.6` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.27.0` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -59,6 +59,12 @@
 **Risks / unknowns to resolve during Phase 2:** (a) on-connect state dump vs persistent connection; (b) exact login form for `_login`; (c) EIRP scale factor; (d) TLS cert (self-signed → `verify=False`, already handled). Everything downstream (`RicsSnapshot`) is a stable interface, so the widgets/registry can be built against it once (1)–(3) are answered.
 
 ### Shipped (all on `main`, in order)
+- **0.27.0 — Usability batch (part 1 of the 2026-07-09 request):**
+  - Dashboard `<h4>` title "Live Range Dashboard" → **"Range Dashboard"** (`dashboard.html`).
+  - **Effect logs** (`dashboard_signal_call` in `dashboard.py`) notes now include `Mod: {modulation}` and `Power: {power} {unit}` from the signal's latest state; the `logs_list.html` effect row already renders arbitrary `key: value` chips, so they show automatically.
+  - **Live Spectrum** controls wrapped in a Bootstrap `.collapse` (id `specParams-${id}`) with a **Parameters** toggle button in the widget body (`utilityBody` `live-spectrum` branch).
+  - **PDF upload discoverability**: added an **Attach PDF** header button on `docs_page.html` (hidden file input auto-submitting to the existing `POST /docs/{slug}/attachments`). Feature/endpoints unchanged since 0.26.0; the sidebar panel remains too.
+  - Remaining from this request (see ROADMAP "Requested batch"): **encrypt admin-only docs at rest** (next), **dashboard layout overhaul** and **activity→serial→package workflow** (larger, staged).
 - **0.26.6 — Readable effect log rows:**
   - `dashboard_signal_call` (dashboard.py) now writes the effect `notes` in a fixed, splittable order: `Effect: {type} | Source: {src} | Eb/No: {x} | Carrier Lock: {ok} | Channel Sync: {ok} | Mod Lock: {ok}`.
   - `logs_list.html` renders `entry_type == 'Effect'` as a distinct `log-event-effect` event row (own branch before the normal signal row): signal name + effect badge + the `key: value` chips parsed from notes, with OK green / Fault red. New `.log-event-effect` style in `app.css` (cache bumped `app.css?v=35`). Backward-compatible with old-format effect notes (just no Source chip).

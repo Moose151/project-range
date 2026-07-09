@@ -25,6 +25,29 @@ Two dashboard widgets for the Ranger terminal's **SSPB TX Power** and **antenna 
 
 ---
 
+## 📋 Requested batch — usability & workflow (in progress)
+
+User-requested (2026-07-09). Smaller items shipped in **0.27.0**; the two larger overhauls are staged.
+
+- **[shipped 0.27.0]** Dashboard title changed from "Live Range Dashboard" → **"Range Dashboard"** (avoids confusion with range *state*).
+- **[shipped 0.27.0]** **Effect logs** now also capture **Mod type** and **Power** alongside source/Eb/No/locks.
+- **[shipped 0.27.0]** **Live Spectrum** parameters (centre, span, guards, view) are now **collapsible** to reclaim space.
+- **[shipped 0.27.0]** **PDF upload discoverability** — added a prominent **Attach PDF** button in the doc-page header (the feature existed since 0.26.0 but was buried in the right sidebar).
+- **[next]** **Encrypt admin-only documents at rest** — Fernet-encrypt `DocPage.content` (and version snapshots) for `visibility == 'admins'` so they aren't plaintext in `range.db`. Trade-off: encrypted docs won't be full-text-searchable by content (title/tags still work); SECRET_KEY must be stable (same caveat as modem passwords). Plan/decision points in HANDOVER.
+- **[planned — larger]** **Dashboard visual/layout overhaul** — consistent widget sizing so half-width widgets tile cleanly in columns without dead space; general polish and easier use.
+- **[planned — larger]** **Activity → Serial → Package workflow** — a smoother, more intuitive single-screen flow inside an activity to add/modify serials and packages. See usability notes below.
+
+### Usability ideas (proposed — to prioritise with the user)
+- **Guided "new activity" wizard**: one flow that creates the activity, its serials, and attaches/creates packages, instead of hopping between pages.
+- **Inline package signal editing** everywhere a package appears (already partially on the activity hub) — consistent edit affordances.
+- **Global "＋ New" quick-action** in the header (new serial / package / activity / log / note) to cut navigation.
+- **Breadcrumbs + "where am I"** context on planning pages (Activity ▸ Serial ▸ Package).
+- **Consistent widget chrome** on the dashboard (uniform headers, collapse/expand, drag handles) and a **layout reset**.
+- **Saved dashboard presets** (e.g. "Ops", "Planning") to switch widget sets quickly.
+- **Duplicate/clone** buttons on serials & packages to speed repetitive setup.
+
+---
+
 ## ✅ Already delivered (through 0.26.6)
 
 Core of the MVP scope is in place:
