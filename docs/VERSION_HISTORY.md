@@ -1,7 +1,17 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.31.1**
+Current version: **0.31.2**
+
+---
+
+## 0.31.2 — Wiki Workflow & Dashboard Notes Widget
+
+- **Serial notes/instructions are now their own dashboard widget.** They are no longer embedded inside the Serial / Signals widget, so they can be moved, collapsed, resized, hidden, and restored independently.
+- **Better wiki search.** Wiki search now checks decrypted page content as well as title/category/tags, and search results show short snippets from the matching page body.
+- **Orphan page view.** `/docs/orphans` lists published wiki pages that are not linked from any visible page yet, making it easier to tidy the knowledge map.
+- **Start Here / pinned wiki pages.** Pages titled like "Start Here" / "Home" or tagged `pinned` / `start-here` now appear in a Start Here panel on the wiki home.
+- **Wiki editor preview.** The edit/propose page now has a rendered preview pane plus quick-insert buttons for headings, bold, bullets, checklists, wiki links, and tables. New-page template switching happens in-place instead of reloading the draft.
 
 ---
 

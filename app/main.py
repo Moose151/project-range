@@ -47,6 +47,8 @@ def _observer_write_allowed(path: str) -> bool:
         return True
     # Observers may request documentation edits, but cannot approve, reject,
     # restore, create pages, or perform other write actions.
+    if path == "/docs/preview":
+        return True
     if path.startswith("/docs/") and path.endswith("/edit"):
         return True
     # Observers may upload a PDF to a wiki page, but it stays pending until an

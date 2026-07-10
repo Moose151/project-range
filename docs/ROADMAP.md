@@ -279,8 +279,8 @@ device-routing, audit-retention, and archive work.
   wiki while preserving Markdown, approvals, version history, and audit logging.
   First slices: `[[Page Title]]` / `[[Page Title|label]]` wiki links,
   missing-page links, backlinks, wanted pages, aliases/redirects, page
-  visibility levels, page templates, and a denser wiki home. Later slices:
-  richer search snippets, orphan pages, and optional pinned/start-here pages.
+  visibility levels, page templates, a denser wiki home, richer search snippets,
+  orphan pages, and optional pinned/start-here pages via title/tag convention.
 - [~] **Form ergonomics** — duplicate-from-existing, inline validation, and
   preserved form values after validation errors.
 - [x] **Operator readiness surfacing** — package health badges, serial readiness

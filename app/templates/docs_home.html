@@ -20,6 +20,12 @@
       <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ wanted_count }}</span>
       {% endif %}
     </a>
+    <a href="/docs/orphans" class="btn btn-sm btn-outline-secondary position-relative">
+      <i class="bi bi-diagram-2 me-1"></i>Orphans
+      {% if orphan_count %}
+      <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-secondary">{{ orphan_count }}</span>
+      {% endif %}
+    </a>
     {% if user.role == 'administrator' %}
     <a href="/docs/proposals" class="btn btn-sm btn-outline-warning position-relative">
       <i class="bi bi-hourglass-split me-1"></i>Approvals
@@ -87,6 +93,10 @@
           <span><i class="bi bi-question-diamond me-2"></i>Wanted Pages</span>
           <span class="badge bg-secondary">{{ wanted_count }}</span>
         </a>
+        <a href="/docs/orphans" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-diagram-2 me-2"></i>Orphan Pages</span>
+          <span class="badge bg-secondary">{{ orphan_count }}</span>
+        </a>
         {% if user.role == 'administrator' %}
         <a href="/docs/proposals" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
           <span><i class="bi bi-hourglass-split me-2"></i>Approval Queue</span>
@@ -101,6 +111,21 @@
   </div>
 
   <div class="col-lg-6">
+    {% if start_here_pages and not q and not category %}
+    <div class="docs-side-panel mb-3">
+      <div class="docs-side-heading"><span><i class="bi bi-pin-angle me-1"></i>Start Here</span></div>
+      <div class="list-group list-group-flush docs-category-list">
+        {% for doc in start_here_pages %}
+        <a href="/docs/{{ doc.slug }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+          <i class="bi bi-file-earmark-text text-primary"></i>
+          <span class="fw-semibold flex-grow-1">{{ doc.title }}</span>
+          {% if doc.category %}<span class="badge bg-secondary">{{ doc.category }}</span>{% endif %}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     <div class="docs-section-title">
       <span>{% if q or category %}Results{% else %}All Pages{% endif %}</span>
       <span class="text-muted small">{{ pages | length }}</span>
@@ -128,6 +153,9 @@
             {% if tag.strip() %}<span>{{ tag.strip() }}</span>{% endif %}
             {% endfor %}
           </div>
+          {% endif %}
+          {% if q and search_snippets.get(doc.id) %}
+          <div class="docs-search-snippet mt-2">{{ search_snippets.get(doc.id) }}</div>
           {% endif %}
         </div>
         <i class="bi bi-chevron-right text-secondary"></i>

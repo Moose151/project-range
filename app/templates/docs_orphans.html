@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Orphan Pages{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-start mb-3 gap-2 flex-wrap">
+  <div>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-1">
+        <li class="breadcrumb-item"><a href="/docs">Wiki</a></li>
+        <li class="breadcrumb-item active">Orphan Pages</li>
+      </ol>
+    </nav>
+    <h4 class="mb-1"><i class="bi bi-diagram-2 me-2"></i>Orphan Pages</h4>
+    <div class="text-muted small">Published wiki pages that no visible page links to yet.</div>
+  </div>
+  <a href="/docs" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-arrow-left me-1"></i>Back to Wiki</a>
+</div>
+
+{% if pages %}
+<div class="alert alert-secondary py-2">
+  These pages can still be found through search and browsing, but adding wiki links to them makes the range knowledge map easier to follow.
+</div>
+<div class="docs-page-list">
+  {% for doc in pages %}
+  <a href="/docs/{{ doc.slug }}" class="docs-page-row">
+    <div class="docs-page-icon"><i class="bi bi-file-earmark-text"></i></div>
+    <div class="flex-grow-1 min-w-0">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="fw-semibold">{{ doc.title }}</span>
+        {% if doc.category %}<span class="badge bg-secondary">{{ doc.category }}</span>{% else %}<span class="badge text-bg-secondary">Uncategorised</span>{% endif %}
+      </div>
+      <div class="text-muted small mt-1">
+        Updated
+        {% if doc.updated_at %}{{ doc.updated_at.strftime('%d %b %Y') }} by {{ doc.updated_by.display_name }}
+        {% else %}{{ doc.created_at.strftime('%d %b %Y') }} by {{ doc.created_by.display_name }}{% endif %}
+      </div>
+      {% if doc.tags %}
+      <div class="docs-tag-line mt-2">
+        {% for tag in doc.tags.split(',') %}
+        {% if tag.strip() %}<span>{{ tag.strip() }}</span>{% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    <i class="bi bi-chevron-right text-secondary"></i>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-check2-circle display-4 d-block mb-3 text-success"></i>
+  No orphan pages. Every published page is linked from somewhere visible.
+</div>
+{% endif %}
+{% endblock %}

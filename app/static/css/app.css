@@ -328,6 +328,23 @@ code {
   background: rgba(var(--range-accent-rgb), 0.08);
   color: var(--bs-body-color);
 }
+.docs-search-snippet {
+  color: var(--bs-secondary-color);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+.docs-editor-toolbar .btn {
+  min-width: 2rem;
+}
+.docs-preview-card {
+  position: sticky;
+  top: 1rem;
+}
+.docs-edit-preview {
+  max-height: 34rem;
+  min-height: 10rem;
+  overflow: auto;
+}
 .docs-page-icon {
   display: inline-flex;
   align-items: center;

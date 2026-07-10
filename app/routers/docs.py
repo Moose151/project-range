@@ -148,6 +148,9 @@ DOC_PAGE_TEMPLATES = {
 """,
     },
 }
+DOC_ORPHAN_EXEMPT_TITLES = {"home", "index", "start here", "range wiki", "wiki home"}
+DOC_START_HERE_TITLES = {"start here", "home", "range wiki", "wiki home", "operations overview"}
+DOC_PIN_TAGS = {"pinned", "pin", "start-here", "start here"}
 
 
 def _render_markdown(content: str) -> str:
@@ -279,6 +282,86 @@ def _render_doc_content(content: str, db: Session, current_user: User | None = N
     return _render_markdown(_render_wiki_links(content, db, current_user=current_user))
 
 
+def _doc_plain_search_text(doc: DocPage) -> str:
+    content = WIKI_LINK_RE.sub(lambda m: m.group(2) or m.group(1), doc.plain_content)
+    content = re.sub(r"[#*_`>\-\[\]\(\)!|]", " ", content)
+    return re.sub(r"\s+", " ", content).strip()
+
+
+def _doc_tag_set(doc: DocPage) -> set[str]:
+    return {tag.strip().lower() for tag in (doc.tags or "").split(",") if tag.strip()}
+
+
+def _doc_matches_query(doc: DocPage, query: str) -> bool:
+    needle = query.strip().lower()
+    if not needle:
+        return True
+    haystack = " ".join([
+        doc.title or "",
+        doc.tags or "",
+        doc.category or "",
+        _doc_plain_search_text(doc),
+    ]).lower()
+    return needle in haystack
+
+
+def _doc_search_snippet(doc: DocPage, query: str, length: int = 180) -> str:
+    text = _doc_plain_search_text(doc)
+    if not text:
+        return ""
+    needle = query.strip().lower()
+    if not needle:
+        return text[:length].rstrip() + ("..." if len(text) > length else "")
+    idx = text.lower().find(needle)
+    if idx < 0:
+        return text[:length].rstrip() + ("..." if len(text) > length else "")
+    start = max(0, idx - 55)
+    end = min(len(text), idx + len(needle) + length - 70)
+    prefix = "..." if start > 0 else ""
+    suffix = "..." if end < len(text) else ""
+    return prefix + text[start:end].strip() + suffix
+
+
+def _visible_incoming_page_ids(db: Session, current_user: User) -> set[int]:
+    rows = (
+        db.query(DocLink.target_page_id)
+        .join(DocPage, DocPage.id == DocLink.from_page_id)
+        .filter(
+            DocPage.is_published == True,
+            DocLink.target_page_id != None,
+            DocLink.from_page_id != DocLink.target_page_id,
+        )
+        .filter(_visibility_filter(current_user))
+        .distinct()
+        .all()
+    )
+    return {row[0] for row in rows}
+
+
+def _orphan_docs(db: Session, current_user: User) -> list[DocPage]:
+    incoming_ids = _visible_incoming_page_ids(db, current_user)
+    docs = _visible_docs_query(db, current_user).order_by(DocPage.title).all()
+    return [
+        doc for doc in docs
+        if doc.id not in incoming_ids and doc.title.strip().lower() not in DOC_ORPHAN_EXEMPT_TITLES
+    ]
+
+
+def _start_here_docs(db: Session, current_user: User) -> list[DocPage]:
+    docs = _visible_docs_query(db, current_user).order_by(DocPage.title).all()
+    selected = [
+        doc for doc in docs
+        if doc.title.strip().lower() in DOC_START_HERE_TITLES or (_doc_tag_set(doc) & DOC_PIN_TAGS)
+    ]
+    return sorted(
+        selected,
+        key=lambda doc: (
+            0 if doc.title.strip().lower() == "start here" else 1,
+            doc.title.lower(),
+        ),
+    )[:6]
+
+
 def _sync_doc_links(db: Session, page: DocPage) -> None:
     db.query(DocLink).filter(DocLink.from_page_id == page.id).delete()
     for title in _extract_wiki_links(page.plain_content):
@@ -358,12 +441,10 @@ async def docs_home(
         query = query.filter(or_(DocPage.category == None, DocPage.category == ""))
     elif category:
         query = query.filter(DocPage.category == category)
-    if q:
-        q_lower = f"%{q.lower()}%"
-        query = query.filter(
-            or_(DocPage.title.ilike(q_lower), DocPage.content.ilike(q_lower), DocPage.tags.ilike(q_lower))
-        )
     pages = query.order_by(DocPage.title).all()
+    if q:
+        pages = [doc for doc in pages if _doc_matches_query(doc, q)]
+    search_snippets = {doc.id: _doc_search_snippet(doc, q) for doc in pages} if q else {}
     all_pages = _visible_docs_query(db, current_user).order_by(DocPage.title).all()
     recent_pages = (
         _visible_docs_query(db, current_user)
@@ -395,6 +476,8 @@ async def docs_home(
         .group_by(DocLink.target_title)
         .count()
     )
+    orphan_count = len(_orphan_docs(db, current_user))
+    start_here_pages = _start_here_docs(db, current_user)
 
     pending_count = 0
     if current_user.role == "administrator":
@@ -408,6 +491,9 @@ async def docs_home(
         "recent_pages": recent_pages,
         "wanted_links": wanted_links,
         "wanted_count": wanted_count,
+        "orphan_count": orphan_count,
+        "start_here_pages": start_here_pages,
+        "search_snippets": search_snippets,
         "uncategorized_count": uncategorized_count,
         "q": q,
         "category": category,
@@ -446,6 +532,15 @@ async def docs_new_page(
         "visibility_labels": DOC_VISIBILITY_LABELS,
         "page": "docs",
     })
+
+
+@router.post("/preview", response_class=HTMLResponse)
+async def docs_preview(
+    content: str = Form(""),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return HTMLResponse(_render_doc_content(content, db, current_user=current_user))
 
 
 @router.post("/new")
@@ -601,6 +696,22 @@ async def docs_wanted(
         "range_state": get_current_range_state(db),
         "wanted_links": wanted_links,
         "sources": sources,
+        "page": "docs",
+    })
+
+
+@router.get("/orphans", response_class=HTMLResponse)
+async def docs_orphans(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_doc_link_index(db)
+    pages = _orphan_docs(db, current_user)
+    return templates.TemplateResponse(request, "docs_orphans.html", {
+        "user": current_user,
+        "range_state": get_current_range_state(db),
+        "pages": pages,
         "page": "docs",
     })
 

@@ -34,7 +34,7 @@
       {% if mode == 'new' %}
       <div class="mb-3">
         <label class="form-label fw-semibold">Page Template</label>
-        <select class="form-select" onchange="location.href='/docs/new?page_template=' + encodeURIComponent(this.value) + '&title=' + encodeURIComponent(document.querySelector('[name=title]')?.value || '')">
+        <select class="form-select" data-doc-template-select>
           {% for key, tpl in page_templates.items() %}
           <option value="{{ key }}" {% if selected_template == key %}selected{% endif %}>{{ tpl.label }}</option>
           {% endfor %}
@@ -44,7 +44,7 @@
 
       <div class="mb-3">
         <label class="form-label fw-semibold">Page Title</label>
-        <input type="text" class="form-control" name="title" required
+        <input type="text" class="form-control" name="title" required data-doc-title
                value="{{ doc_page.title if doc_page else (draft_title if draft_title is defined else '') }}"
                placeholder="e.g. Signal Setup Procedure">
         {% if mode == 'new' %}
@@ -54,8 +54,18 @@
       {% endif %}
 
       <div class="mb-3">
-        <label class="form-label fw-semibold">Content <span class="text-muted fw-normal">(Markdown)</span></label>
-        <textarea class="form-control font-monospace" name="content" rows="28"
+        <div class="d-flex align-items-center justify-content-between gap-2 mb-1 flex-wrap">
+          <label class="form-label fw-semibold mb-0">Content <span class="text-muted fw-normal">(Markdown)</span></label>
+          <div class="btn-group btn-group-sm docs-editor-toolbar" role="group">
+            <button type="button" class="btn btn-outline-secondary" title="Heading" onclick="insertWikiText('## ', '')"><i class="bi bi-type-h2"></i></button>
+            <button type="button" class="btn btn-outline-secondary" title="Bold" onclick="insertWikiText('**', '**')"><i class="bi bi-type-bold"></i></button>
+            <button type="button" class="btn btn-outline-secondary" title="Bullet" onclick="insertWikiText('- ', '')"><i class="bi bi-list-ul"></i></button>
+            <button type="button" class="btn btn-outline-secondary" title="Checklist" onclick="insertWikiText('- [ ] ', '')"><i class="bi bi-check2-square"></i></button>
+            <button type="button" class="btn btn-outline-secondary" title="Wiki link" onclick="insertWikiText('[[', ']]')"><i class="bi bi-link-45deg"></i></button>
+            <button type="button" class="btn btn-outline-secondary" title="Table" onclick="insertWikiText('| Item | Detail |\\n|---|---|\\n|  |  |', '')"><i class="bi bi-table"></i></button>
+          </div>
+        </div>
+        <textarea class="form-control font-monospace" name="content" rows="28" id="docContentEditor"
                   placeholder="Write your content using Markdown…">{{ doc_page.plain_content if doc_page else (draft_content if draft_content is defined else '') }}</textarea>
         <div class="form-text">
           Supports Markdown plus wiki links: [[Page Title]] or [[Page Title|label]].
@@ -67,6 +77,7 @@
         <div class="col-md-4">
           <label class="form-label fw-semibold">Category <span class="text-muted fw-normal">(optional)</span></label>
           <input type="text" class="form-control" name="category" list="docCategoryList"
+                 data-doc-category
                  value="{{ doc_page.category if doc_page and doc_page.category else (draft_category if draft_category is defined else '') }}"
                  placeholder="e.g. Operations, Devices, Safety">
           <datalist id="docCategoryList">
@@ -77,7 +88,7 @@
         </div>
         <div class="col-md-4">
           <label class="form-label fw-semibold">Tags <span class="text-muted fw-normal">(optional, comma separated)</span></label>
-          <input type="text" class="form-control" name="tags"
+          <input type="text" class="form-control" name="tags" data-doc-tags
                  value="{{ doc_page.tags if doc_page and doc_page.tags else (draft_tags if draft_tags is defined else '') }}"
                  placeholder="e.g. checklist, rf, handover">
         </div>
@@ -111,6 +122,18 @@
     </div>
 
     <div class="col-lg-4">
+      <div class="card border-secondary mb-3 docs-preview-card">
+        <div class="card-header d-flex align-items-center gap-2 py-2">
+          <span class="small fw-semibold flex-grow-1"><i class="bi bi-eye me-1"></i>Preview</span>
+          <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" onclick="previewWikiEdit()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+          </button>
+        </div>
+        <div class="card-body doc-content docs-edit-preview" id="docEditPreview">
+          <div class="text-muted small">Refresh preview to render this draft.</div>
+        </div>
+      </div>
+
       <div class="card border-secondary">
         <div class="card-header small fw-semibold"><i class="bi bi-markdown me-1"></i>Markdown Reference</div>
         <div class="card-body small font-monospace">
@@ -137,4 +160,69 @@
     </div>
   </div>
 </form>
+
+{% if mode == 'new' %}
+<script id="docPageTemplatesJson" type="application/json">{{ page_templates | tojson }}</script>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+function docEditor() {
+  return document.getElementById('docContentEditor');
+}
+function insertWikiText(prefix, suffix) {
+  const editor = docEditor();
+  if (!editor) return;
+  const start = editor.selectionStart ?? editor.value.length;
+  const end = editor.selectionEnd ?? editor.value.length;
+  const selected = editor.value.slice(start, end);
+  const before = editor.value.slice(0, start);
+  const after = editor.value.slice(end);
+  editor.value = before + prefix + selected + suffix + after;
+  const cursor = start + prefix.length + selected.length;
+  editor.focus();
+  editor.setSelectionRange(cursor, cursor);
+}
+async function previewWikiEdit() {
+  const target = document.getElementById('docEditPreview');
+  const editor = docEditor();
+  if (!target || !editor) return;
+  target.innerHTML = '<div class="text-muted small">Rendering...</div>';
+  try {
+    const body = new URLSearchParams({ content: editor.value });
+    const resp = await fetch('/docs/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    if (!resp.ok) throw new Error();
+    const html = await resp.text();
+    target.innerHTML = html || '<div class="text-muted small">Nothing to preview.</div>';
+  } catch (_) {
+    target.innerHTML = '<div class="text-danger small">Preview failed.</div>';
+  }
+}
+function initDocTemplateSwitcher() {
+  const select = document.querySelector('[data-doc-template-select]');
+  const raw = document.getElementById('docPageTemplatesJson')?.textContent;
+  if (!select || !raw) return;
+  let templates = {};
+  try { templates = JSON.parse(raw); } catch (_) { return; }
+  select.addEventListener('change', () => {
+    const tpl = templates[select.value];
+    const editor = docEditor();
+    if (!tpl || !editor) return;
+    if (editor.value.trim() && !confirm('Replace the current draft with this template?')) return;
+    editor.value = tpl.content || '';
+    const category = document.querySelector('[data-doc-category]');
+    const tags = document.querySelector('[data-doc-tags]');
+    if (category) category.value = tpl.category || '';
+    if (tags) tags.value = tpl.tags || '';
+    previewWikiEdit();
+  });
+}
+document.addEventListener('DOMContentLoaded', initDocTemplateSwitcher);
+</script>
 {% endblock %}
