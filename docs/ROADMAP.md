@@ -34,6 +34,8 @@ User-requested 2026-07-09. Working through these systematically; each ships as a
 - **[shipped 0.30.1]** **Global "＋ New" quick-action** in the top bar + breadcrumb on the package editor.
 - **[shipped 0.30.3]** **Dashboard presets** — save/switch named layouts (Reset Layout already existed; per-widget min-heights intentionally skipped as they fight the 0.29.0 masonry).
 - **[shipped 0.31.0]** Activity **complete/delete** lifecycle (complete ends serials → history); **edit pending/active serials** (title/notes/instructions) from the Serials page; **show/hide signals** in the package Spectrum Plan. (Signal drag-reorder already existed.)
+- **[shipped 0.31.3]** Chat emoji picker in the floating and dashboard chat composers; dashboard signal quick-edit can rename a signal within the current serial/package context.
+- **[shipped 0.31.4]** Effect log badges are colour-coded from the admin-configurable Effects list, whose config screen now mirrors Duty Roles with colour picker + preview.
 
 ---
 

@@ -747,16 +747,18 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="card-body p-0">
         <table class="table table-dark table-sm align-middle mb-0">
           <thead class="table-secondary">
-            <tr><th style="width:28px"></th><th>Name</th><th>Status</th><th></th></tr>
+            <tr><th style="width:28px"></th><th>Name</th><th>Colour</th><th>Preview</th><th>Status</th><th></th></tr>
           </thead>
           <tbody id="tbody-call-types">
             {% for ct in call_types %}
             <tr class="{% if not ct.is_active %}opacity-50{% endif %}" data-id="{{ ct.id }}">
               <td class="drag-handle text-muted ps-2" style="cursor:grab" title="Drag to reorder"><i class="bi bi-grip-vertical"></i></td>
-              <td class="py-1">
+              <td colspan="3" class="py-1">
                 <form method="post" action="/config/call-type/{{ ct.id }}/edit" class="d-flex align-items-center gap-2">
-                  <input type="text" class="form-control form-control-sm" name="name" value="{{ ct.name }}" required style="max-width:200px">
-                  <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Save"><i class="bi bi-check2"></i></button>
+                  <input type="text" class="form-control form-control-sm" name="name" value="{{ ct.name }}" required style="max-width:180px">
+                  <input type="color" class="form-control form-control-color form-control-sm" name="color" value="{{ ct.color or '#0dcaf0' }}" title="Badge colour">
+                  <span class="badge duty-badge" style="background:{{ ct.color or '#0dcaf0' }}">{{ ct.name }}</span>
+                  <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Save changes"><i class="bi bi-check2"></i></button>
                 </form>
               </td>
               <td>
@@ -780,18 +782,24 @@ document.addEventListener('DOMContentLoaded', () => {
             </tr>
             {% endfor %}
             {% if not call_types %}
-            <tr><td colspan="4" class="text-muted fst-italic small ps-3 py-2">No effects yet — add one below.</td></tr>
+            <tr><td colspan="6" class="text-muted fst-italic small ps-3 py-2">No effects yet — add one below.</td></tr>
             {% endif %}
           </tbody>
         </table>
       </div>
       <div class="card-footer">
-        <form method="post" action="/config/call-type/add" class="d-flex gap-2">
-          <input type="text" class="form-control form-control-sm" name="name"
-                 placeholder="e.g. Radio Check" required style="max-width:220px">
-          <button type="submit" class="btn btn-sm btn-primary">
-            <i class="bi bi-plus-lg me-1"></i>Add
-          </button>
+        <form method="post" action="/config/call-type/add" class="row g-2 align-items-end">
+          <div class="col-auto">
+            <label class="form-label small mb-1">Name</label>
+            <input type="text" class="form-control form-control-sm" name="name" placeholder="e.g. Radio Check" required style="width:180px">
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-1">Colour</label>
+            <input type="color" class="form-control form-control-color form-control-sm" name="color" value="#0dcaf0">
+          </div>
+          <div class="col-auto">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Add Effect</button>
+          </div>
         </form>
       </div>
     </div>

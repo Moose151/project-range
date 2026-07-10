@@ -10,7 +10,7 @@ import io
 import openpyxl
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials, is_testing_state
-from app.models import User, SignalLog, Signal, AuditLog, SignalStatus, Role, ModulationType, FecType, SignalSource, AntennaType, LogSession, Serial, RFDevice
+from app.models import User, SignalLog, Signal, AuditLog, SignalStatus, Role, ModulationType, FecType, SignalSource, AntennaType, LogSession, Serial, RFDevice, CallType
 from app.rf_config import serial_package_rf_config
 from app.signal_warnings import warning_flags_for
 from app.log_changes import annotate_log_changes
@@ -162,6 +162,10 @@ async def log_list(
         "yesterday": yesterday.isoformat(),
         "last7": (today - timedelta(days=6)).isoformat(),
     }
+    effect_colors = {
+        ct.name: (ct.color or "#0dcaf0")
+        for ct in db.query(CallType).order_by(CallType.display_order, CallType.name).all()
+    }
 
     return templates.TemplateResponse(request, "logs_list.html", {
         "user": current_user,
@@ -179,6 +183,7 @@ async def log_list(
         "local_timezone": local_timezone,
         "toast": toast,
         "quick_dates": quick_dates,
+        "effect_colors": effect_colors,
         "filters": {
             "search": search, "status": status, "band": band,
             "date_from": date_from, "date_to": date_to,

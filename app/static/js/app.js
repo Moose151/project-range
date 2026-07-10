@@ -499,6 +499,62 @@ function renderChatTypingIndicators(roomId) {
   });
 }
 
+const CHAT_EMOJIS = ['😀','😁','😂','🙂','😊','😍','😎','🤔','😬','👍','👌','👏','🙏','✅','⚠️','🚨','📡','🔧','📋','☕'];
+
+function chatEmojiPicker() {
+  let picker = document.getElementById('chatEmojiPicker');
+  if (picker) return picker;
+  picker = document.createElement('div');
+  picker.id = 'chatEmojiPicker';
+  picker.className = 'chat-emoji-picker shadow-lg d-none';
+  picker.innerHTML = CHAT_EMOJIS.map(emoji =>
+    `<button type="button" class="chat-emoji-choice" data-chat-emoji="${escapeHtml(emoji)}">${escapeHtml(emoji)}</button>`
+  ).join('');
+  document.body.appendChild(picker);
+  picker.addEventListener('click', evt => {
+    const btn = evt.target.closest('[data-chat-emoji]');
+    const input = picker._targetInput;
+    if (!btn || !input) return;
+    insertChatEmoji(input, btn.dataset.chatEmoji || '');
+    picker.classList.add('d-none');
+  });
+  return picker;
+}
+
+function insertChatEmoji(input, emoji) {
+  if (!input || !emoji) return;
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? input.value.length;
+  input.value = input.value.slice(0, start) + emoji + input.value.slice(end);
+  const next = start + emoji.length;
+  input.focus();
+  input.setSelectionRange?.(next, next);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function toggleChatEmojiPicker(button) {
+  const form = button?.closest('form');
+  const input = form?.querySelector('input[name="body"]');
+  if (!button || !input || input.disabled) return;
+  const picker = chatEmojiPicker();
+  if (!picker.classList.contains('d-none') && picker._targetInput === input) {
+    picker.classList.add('d-none');
+    return;
+  }
+  picker._targetInput = input;
+  const rect = button.getBoundingClientRect();
+  picker.style.left = `${Math.min(rect.left, window.innerWidth - 230)}px`;
+  picker.style.top = `${Math.max(8, rect.top - 132)}px`;
+  picker.classList.remove('d-none');
+}
+
+document.addEventListener('click', evt => {
+  const picker = document.getElementById('chatEmojiPicker');
+  if (!picker || picker.classList.contains('d-none')) return;
+  if (evt.target.closest('#chatEmojiPicker') || evt.target.closest('.chat-emoji-btn')) return;
+  picker.classList.add('d-none');
+});
+
 function renderAllChatTypingIndicators() {
   Object.keys(chatState.rooms).forEach(renderChatTypingIndicators);
 }
@@ -651,6 +707,7 @@ function openChatWindow(roomId) {
     <div class="chat-window-body" data-chat-messages></div>
     <div class="chat-typing d-none" data-chat-typing-for="${escapeHtml(roomId)}"></div>
     <form class="chat-window-form" onsubmit="sendChatMessage(event, '${escapeHtml(roomId)}')">
+      <button type="button" class="btn btn-sm btn-outline-secondary chat-emoji-btn" title="Add emoji" onclick="toggleChatEmojiPicker(this)"><i class="bi bi-emoji-smile"></i></button>
       <input type="text" class="form-control form-control-sm" name="body" autocomplete="off" maxlength="2000" placeholder="Type a message…" oninput="sendChatTyping('${escapeHtml(roomId)}', this)" onblur="stopChatTyping('${escapeHtml(roomId)}')">
       <button type="submit" class="btn btn-sm btn-primary" title="Send"><i class="bi bi-send-fill"></i></button>
     </form>`;

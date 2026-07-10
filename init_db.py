@@ -46,6 +46,14 @@ DEFAULT_DUTY_ROLES = [
     ("Observer",   "#6c757d", 3),
 ]
 
+DEFAULT_CALL_TYPES = [
+    ("Radio Check", "#0dcaf0"),
+    ("Time Hack", "#6f42c1"),
+    ("Status Check", "#198754"),
+    ("Briefing Call", "#fd7e14"),
+    ("Security Call", "#dc3545"),
+]
+
 # Range CBM-400 modems. Seeded idempotently into the device registry so signal
 # package entries can be mapped to a modem before the read-only sync poller runs.
 DEFAULT_CBM_DEVICES = [
@@ -159,6 +167,7 @@ def _migrate(conn):
         "ALTER TABLE doc_attachments ADD COLUMN approval_status VARCHAR(16) DEFAULT 'approved'",
         "ALTER TABLE activities ADD COLUMN completed_at DATETIME",
         "ALTER TABLE activities ADD COLUMN completed_by_id INTEGER REFERENCES users(id)",
+        "ALTER TABLE call_types ADD COLUMN color VARCHAR(16) DEFAULT '#0dcaf0'",
     ]
     for sql in migrations:
         try:
@@ -736,10 +745,19 @@ def main():
             print("Seeded default activity types.")
 
         if not db.query(CallType).first():
-            for i, name in enumerate(["Radio Check", "Time Hack", "Status Check", "Briefing Call", "Security Call"]):
-                db.add(CallType(name=name, display_order=i))
+            for i, (name, color) in enumerate(DEFAULT_CALL_TYPES):
+                db.add(CallType(name=name, color=color, display_order=i))
             db.commit()
             print("Seeded default call types.")
+        else:
+            defaults = dict(DEFAULT_CALL_TYPES)
+            changed = False
+            for ct in db.query(CallType).all():
+                if not getattr(ct, "color", None) or (ct.name in defaults and ct.color == "#0dcaf0"):
+                    ct.color = defaults.get(ct.name, "#0dcaf0")
+                    changed = True
+            if changed:
+                db.commit()
 
         # Seed duty-role tags if table is empty
         if not db.query(DutyRole).first():

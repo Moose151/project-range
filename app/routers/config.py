@@ -1,5 +1,6 @@
 from typing import Optional
 from pathlib import Path
+import re
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi import HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
@@ -848,16 +849,23 @@ async def activity_type_reorder(
 
 # ── Effects (admin-configurable list; stored as CallType for back-compat) ──────
 
+def _clean_color(value: str, fallback: str = "#0dcaf0") -> str:
+    value = (value or "").strip()
+    if re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+        return value
+    return fallback
+
 @router.post("/call-type/add")
 async def call_type_add(
     name: str = Form(...),
+    color: str = Form("#0dcaf0"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
     name = name.strip()
     if name and not db.query(CallType).filter(CallType.name == name).first():
         max_order = db.query(CallType).count()
-        db.add(CallType(name=name, display_order=max_order))
+        db.add(CallType(name=name, color=_clean_color(color), display_order=max_order))
         db.commit()
     return RedirectResponse("/config?toast=Call+type+added#cfg-call-types", status_code=302)
 
@@ -866,12 +874,14 @@ async def call_type_add(
 async def call_type_edit(
     type_id: int,
     name: str = Form(...),
+    color: str = Form("#0dcaf0"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
     ct = db.query(CallType).filter(CallType.id == type_id).first()
     if ct:
         ct.name = name.strip() or ct.name
+        ct.color = _clean_color(color, ct.color or "#0dcaf0")
         db.commit()
     return RedirectResponse("/config?toast=Call+type+updated#cfg-call-types", status_code=302)
 

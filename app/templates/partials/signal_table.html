@@ -58,6 +58,7 @@
     <tr id="{{ row_id }}-row"
         data-row="{{ row_id }}"
         data-signal-name="{{ log.signal_name }}"
+        data-orig-signal-name="{{ log.signal_name }}"
         data-serial-id="{{ serial_id if serial_id is not none else '' }}"
         data-orig-status="{{ log.signal_status }}"
         data-orig-power="{{ log.power if log.power is not none else '' }}"
@@ -229,6 +230,13 @@
             <input type="hidden" name="signal_name" value="{{ log.signal_name }}">
             {% if serial_id is not none %}<input type="hidden" name="serial_id" value="{{ serial_id }}">{% endif %}
             <div class="d-flex gap-2 flex-wrap align-items-end">
+
+              <div>
+                <label class="form-label small mb-1">Name</label>
+                <input type="text" class="form-control form-control-sm" name="signal_new_name"
+                       value="{{ log.signal_name }}" style="width:130px"
+                       data-stage-field="signalName" oninput="stageQuickEditField('{{ row_id }}', this)">
+              </div>
 
               <div>
                 <label class="form-label small mb-1">Status</label>

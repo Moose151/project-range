@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.31.0` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.31.4` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -63,6 +63,13 @@ Dashboard masonry (0.29.0) and the activity create/clone workflow (0.29.2) are *
 **Risks / unknowns to resolve during Phase 2:** (a) on-connect state dump vs persistent connection; (b) exact login form for `_login`; (c) EIRP scale factor; (d) TLS cert (self-signed → `verify=False`, already handled). Everything downstream (`RicsSnapshot`) is a stable interface, so the widgets/registry can be built against it once (1)–(3) are answered.
 
 ### Shipped (all on `main`, in order)
+- **0.31.4 — Configurable effect colours in logs:**
+  - `CallType` now has `color` (`#RRGGBB`), auto-migrated by `init_db.py` (`ALTER TABLE call_types ADD COLUMN color VARCHAR(16) DEFAULT '#0dcaf0'`). Default seeded effects get distinct colours; existing custom effects default to cyan until edited.
+  - Admin → Config → Effects now matches the Duty Roles config pattern: name, colour picker, preview badge, active/inactive, reorder/delete, and matching add form.
+  - Effect log badges in `/logs` and serial history use the configured colour by effect name.
+- **0.31.3 — Chat emoji picker + dashboard signal rename:**
+  - Chat composers now have an emoji picker in both the floating chat windows and the dashboard chat widget. Messages remain escaped text; emojis are inserted client-side into the existing body field.
+  - Dashboard quick edit gained a **Name** field. Submitting a rename updates the current serial's package entry and matching signal log rows, blocks duplicate names in the same widget, audits the rename, and re-renders through the existing bulk-update path.
 - **0.31.0 — Activity lifecycle, serial editing, spectrum toggles:**
   - `Activity.completed_at` / `completed_by_id` (+ migration); `status` returns "Completed" only when set. `POST /activities/{id}/complete` ends running serials via the new shared `serials.end_serial(db, serial, user)` helper (extracted from `serial_end`) and files the activity under Completed. `POST /activities/{id}/delete` unassigns serials then deletes. Buttons on `activity_detail.html` + a delete on the list row.
   - `serial_update_details` now also sets **title**; `serials.html` gained an inline **edit collapse** (title/notes/instructions) on **both** pending and active serial cards.

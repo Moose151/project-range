@@ -267,7 +267,8 @@
                 {% set key = part.split(':', 1)[0].strip() %}
                 {% set val = part.split(':', 1)[1].strip() %}
                 {% if loop.first %}
-                  <span class="badge bg-info text-dark me-2" title="Effect">{{ val }}</span>
+                  {% set effect_color = effect_colors.get(val, '#0dcaf0') if effect_colors is defined else '#0dcaf0' %}
+                  <span class="badge me-2" style="background:{{ effect_color }};color:#fff" title="Effect">{{ val }}</span>
                 {% else %}
                   <span class="me-3 small"><span class="text-muted">{{ key }}:</span>
                     {% if val == 'OK' %}<span class="text-success fw-semibold">OK</span>

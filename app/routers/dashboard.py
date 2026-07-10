@@ -22,6 +22,7 @@ from app.routers.docs import _render_markdown
 
 class _SignalUpdate(BaseModel):
     signal_name: str
+    signal_new_name: Optional[str] = None
     signal_status: str
     modulation: Optional[str] = None
     fec: Optional[str] = None
@@ -112,6 +113,63 @@ def _buzzer_active(signals: list, range_state: str) -> bool:
     if range_state == "Standby/Off":
         return False
     return any(s.signal_status == "Up" for s in signals)
+
+
+def _rename_dashboard_signal(
+    db: Session,
+    serial: Serial | None,
+    serial_id: int | None,
+    testing: bool,
+    old_name: str,
+    new_name: str,
+    current_user: User,
+) -> int:
+    """Rename a signal within the dashboard's serial/package context."""
+    old_name = old_name.strip()
+    new_name = new_name.strip()
+    if not old_name or not new_name or old_name == new_name:
+        return 0
+
+    latest_names = [log.signal_name for log in _latest_signal_status(db, serial_id=serial_id)]
+    if any(name == new_name for name in latest_names if name != old_name):
+        raise ValueError(f"Another dashboard signal is already named {new_name}.")
+
+    changed = 0
+    if serial:
+        package_ids = [link.package_id for link in serial.package_links]
+        if package_ids:
+            entries = db.query(SignalPackageEntry).filter(
+                SignalPackageEntry.package_id.in_(package_ids),
+                SignalPackageEntry.signal_name == old_name,
+            ).all()
+            for entry in entries:
+                entry.signal_name = new_name
+                entry.package.updated_at = datetime.utcnow()
+                changed += 1
+
+    logs_q = db.query(SignalLog).filter(
+        SignalLog.signal_name == old_name,
+        SignalLog.is_testing == testing,
+    )
+    if serial_id is not None:
+        logs_q = logs_q.filter(SignalLog.serial_id == serial_id)
+    logs = logs_q.all()
+    for log in logs:
+        log.signal_name = new_name
+        log.updated_by_id = current_user.id
+        changed += 1
+
+    if changed:
+        db.add(AuditLog(
+            user_id=current_user.id,
+            action_type="DASHBOARD_SIGNAL_RENAME",
+            entity_type="Serial" if serial_id is not None else "SignalLog",
+            entity_id=serial_id,
+            previous_value=old_name,
+            new_value=new_name,
+            comment="Renamed from dashboard quick edit.",
+        ))
+    return changed
 
 
 def _get_mod_types(db: Session) -> list[str]:
@@ -850,6 +908,7 @@ def _dashboard_values_from_update(
     serial_id: int | None,
     latest: SignalLog | None,
     upd: _SignalUpdate,
+    signal_name: str | None = None,
 ) -> dict:
     values = {
         "signal_status": upd.signal_status,
@@ -870,7 +929,7 @@ def _dashboard_values_from_update(
         "antenna": _blank_to_none(upd.antenna) if "antenna" in upd.changed_fields else (latest.antenna if latest else None),
     }
     if serial_id is not None:
-        rf = serial_package_rf_config(db, serial_id, upd.signal_name)
+        rf = serial_package_rf_config(db, serial_id, signal_name or upd.signal_name)
         freq_changed = [f for f in ("tx_if", "tx_rf", "rx_rf", "rx_if") if f in upd.changed_fields]
         values = recalculate_from_values(values, rf, preferred=freq_changed or None)
         if rf:
@@ -1104,14 +1163,28 @@ async def dashboard_bulk_update(
     range_state = get_current_range_state(db)
     testing = is_testing_state(db)
     serial_id = body.serial_id
+    serial = None
     if serial_id is not None:
         serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == testing).first()
         if not serial:
             serial_id = None
+            serial = None
 
     for upd in body.updates:
+        old_signal_name = upd.signal_name.strip()
+        new_signal_name = (upd.signal_new_name or old_signal_name).strip()
+        if "signal_name" in upd.changed_fields:
+            if not new_signal_name:
+                return HTMLResponse("Signal name is required.", status_code=400)
+            try:
+                _rename_dashboard_signal(
+                    db, serial, serial_id, testing, old_signal_name, new_signal_name, current_user
+                )
+            except ValueError as exc:
+                return HTMLResponse(str(exc), status_code=400)
+
         latest_q = db.query(SignalLog).filter(
-            SignalLog.signal_name == upd.signal_name,
+            SignalLog.signal_name == new_signal_name,
             SignalLog.is_deleted == False,
             SignalLog.is_testing == testing,
         )
@@ -1121,11 +1194,11 @@ async def dashboard_bulk_update(
 
         # Exclusivity group enforcement
         if upd.signal_status == "Up":
-            sig_reg = db.query(Signal).filter(Signal.name == upd.signal_name).first()
+            sig_reg = db.query(Signal).filter(Signal.name == new_signal_name).first()
             if sig_reg and sig_reg.exclusivity_group:
                 siblings = db.query(Signal).filter(
                     Signal.exclusivity_group == sig_reg.exclusivity_group,
-                    Signal.name != upd.signal_name,
+                    Signal.name != new_signal_name,
                 ).all()
                 for sib in siblings:
                     sib_q = db.query(SignalLog).filter(
@@ -1149,24 +1222,24 @@ async def dashboard_bulk_update(
                             ber_estimate=sib_latest.ber_estimate,
                             engaged=sib_latest.engaged,
                             source=sib_latest.source, antenna=sib_latest.antenna,
-                            notes=f"Auto-downed: {upd.signal_name} came Up (group: {sig_reg.exclusivity_group})",
+                            notes=f"Auto-downed: {new_signal_name} came Up (group: {sig_reg.exclusivity_group})",
                             entry_type="Automatic", updated_by_id=current_user.id, serial_id=serial_id,
                         ))
 
         effective_source = None
         if "source" in upd.changed_fields:
             effective_source, _ = _update_serial_package_signal_source(
-                db, serial, upd.signal_name, upd.source or "", current_user, testing,
+                db, serial, new_signal_name, upd.source or "", current_user, testing,
             )
             # Dashboard modem-source uniqueness: if the new source is a modem,
             # clear it from any other signal that still shows it.
             device = _cbm_source_device(db, (upd.source or "").strip(), testing)
             if device:
                 _reassign_modem_source(
-                    db, serial_id, testing, range_state, upd.signal_name, device.name, current_user,
+                    db, serial_id, testing, range_state, new_signal_name, device.name, current_user,
                 )
 
-        values = _dashboard_values_from_update(db, serial_id, latest, upd)
+        values = _dashboard_values_from_update(db, serial_id, latest, upd, signal_name=new_signal_name)
         if "source" in upd.changed_fields:
             values["source"] = effective_source
             # Removing the modem source invalidates live modem metrics.
@@ -1180,7 +1253,7 @@ async def dashboard_bulk_update(
 
         new_entry = SignalLog(
             operator_id=current_user.id, range_state=range_state,
-            signal_name=upd.signal_name, signal_status=values["signal_status"],
+            signal_name=new_signal_name, signal_status=values["signal_status"],
             tx_if=values["tx_if"],
             tx_rf=values["tx_rf"],
             rx_rf=values["rx_rf"],
@@ -1201,7 +1274,7 @@ async def dashboard_bulk_update(
             entry_type="Dashboard", updated_by_id=current_user.id,
             serial_id=serial_id if serial_id is not None else (latest.serial_id if latest else None),
             warning_flags=warning_flags_for(
-                db, upd.signal_name,
+                db, new_signal_name,
                 values["power"],
                 values["power_unit"],
                 tx_rf=values["tx_rf"],
@@ -1214,10 +1287,11 @@ async def dashboard_bulk_update(
 
     db.flush()
     for upd in body.updates:
+        new_signal_name = (upd.signal_new_name or upd.signal_name).strip()
         db.add(AuditLog(
             user_id=current_user.id, action_type="DASHBOARD_UPDATE",
             entity_type="SignalLog",
-            new_value=f"{upd.signal_name}: {upd.signal_status}",
+            new_value=f"{new_signal_name}: {upd.signal_status}",
             comment=", ".join(upd.changed_fields) if upd.changed_fields else None,
         ))
     db.commit()

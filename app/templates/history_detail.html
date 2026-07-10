@@ -279,6 +279,33 @@ window.addEventListener('resize', () => {
           </td>
           <td class="small text-muted">{{ log.entry_type }}</td>
         </tr>
+        {% elif log.entry_type == 'Effect' %}
+        {% set effect_parts = (log.notes or '').split(' | ') %}
+        <tr class="log-event-row log-event-effect">
+          <td class="small">{{ time_cell(log) }}</td>
+          <td class="small">{{ log.operator.username if log.operator else '—' }}</td>
+          <td class="fw-semibold">{{ log.signal_name }}</td>
+          <td colspan="11">
+            <i class="bi bi-asterisk text-info me-1"></i>
+            {% for part in effect_parts %}
+              {% if ':' in part %}
+                {% set key = part.split(':', 1)[0].strip() %}
+                {% set val = part.split(':', 1)[1].strip() %}
+                {% if loop.first %}
+                  {% set effect_color = effect_colors.get(val, '#0dcaf0') if effect_colors is defined else '#0dcaf0' %}
+                  <span class="badge me-2" style="background:{{ effect_color }};color:#fff" title="Effect">{{ val }}</span>
+                {% else %}
+                  <span class="me-3 small"><span class="text-muted">{{ key }}:</span>
+                    {% if val == 'OK' %}<span class="text-success fw-semibold">OK</span>
+                    {% elif val == 'Fault' %}<span class="text-danger fw-semibold">Fault</span>
+                    {% else %}<span class="fw-semibold">{{ val }}</span>{% endif %}
+                  </span>
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          </td>
+          <td class="small text-muted">Effect</td>
+        </tr>
         {% else %}
         <tr class="{% if log.signal_status == 'Faulted' %}status-faulted{% elif log.signal_status == 'Up' %}status-up{% endif %}">
           <td class="small">{{ time_cell(log) }}</td>

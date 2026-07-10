@@ -741,6 +741,9 @@ function utilityBody(id, type, config = {}) {
               </div>
               <div class="chat-typing d-none" data-dashboard-chat-typing></div>
               <form class="dashboard-chat-form d-flex gap-2" onsubmit="sendDashboardChatMessage(event, '${id}')">
+                <button type="button" class="btn btn-sm btn-outline-secondary chat-emoji-btn" title="Add emoji" onclick="toggleChatEmojiPicker(this)">
+                  <i class="bi bi-emoji-smile"></i>
+                </button>
                 <input type="text" class="form-control form-control-sm" name="body" autocomplete="off" maxlength="2000" placeholder="Message" oninput="sendDashboardChatTyping('${id}', this)" onblur="stopDashboardChatTyping('${id}')" disabled>
                 <button type="submit" class="btn btn-sm btn-primary" title="Send" disabled><i class="bi bi-send"></i></button>
               </form>
@@ -1060,7 +1063,7 @@ async function startDashboardPrivateChat(widgetId, userId) {
 
 function setDashboardChatEnabled(widget, enabled) {
   widget.querySelector('.dashboard-chat-form input')?.toggleAttribute('disabled', !enabled);
-  widget.querySelector('.dashboard-chat-form button')?.toggleAttribute('disabled', !enabled);
+  widget.querySelectorAll('.dashboard-chat-form button').forEach(button => button.toggleAttribute('disabled', !enabled));
 }
 
 function selectDashboardChatRoom(widgetId, roomId) {
@@ -2005,7 +2008,7 @@ function statusBadgeHtml(status) {
 }
 
 function quickRowState(row) {
-  const fields = ['status', 'power', 'source', 'modulation', 'symbolRate', 'fec', 'antenna', 'ebNo', 'txIf', 'txRf', 'rxRf', 'rxIf', 'notes', 'powerUnit'];
+  const fields = ['signalName', 'status', 'power', 'source', 'modulation', 'symbolRate', 'fec', 'antenna', 'ebNo', 'txIf', 'txRf', 'rxRf', 'rxIf', 'notes', 'powerUnit'];
   const state = {};
   fields.forEach(field => {
     const origKey = 'orig' + field.charAt(0).toUpperCase() + field.slice(1);
@@ -2017,7 +2020,7 @@ function quickRowState(row) {
 
 function stagedFieldNames(row) {
   const map = {
-    stageStatus: 'signal_status', stagePower: 'power', stageSource: 'source',
+    stageSignalName: 'signal_name', stageStatus: 'signal_status', stagePower: 'power', stageSource: 'source',
     stageModulation: 'modulation', stageSymbolRate: 'symbol_rate', stageFec: 'fec',
     stageAntenna: 'antenna', stageEbNo: 'eb_no', stageTxIf: 'tx_if',
     stageTxRf: 'tx_rf', stageRxRf: 'rx_rf', stageRxIf: 'rx_if',
@@ -2069,6 +2072,7 @@ async function submitAllDirty(btn) {
     const s = quickRowState(row);
     const upd = {
       signal_name: row.dataset.signalName,
+      signal_new_name: s.signalName || row.dataset.signalName,
       signal_status: s.status,
       power_unit: s.powerUnit || row.dataset.powerUnit || 'dBm',
       modulation: s.modulation || '',

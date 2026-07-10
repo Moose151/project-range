@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, is_testing_state, require_supervisor
-from app.models import User, Serial, SignalLog, Activity
+from app.models import User, Serial, SignalLog, Activity, CallType
 from app.serial_archive import archive_closed_serial
 from app.log_changes import annotate_log_changes
 from app.settings import annotate_local_times, get_local_timezone
@@ -89,6 +89,10 @@ async def history_detail(
     show_local_time = local_time == "1"
     if show_local_time:
         annotate_local_times(logs, local_timezone)
+    effect_colors = {
+        ct.name: (ct.color or "#0dcaf0")
+        for ct in db.query(CallType).order_by(CallType.display_order, CallType.name).all()
+    }
 
     return templates.TemplateResponse(request, "history_detail.html", {
         "user": current_user,
@@ -98,6 +102,7 @@ async def history_detail(
         "search": search,
         "show_local_time": show_local_time,
         "local_timezone": local_timezone,
+        "effect_colors": effect_colors,
         "page_name": "history",
     })
 

@@ -572,6 +572,7 @@ class CallType(Base):
     __tablename__ = "call_types"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    color: Mapped[str] = mapped_column(String(16), nullable=False, default="#0dcaf0")
     display_order: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
