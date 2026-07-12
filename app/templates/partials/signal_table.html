@@ -17,6 +17,10 @@
 {% endmacro %}
 
 {% set can_manage = (can_edit is defined and can_edit and serial_id is not none) %}
+{% if serial_id is not none %}
+<span class="cbm-map-flag" hidden data-serial-id="{{ serial_id }}"
+      data-has-cbm="{{ 1 if (has_cbm_mapping is defined and has_cbm_mapping) else 0 }}"></span>
+{% endif %}
 {% if signals %}
 <table class="table table-dark table-hover table-sm align-middle mb-0 signal-table"
        id="signalTable-{{ serial_id if serial_id is not none else 'legacy' }}"
@@ -95,7 +99,7 @@
       </td>
       <td data-col="call" class="py-0">
         <div class="dropdown">
-          <button class="btn btn-sm btn-outline-info py-0 px-2 dropdown-toggle" type="button"
+          <button class="btn btn-sm btn-outline-info py-0 px-2 dropdown-toggle effects-dd-toggle" type="button"
                   data-bs-toggle="dropdown" aria-expanded="false"
                   title="Log an effect for {{ log.signal_name }}">
             <i class="bi bi-asterisk"></i>

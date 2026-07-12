@@ -117,7 +117,7 @@
           <div class="serial-actions-store d-none">
             <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
                     title="Hide clock widget" onclick="hideClockWidget()">
-              <i class="bi bi-eye-slash"></i>
+              <i class="bi bi-x-lg"></i>
             </button>
           </div>
           <div class="card-body">
@@ -176,7 +176,7 @@
             </a>
             <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
                     title="Hide CDA widget" onclick="hideCDAWidget()">
-              <i class="bi bi-eye-slash"></i>
+              <i class="bi bi-x-lg"></i>
             </button>
           </div>
           <div class="card-body p-0">
@@ -294,7 +294,7 @@
             {% endif %}
             <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
                     title="Hide serial notes / instructions widgets" onclick="hideSerialDetailsWidgets()">
-              <i class="bi bi-eye-slash"></i>
+              <i class="bi bi-x-lg"></i>
             </button>
           </div>
           <div class="card-body">
@@ -380,8 +380,9 @@
             <span class="text-muted small me-1">Started {{ serial.opened_at.strftime('%H:%M %d/%m') }}</span>
             <span class="htmx-indicator spinner-border spinner-border-sm text-secondary me-1" role="status" style="width:0.7rem;height:0.7rem"></span>
             <span id="widgetBuzzer-{{ serial.id }}">{% if w_buzzer %}<span class="badge bg-danger">TRANSMITTING</span>{% endif %}</span>
-            {% if sd.has_cbm_mapping and user.role != 'observer' %}
-            <form method="post" action="/dashboard/cbm-sync" class="d-inline">
+            {% if user.role != 'observer' %}
+            <form method="post" action="/dashboard/cbm-sync"
+                  class="serial-cbm-form d-inline{% if not sd.has_cbm_mapping %} d-none{% endif %}">
               <button type="submit" class="btn btn-sm btn-outline-info py-0 px-2"
                       title="Force read-only CBM update for active mapped signals">
                 <i class="bi bi-arrow-repeat me-1"></i>CBM
@@ -394,7 +395,7 @@
             <a href="/logs?serial_id={{ serial.id }}" class="btn btn-sm btn-outline-secondary py-0 px-2" title="View logs"><i class="bi bi-journal-text"></i></a>
             <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
                     title="Hide serial / signals widgets" onclick="hideSignalWidgets()">
-              <i class="bi bi-eye-slash"></i>
+              <i class="bi bi-x-lg"></i>
             </button>
             {% if user.role != 'observer' %}
             <form method="post" action="/serials/{{ serial.id }}/end" class="d-inline"
@@ -408,7 +409,7 @@
             {% endif %}
             <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
                     title="Hide serial / signals widgets" onclick="hideSignalWidgets()">
-              <i class="bi bi-eye-slash"></i>
+              <i class="bi bi-x-lg"></i>
             </button>
             {% endif %}
           </div>
@@ -501,7 +502,7 @@
                {% if serial %}hx-get="/dashboard/fragment/{{ serial.id }}"{% else %}hx-get="/dashboard/fragment"{% endif %}
                hx-trigger="every 5s, range-state-changed from:body"
                hx-swap="innerHTML" hx-on::after-request="updateRefreshTime()">
-            {% with signals=w_signals, buzzer_active=w_buzzer, serial_id=(serial.id if serial else none), pkg_rf_by_signal=(sd.pkg_rf_by_signal if serial else {}), priority_by_signal=(sd.priority_by_signal if serial else {}), closed_loop=(serial.is_closed_loop if serial else False) %}
+            {% with signals=w_signals, buzzer_active=w_buzzer, serial_id=(serial.id if serial else none), pkg_rf_by_signal=(sd.pkg_rf_by_signal if serial else {}), priority_by_signal=(sd.priority_by_signal if serial else {}), closed_loop=(serial.is_closed_loop if serial else False), has_cbm_mapping=(sd.has_cbm_mapping if serial else False) %}
             {% include "partials/signal_table.html" %}
             {% endwith %}
           </div>
@@ -1285,6 +1286,43 @@ function switchTab(btn) {
   if (group) { setActiveTab(group, btn.dataset.serialTab); saveLayout(); }
 }
 
+// After a signal-table swap, sync the header CBM sync button to the freshly
+// computed mapping state (the flag is rendered hidden inside the fragment).
+// Assigning a modem source from the dashboard adds a CBM mapping, so the button
+// must appear without a full page reload. `scope` is the swapped container.
+function applyCbmMapping(scope) {
+  const flag = scope ? scope.querySelector('.cbm-map-flag') : null;
+  if (!flag) return;
+  const serialId = flag.dataset.serialId;
+  const hasCbm = flag.dataset.hasCbm === '1';
+  const toggle = root => {
+    if (root) root.querySelectorAll('.serial-cbm-form').forEach(el => el.classList.toggle('d-none', !hasCbm));
+  };
+  // The hidden store holds the template; the visible header shows a clone of the
+  // active tab's store. Toggle the button in both so the state survives tab
+  // switches without re-mirroring (which would clobber the OOB buzzer badge).
+  const wrap = document.querySelector(`.serial-body-wrap[data-serial-body="${serialId}"]`);
+  toggle(wrap ? wrap.querySelector('.serial-actions-store') : null);
+  const group = groupOf(serialId);
+  if (group && String(group.dataset.activeTab) === String(serialId)) {
+    toggle(group.querySelector('.serial-actions'));
+  }
+}
+
+// The signal-table body has overflow-auto (for wide tables), which clips the
+// absolutely-positioned effects dropdown — so on a short widget (1–2 signals)
+// the menu is cut off. Init these dropdowns with Popper's fixed strategy so the
+// menu renders position:fixed and escapes the overflow container.
+function initEffectDropdowns(scope) {
+  if (typeof bootstrap === 'undefined' || !bootstrap.Dropdown) return;
+  (scope || document).querySelectorAll('.effects-dd-toggle').forEach(el => {
+    if (bootstrap.Dropdown.getInstance(el)) return;
+    bootstrap.Dropdown.getOrCreateInstance(el, {
+      popperConfig(defaultConfig) { return { ...defaultConfig, strategy: 'fixed' }; },
+    });
+  });
+}
+
 function initGroup(group) {
   group.querySelectorAll('.serial-tab-btn').forEach(b => { b.draggable = true; });
   setActiveTab(group, group.dataset.activeTab || groupSerialIds(group)[0]);
@@ -1893,6 +1931,8 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
   if (event.target?.id?.startsWith('signalTableContainer-')) {
     liveSpecFetchAll();
     initSignalReorder(event.target);
+    applyCbmMapping(event.target);
+    initEffectDropdowns(event.target);
   }
 });
 
@@ -1949,6 +1989,7 @@ document.addEventListener('DOMContentLoaded', () => {
   applyColumnVisibility();
   applyCDAColumnVisibility();
   initSignalReorder();
+  initEffectDropdowns();
   // Sync to server time first, then tick clocks/CDA from it every second and
   // re-sync the offset periodically (covers drift + suspended tabs).
   syncServerClock().finally(() => {
@@ -2119,6 +2160,8 @@ async function submitAllDirty(btn) {
     updateRefreshTime();
     liveSpecFetchAll();
     initSignalReorder(container);
+    applyCbmMapping(container);
+    initEffectDropdowns(container);
     showToast(`${updates.length} signal${updates.length > 1 ? 's' : ''} updated`, 'success');
   } catch (_) {
     showToast('Update failed — please try again', 'danger');
@@ -2351,6 +2394,8 @@ function applyDashboardFragment(container, html) {
   updateRefreshTime();
   liveSpecFetchAll();
   initSignalReorder(container);
+  applyCbmMapping(container);
+  initEffectDropdowns(container);
 }
 
 async function submitSignalOrder(table) {

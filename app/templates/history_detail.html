@@ -263,7 +263,7 @@ window.addEventListener('resize', () => {
       </thead>
       <tbody>
         {% for log in logs %}
-        {% if log.entry_type in ('Narrative', 'SerialStart', 'SerialEnd') %}
+        {% if log.entry_type in ('Narrative', 'SerialStart', 'SerialEnd', 'SerialRename') or log.signal_name == '[NOTE]' %}
         <tr class="log-event-row {% if log.entry_type == 'SerialStart' %}log-event-start{% elif log.entry_type == 'SerialEnd' %}log-event-end{% else %}log-event-note{% endif %}">
           <td class="small">{{ time_cell(log) }}</td>
           <td class="small">{{ log.operator.username if log.operator else '—' }}</td>

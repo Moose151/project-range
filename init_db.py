@@ -168,6 +168,17 @@ def _migrate(conn):
         "ALTER TABLE activities ADD COLUMN completed_at DATETIME",
         "ALTER TABLE activities ADD COLUMN completed_by_id INTEGER REFERENCES users(id)",
         "ALTER TABLE call_types ADD COLUMN color VARCHAR(16) DEFAULT '#0dcaf0'",
+        # --- Performance indexes (existing DBs; create_all covers fresh ones) ---
+        # The dashboard polls the latest log per signal for the active serial
+        # every 5s. Without these, each poll is a full scan of signal_logs.
+        "CREATE INDEX IF NOT EXISTS ix_signal_logs_serial_signal_ts ON signal_logs (serial_id, signal_name, timestamp)",
+        "CREATE INDEX IF NOT EXISTS ix_signal_logs_signal_ts ON signal_logs (signal_name, timestamp)",
+        "CREATE INDEX IF NOT EXISTS ix_signal_logs_serial_id ON signal_logs (serial_id)",
+        "CREATE INDEX IF NOT EXISTS ix_audit_logs_timestamp ON audit_logs (timestamp)",
+        "CREATE INDEX IF NOT EXISTS ix_audit_logs_id_desc ON audit_logs (id)",
+        "CREATE INDEX IF NOT EXISTS ix_serials_started ON serials (is_started, closed_at)",
+        "CREATE INDEX IF NOT EXISTS ix_spe_package_id ON signal_package_entries (package_id)",
+        "CREATE INDEX IF NOT EXISTS ix_serial_packages_serial_id ON serial_packages (serial_id)",
     ]
     for sql in migrations:
         try:

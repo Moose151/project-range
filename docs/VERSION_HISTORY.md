@@ -1,7 +1,41 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.31.2**
+Current version: **0.31.7**
+
+---
+
+## 0.31.7 — Login-Kick Fix & Performance Pass
+
+- **Fixed the tiled/jumping login screen when you get kicked out.** If your session idled out — or you logged in on another terminal and bumped yourself off the first one — the dashboard's background refreshes used to paint copies of the login form all over the screen, and you had to refresh before you could log in. Now a kicked terminal cleanly jumps to a normal login page on its own.
+- **Faster dashboard as logs pile up.** Added database indexes so the live dashboard no longer has to scan the entire signal-log history every few seconds. This is the first of several planned speed-ups (see the performance plan in the handover).
+
+---
+
+## 0.31.6 — Rename History & Consistent Close Buttons
+
+- **Rename a signal from the dashboard, with a history trail.** Renaming a signal in the dashboard quick-edit now also records a note in the serial's Logs/History (e.g. *"Signal renamed: 301 → 305"*), so you can see what it used to be called — without cluttering the dashboard widget with old names.
+- **Every widget closes with an X.** Some dashboard widgets used an eye icon to hide and others used an X; they're now all a consistent **X**.
+
+---
+
+## 0.31.5 — Dashboard Source & Effects Fixes
+
+- **Assigning a modem source on the dashboard now works immediately.** Setting a signal's source from the dashboard now makes the **CBM** sync button appear right away (no page refresh) and the signal starts getting modem updates.
+- **Effects menu no longer cut off.** On a short widget (1–2 signals) the effects drop-down was clipped by the bottom of the widget; it now opens fully and is easy to navigate.
+
+---
+
+## 0.31.4 — Configurable Effect Colours
+
+- **Colour-code your effects.** Each effect type can be given its own colour (Admin → Config → Effects), and effect badges in the logs and serial history use it.
+
+---
+
+## 0.31.3 — Emoji Picker & Dashboard Signal Rename
+
+- **Emoji picker in chat.** Both the floating chat windows and the dashboard chat widget gained an emoji picker.
+- **Rename signals from the dashboard.** The dashboard quick-edit gained a **Name** field so you can rename a signal in place.
 
 ---
 

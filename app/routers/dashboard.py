@@ -169,6 +169,23 @@ def _rename_dashboard_signal(
             new_value=new_name,
             comment="Renamed from dashboard quick edit.",
         ))
+        # Renaming rewrites every log to the new name (so the dashboard shows one
+        # identity, not a stale duplicate row). To preserve the trail of what the
+        # signal was previously called, drop a narrative note into the serial
+        # history. It is a "[NOTE]" row, which the dashboard widget filters out —
+        # so the name history lives in Logs/History, never on the dashboard.
+        db.add(SignalLog(
+            operator_id=current_user.id,
+            range_state=get_current_range_state(db),
+            signal_name="[NOTE]",
+            signal_status="Note",
+            freq_unit="MHz",
+            power_unit="dBm",
+            notes=f"Signal renamed: {old_name} → {new_name}",
+            entry_type="SerialRename",
+            serial_id=serial_id,
+            updated_by_id=current_user.id,
+        ))
     return changed
 
 
@@ -859,6 +876,7 @@ async def dashboard_fragment_legacy(
         "signals": signals,
         "buzzer_active": _buzzer_active(signals, range_state),
         "serial_id": None,
+        "has_cbm_mapping": False,
     })
 
 
@@ -897,6 +915,23 @@ def _priority_by_signal(db: Session, serial_id: int | None, signals: list[Signal
         if priority is not None and name.strip().casefold() in names:
             out[name] = priority
     return out
+
+
+def _serial_has_cbm_mapping(db: Session, serial_id: int | None) -> bool:
+    """True when any signal package entry on the serial has a CBM modem mapped.
+
+    Drives the header CBM sync button. Recomputed for every fragment response so
+    assigning a modem source from the dashboard makes the button appear without a
+    full page reload.
+    """
+    if serial_id is None:
+        return False
+    return db.query(SignalPackageEntry.id).join(
+        SerialPackage, SerialPackage.package_id == SignalPackageEntry.package_id
+    ).filter(
+        SerialPackage.serial_id == serial_id,
+        SignalPackageEntry.cbm_device_id.isnot(None),
+    ).first() is not None
 
 
 def _blank_to_none(value):
@@ -961,6 +996,7 @@ async def dashboard_fragment(
         "pkg_rf": _pkg_rf_for_serial(db, serial_id),
         "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial_id, signals),
         "priority_by_signal": _priority_by_signal(db, serial_id, signals),
+        "has_cbm_mapping": _serial_has_cbm_mapping(db, serial_id),
     })
 
 
@@ -1149,6 +1185,7 @@ async def dashboard_quick_update(
         "priority_by_signal": (
             _priority_by_signal(db, effective_serial_id, signals) if effective_serial_id else {}
         ),
+        "has_cbm_mapping": _serial_has_cbm_mapping(db, effective_serial_id),
     })
 
 
@@ -1306,6 +1343,7 @@ async def dashboard_bulk_update(
         "pkg_rf": _pkg_rf_for_serial(db, serial_id) if serial_id else None,
         "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial_id, signals) if serial_id else {},
         "priority_by_signal": _priority_by_signal(db, serial_id, signals) if serial_id else {},
+        "has_cbm_mapping": _serial_has_cbm_mapping(db, serial_id),
     })
 
 
@@ -1366,6 +1404,7 @@ def _render_serial_fragment(request: Request, db: Session, current_user: User, s
         "pkg_rf": _pkg_rf_for_serial(db, serial_id) if serial_id else None,
         "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial_id, signals) if serial_id else {},
         "priority_by_signal": _priority_by_signal(db, serial_id, signals) if serial_id else {},
+        "has_cbm_mapping": _serial_has_cbm_mapping(db, serial_id),
     })
 
 

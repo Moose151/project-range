@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 from sqlalchemy import (
-    Boolean, DateTime, Enum, Float, ForeignKey, event,
+    Boolean, DateTime, Enum, Float, ForeignKey, Index, event,
     Integer, String, Text, func
 )
 from sqlalchemy.orm import Mapped, Session as SASession, mapped_column, relationship
@@ -247,6 +247,16 @@ class SerialPackage(Base):
 
 class SignalLog(Base):
     __tablename__ = "signal_logs"
+
+    # The dashboard poll (every 5s) resolves the latest log per signal for a
+    # serial and filters on is_testing/is_deleted; these indexes keep that off a
+    # full table scan as the log table grows. Mirrored in init_db._migrate for
+    # existing databases (create_all only builds indexes for fresh tables).
+    __table_args__ = (
+        Index("ix_signal_logs_serial_signal_ts", "serial_id", "signal_name", "timestamp"),
+        Index("ix_signal_logs_signal_ts", "signal_name", "timestamp"),
+        Index("ix_signal_logs_serial_id", "serial_id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

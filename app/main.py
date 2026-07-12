@@ -1,7 +1,7 @@
 import asyncio
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
@@ -224,7 +224,15 @@ async def start_auto_cbm_sync() -> None:
 
 @app.exception_handler(302)
 async def redirect_handler(request: Request, exc):
-    return RedirectResponse(exc.headers["Location"], status_code=302)
+    location = exc.headers["Location"]
+    # HTMX pollers (dashboard fragment every 5s, CEASE, active-count, …) that hit
+    # an expired or kicked-out session would otherwise transparently follow the
+    # 302 to /login and swap the *full login page* into their small target
+    # element — tiling duplicate login forms across the screen and requiring a
+    # manual refresh. Tell HTMX to perform a real full-page redirect instead.
+    if request.headers.get("HX-Request"):
+        return Response(status_code=204, headers={"HX-Redirect": location})
+    return RedirectResponse(location, status_code=302)
 
 
 @app.exception_handler(403)
