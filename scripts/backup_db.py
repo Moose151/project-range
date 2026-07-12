@@ -39,6 +39,22 @@ def main() -> int:
     dest = out_dir / f"range-{stamp}.db"
     source = f"{args.service}:{args.db_path}"
 
+    # The database runs in WAL mode, so recently committed transactions may still
+    # live in the -wal sidecar and not yet be in range.db. Checkpoint first so the
+    # single-file copy below is complete and restorable. Best-effort: WAL
+    # auto-checkpoints anyway, so a failure here only risks the very newest frames.
+    checkpoint = (
+        "import sqlite3; c = sqlite3.connect(r'%s'); "
+        "c.execute('PRAGMA wal_checkpoint(TRUNCATE)'); c.close()" % args.db_path
+    )
+    try:
+        subprocess.run(
+            ["docker", "compose", "exec", "-T", args.service, "python", "-c", checkpoint],
+            check=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        print(f"WARNING: WAL checkpoint before backup failed ({exc}); copying as-is.")
+
     subprocess.run(["docker", "compose", "cp", source, str(dest)], check=True)
     try:
         dest.chmod(0o600)

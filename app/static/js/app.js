@@ -114,36 +114,71 @@ function updateLiveRangeStateWidgets(state) {
   });
 }
 
-async function pollRangeStateStatus() {
+// Apply a range-state value to the banner + live widgets. Called by the
+// consolidated heartbeat (and pollRangeStateStatus for any direct callers).
+function applyRangeState(newState) {
   const banner = document.getElementById('rangeStateBanner');
   if (!banner) return;
+  const oldState = banner.dataset.rangeState || '';
+  if (!newState || newState === oldState) return;
+
+  banner.dataset.rangeState = newState;
+  banner.classList.remove('banner-live', 'banner-closed', 'banner-testing', 'banner-standby');
+  banner.classList.add(rangeStateBannerClass(newState));
+  const text = document.getElementById('rangeStateBannerText');
+  if (text) text.innerHTML = rangeStateBannerHtml(newState);
+  updateLiveRangeStateWidgets(newState);
+
+  document.body.dispatchEvent(new Event('range-state-changed'));
+  showToast?.(`Range state changed to ${escapeHtml(newState)}`, 'info');
+
+  if (oldState === 'Testing' || newState === 'Testing') {
+    window.setTimeout(() => window.location.reload(), 1200);
+  }
+}
+
+async function pollRangeStateStatus() {
+  if (!document.getElementById('rangeStateBanner')) return;
   try {
     const response = await fetch('/range-state/status', { headers: { 'Accept': 'application/json' } });
     if (!response.ok) return;
     const data = await response.json();
-    const newState = data.state || '';
-    const oldState = banner.dataset.rangeState || '';
-    if (!newState || newState === oldState) return;
+    applyRangeState(data.state || '');
+  } catch (e) {}
+}
 
-    banner.dataset.rangeState = newState;
-    banner.classList.remove('banner-live', 'banner-closed', 'banner-testing', 'banner-standby');
-    banner.classList.add(rangeStateBannerClass(newState));
-    const text = document.getElementById('rangeStateBannerText');
-    if (text) text.innerHTML = rangeStateBannerHtml(newState);
-    updateLiveRangeStateWidgets(newState);
-
-    document.body.dispatchEvent(new Event('range-state-changed'));
-    showToast?.(`Range state changed to ${escapeHtml(newState)}`, 'info');
-
-    if (oldState === 'Testing' || newState === 'Testing') {
-      window.setTimeout(() => window.location.reload(), 1200);
-    }
+// ── Consolidated status heartbeat ────────────────────────────────────────────
+// A single poll drives the banner, buzzer/active-count/active-serials badges and
+// the CEASE splash — replacing five separate timers (range-state 5s, CEASE 3s,
+// buzzer 10s, active-count 10s, active-serials 15s). Paused while the tab is
+// hidden; fires immediately when it becomes visible again.
+async function heartbeat() {
+  try {
+    const r = await fetch('/status/heartbeat', { headers: { 'Accept': 'application/json' } });
+    // Session idled out or was kicked (login on another terminal): the request
+    // was redirected to /login. Bounce this page there too — the heartbeat runs
+    // on every authed page, so this replaces the auto-redirect the old per-badge
+    // HTMX pollers used to provide.
+    if (r.redirected && /\/login/.test(r.url)) { window.location.href = r.url; return; }
+    if (!r.ok) return;
+    const d = await r.json();
+    applyRangeState(d.rangeState || '');
+    const bz = document.getElementById('buzzerBadge');
+    if (bz && typeof d.buzzerHtml === 'string') bz.innerHTML = d.buzzerHtml;
+    const ac = document.getElementById('bannerActiveSignals');
+    if (ac) ac.innerHTML = `<i class="bi bi-broadcast me-1"></i>${d.upCount} Up`;
+    const sb = document.getElementById('activeSerialsBadge');
+    if (sb && typeof d.serialsHtml === 'string') sb.innerHTML = d.serialsHtml;
+    document.querySelectorAll('[id^="utilActiveSigCount-"]').forEach(el => { el.textContent = d.upCount; });
+    if (d.cease) applyCeaseState(d.cease);
   } catch (e) {}
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  if (!document.getElementById('rangeStateBanner')) return;
-  setInterval(pollRangeStateStatus, 5000);
+  if (!document.getElementById('rangeStateBanner')) return;  // only on authed pages
+  heartbeat();
+  setInterval(() => { if (!document.hidden) heartbeat(); }, 5000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) heartbeat(); });
 });
 
 // ── Light / dark theme (persisted per terminal via localStorage) ──────────────
@@ -246,27 +281,28 @@ function hideCeaseSplash() {
   if (root) root.innerHTML = '';
 }
 
+// Apply a CEASE state payload (from the heartbeat, or a direct pollCease call
+// right after raising/dismissing). Shows/hides the full-screen splash.
+function applyCeaseState(data) {
+  if (!document.getElementById('ceaseRoot') || !data) return;
+  if (data.active) {
+    if (ceaseCurrentId !== data.id) { ceaseCurrentId = data.id; showCeaseSplash(data); }
+  } else if (ceaseCurrentId !== null) {
+    ceaseCurrentId = null;
+    hideCeaseSplash();
+  }
+}
+
+// Kept for the immediate refresh after a raise/dismiss; periodic CEASE polling
+// now rides on the consolidated heartbeat.
 async function pollCease() {
   if (!document.getElementById('ceaseRoot')) return;
   try {
     const r = await fetch('/cease/state', { headers: { 'Accept': 'application/json' } });
     if (!r.ok) return;
-    const data = await r.json();
-    if (data.active) {
-      if (ceaseCurrentId !== data.id) { ceaseCurrentId = data.id; showCeaseSplash(data); }
-    } else if (ceaseCurrentId !== null) {
-      ceaseCurrentId = null;
-      hideCeaseSplash();
-    }
+    applyCeaseState(await r.json());
   } catch (e) {}
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-  if (document.getElementById('ceaseRoot')) {
-    pollCease();
-    setInterval(pollCease, 3000);
-  }
-});
 
 // ── Instant chat: lightweight in-memory polling chat ─────────────────────────
 function loadChatSessionState() {
@@ -915,8 +951,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!document.getElementById('chatDock')) return;
   refreshChatState();
   updateChatUnreadBadge();
-  setInterval(refreshChatState, 10000);
-  setInterval(pollKnownChatRooms, 2500);
+  // Skip chat polls while the tab is hidden (backgrounded/forgotten terminals
+  // stop hammering the server); resume immediately when it becomes visible.
+  setInterval(() => { if (!document.hidden) refreshChatState(); }, 10000);
+  setInterval(() => { if (!document.hidden) pollKnownChatRooms(); }, 2500);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { refreshChatState(); pollKnownChatRooms(); }
+  });
 });
 
 function markChatOffline() {

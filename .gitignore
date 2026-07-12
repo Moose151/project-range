@@ -2,6 +2,9 @@
 *.db
 *.sqlite
 *.sqlite3
+# SQLite WAL sidecars (journal_mode=WAL)
+*.db-wal
+*.db-shm
 
 # Python
 __pycache__/

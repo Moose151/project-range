@@ -1,6 +1,6 @@
 # Project Range — Roadmap to v1.0
 
-**Current version:** `0.31.7` (beta) · shown in the top-right navbar area and in `app/config.py`.
+**Current version:** `0.31.9` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
 This roadmap takes Project Range from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
@@ -25,7 +25,9 @@ The app has started to feel sluggish as features accumulated. A prioritised,
 low-risk-first plan lives in **[HANDOVER.md → Performance / efficiency plan](HANDOVER.md#-performance--efficiency-plan-how-to-de-sluggify)**.
 
 - **[shipped 0.31.7]** DB indexes on `signal_logs` and other hot tables — the dashboard poll now uses an index instead of a full table scan.
-- **[next]** GZip + long-lived static caching; collapse the many polling timers into one heartbeat; remove the `_dashboard_ctx` N+1 queries; ETag/304 the pollers; retention/archive job for `signal_logs`/`audit_logs`; SQLite WAL.
+- **[shipped 0.31.8]** GZip compression, week-long static caching, SQLite WAL, and the biggest dashboard N+1s removed (`_latest_signal_status` latest-per-signal subquery; `_pkg_rf_by_signal` batched).
+- **[shipped 0.31.9]** Poll storm collapsed into a single `/status/heartbeat` (five timers → one), paused when the tab is hidden.
+- **[next]** ETag/304 the heartbeat + fragment polls; retention/archive job for `signal_logs`/`audit_logs`; finish the last `_dashboard_ctx` N+1s (CDA loop, `has_cbm_mapping`).
 
 ---
 

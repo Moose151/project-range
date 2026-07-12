@@ -236,25 +236,17 @@
           {% endif %}
         </span>
         {% if not user.must_change_password %}
-        <span id="buzzerBadge"
-              hx-get="/status/buzzer"
-              hx-trigger="load, every 10s"
-              hx-swap="innerHTML">
+        <!-- Updated by the consolidated status heartbeat (heartbeat() in app.js). -->
+        <span id="buzzerBadge">
           {% if buzzer_active is defined %}{% include "partials/buzzer_badge.html" %}{% endif %}
         </span>
         {% endif %}
       </span>
       <span class="d-flex align-items-center gap-3">
         {% if not user.must_change_password %}
-        <span id="bannerActiveSignals"
-              hx-get="/status/active-count"
-              hx-trigger="load, every 10s"
-              hx-swap="innerHTML"
-              class="text-muted small"></span>
-        <span id="activeSerialsBadge"
-              hx-get="/status/serials"
-              hx-trigger="load, every 15s"
-              hx-swap="innerHTML"></span>
+        <!-- Both badges are filled by the status heartbeat on first tick. -->
+        <span id="bannerActiveSignals" class="text-muted small"></span>
+        <span id="activeSerialsBadge"></span>
         {% endif %}
         <a href="/range-state/change" class="btn btn-sm btn-outline-secondary py-0">Change State</a>
       </span>
@@ -386,7 +378,7 @@
 
 <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="/static/vendor/htmx/htmx.min.js"></script>
-<script src="/static/js/app.js?v=34"></script>
+<script src="/static/js/app.js?v=35"></script>
 <script>
   // Auto-open a create panel when arriving via a top-bar "+ New" link (?new=1).
   document.addEventListener('DOMContentLoaded', function () {

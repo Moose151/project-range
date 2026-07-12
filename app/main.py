@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from app.config import (
     SECRET_KEY, APP_VERSION, SESSION_MAX_AGE_DAYS,
@@ -104,6 +105,12 @@ async def security_middleware(request: Request, call_next):
     return response
 
 
+# Compress HTML/JS/CSS/JSON responses (fragments, polls, page loads) to cut
+# transfer size over the LAN. Added before SessionMiddleware so Session stays the
+# outermost middleware (the Observer read-only check depends on request.session
+# being populated — see comment below).
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 # Added last so it is the OUTERMOST middleware (Starlette inserts each at index 0),
 # i.e. it runs before security_middleware — guaranteeing request.session is
 # populated when the read-only Observer check inspects it.
@@ -116,7 +123,21 @@ app.add_middleware(
 )
 
 
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+class CachedStaticFiles(StaticFiles):
+    """StaticFiles that lets browsers cache assets for a week.
+
+    Safe because JS/CSS are cache-busted with a ?v=NN query string (bump the
+    version to force a refetch); other assets (logo, fonts, icons) change rarely,
+    so a one-week window is an acceptable trade-off for far fewer revalidations.
+    """
+
+    def file_response(self, *args, **kwargs):
+        resp = super().file_response(*args, **kwargs)
+        resp.headers.setdefault("Cache-Control", "public, max-age=604800")
+        return resp
+
+
+app.mount("/static", CachedStaticFiles(directory="app/static"), name="static")
 
 app.include_router(auth.router)
 app.include_router(dashboard.router)

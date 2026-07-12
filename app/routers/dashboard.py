@@ -6,18 +6,20 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.orm import Session, selectinload
 from urllib.parse import quote_plus
 from app.chameleon import chameleon_base_name, next_chameleon_name
 from app.config import CBM_AUTO_SYNC_SECONDS
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials, is_testing_state
-from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage, SerialCDATable, CDAWindow, RFDevice, CallType, SignalPackageEntry, SerialPackage
+from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage, SerialCDATable, CDAWindow, RFDevice, CallType, SignalPackage, SignalPackageEntry, SerialPackage
 from app.cbm_sync import sync_active_cbms
-from app.rf_config import serial_package_rf_config, recalculate_from_values
+from app.rf_config import serial_package_rf_config, recalculate_from_values, package_rf_config, package_has_rf_config
 from app.signal_warnings import warning_flags_for
 from app.settings import get_local_timezone
 from app.routers.docs import _render_markdown
+from app.routers.cease import _active_cease
 
 
 class _SignalUpdate(BaseModel):
@@ -60,21 +62,24 @@ def _latest_signal_status(db: Session, serial_id: int | None = None) -> list:
     If serial_id is given, restrict to logs from that serial.
     Falls back to all logs when no active serials exist (legacy/no-serial mode).
     """
-    q = db.query(SignalLog).filter(
+    filters = [
         SignalLog.is_deleted == False,
         SignalLog.signal_name != "[NOTE]",
         SignalLog.is_testing == is_testing_state(db),
-    )
+    ]
     if serial_id is not None:
-        q = q.filter(SignalLog.serial_id == serial_id)
-    logs = q.order_by(SignalLog.signal_name, SignalLog.timestamp.desc()).all()
-    seen: set[str] = set()
-    result = []
-    for log in logs:
-        if log.signal_name not in seen:
-            seen.add(log.signal_name)
-            result.append(log)
-    return result
+        filters.append(SignalLog.serial_id == serial_id)
+    # Fetch only the latest row per signal (max id = most recent insert, since ids
+    # are monotonic) instead of loading every historical row for the serial and
+    # de-duping in Python — the poll runs every 5s. Ordered by name so the stable
+    # sort in _order_signals keeps its tie-break behaviour.
+    latest_ids = db.query(func.max(SignalLog.id)).filter(*filters).group_by(SignalLog.signal_name)
+    return (
+        db.query(SignalLog)
+        .filter(SignalLog.id.in_(latest_ids))
+        .order_by(SignalLog.signal_name)
+        .all()
+    )
 
 
 def _active_serial_signals(db: Session) -> list:
@@ -886,9 +891,36 @@ def _pkg_rf_for_serial(db: Session, serial_id: int) -> dict | None:
 
 
 def _pkg_rf_by_signal(db: Session, serial_id: int, signals: list[SignalLog]) -> dict:
-    """Map each displayed signal to the RF plan of its assigned package."""
+    """Map each displayed signal to the RF plan of its assigned package.
+
+    Batches the serial's packages + their signals in a single load and resolves
+    every signal in Python — replacing the previous per-signal
+    ``serial_package_rf_config`` call, which re-queried the serial's packages
+    (and lazy-loaded their signals) once for each row on every 5s poll.
+    """
+    if not signals:
+        return {}
+    links = (
+        db.query(SerialPackage)
+        .filter(SerialPackage.serial_id == serial_id)
+        .order_by(SerialPackage.id)
+        .options(selectinload(SerialPackage.package).selectinload(SignalPackage.signals))
+        .all()
+    )
+    configured = [link.package for link in links if package_has_rf_config(link.package)]
+    if not configured:
+        return {log.signal_name: None for log in signals}
+    # First configured package that contains a signal wins (matches the previous
+    # per-signal preference); signals in no configured package fall back to the
+    # first configured package's plan.
+    default_rf = package_rf_config(configured[0])
+    rf_by_name: dict[str, dict] = {}
+    for package in configured:
+        rf = package_rf_config(package)
+        for entry in package.signals:
+            rf_by_name.setdefault(entry.signal_name.strip().casefold(), rf)
     return {
-        log.signal_name: serial_package_rf_config(db, serial_id, log.signal_name)
+        log.signal_name: rf_by_name.get(log.signal_name.strip().casefold(), default_rf)
         for log in signals
     }
 
@@ -1721,4 +1753,52 @@ async def buzzer_fragment(
     return templates.TemplateResponse(request, "partials/buzzer_badge.html", {
         "buzzer_active": active,
         "range_state": range_state,
+    })
+
+
+@router.get("/status/heartbeat")
+async def status_heartbeat(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """One consolidated status poll for every authenticated page.
+
+    Replaces the separate range-state (5s), CEASE (3s), buzzer (10s),
+    active-count (10s) and active-serials (15s) pollers with a single request.
+    The shared active-signal set is computed once here instead of once per
+    endpoint. The client (``heartbeat()`` in app.js) fans the payload out to the
+    banner, badges and CEASE splash. Badge HTML is rendered from the same
+    partials the old endpoints used, so markup stays in one place.
+    """
+    range_state = get_current_range_state(db)
+    active_signals = _active_serial_signals(db)
+    up_count = sum(1 for s in active_signals if s.signal_status == "Up")
+    buzzer = _buzzer_active(active_signals, range_state)
+    active_serials = get_active_serials(db)
+
+    buzzer_html = templates.env.get_template("partials/buzzer_badge.html").render(
+        buzzer_active=buzzer, range_state=range_state,
+    )
+    serials_html = templates.env.get_template("partials/active_serials_badge.html").render(
+        active_serials=active_serials,
+    )
+
+    ev = _active_cease(db)
+    if ev:
+        cease = {
+            "active": True,
+            "id": ev.id,
+            "reason": ev.reason,
+            "raised_by": ev.raised_by.display_name if ev.raised_by else "Unknown",
+            "raised_at": (ev.raised_at.strftime("%d %b %H:%M") + "Z") if ev.raised_at else "",
+        }
+    else:
+        cease = {"active": False}
+
+    return JSONResponse({
+        "rangeState": range_state,
+        "upCount": up_count,
+        "buzzerHtml": buzzer_html,
+        "serialsHtml": serials_html,
+        "cease": cease,
     })

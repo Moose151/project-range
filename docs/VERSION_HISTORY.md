@@ -1,7 +1,19 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.31.7**
+Current version: **0.31.9**
+
+---
+
+## 0.31.9 — Fewer Background Requests
+
+- **The app polls the server far less.** The status banner, the "transmitting" and active-signal/serial badges, and the CEASE alert used to each refresh on their own separate timer; they now share a single lightweight check. Background/minimised terminals also **stop polling entirely** until you switch back to them, which takes load off the server when lots of screens are left open. No visible change — the banner and badges update exactly as before, just more efficiently. If a terminal gets logged out (idle or bumped by another login) it still bounces to the login screen on its own.
+
+---
+
+## 0.31.8 — Speed-Ups
+
+- **The app is quicker, especially the live dashboard.** Pages and dashboard refreshes are now compressed over the network, static files (styles/scripts) are cached by the browser for a week, and the dashboard does far less database work on each refresh. The database also switched to a mode (WAL) that stops the live refreshes and the background modem sync from waiting on each other. No changes to how anything looks or works — it should just feel snappier as your log history grows.
 
 ---
 

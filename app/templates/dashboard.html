@@ -766,10 +766,7 @@ function utilityBody(id, type, config = {}) {
   if (type === 'active-signals') {
     return `<div class="text-center py-2" id="utilActiveSignalsWidget-${id}">
               <div class="text-muted small mb-1">Active Signals (Up)</div>
-              <div class="fw-bold fs-1" id="utilActiveSigCount-${id}"
-                   hx-get="/status/active-count-raw"
-                   hx-trigger="load, every 10s"
-                   hx-swap="innerHTML">{{ up_count }}</div>
+              <div class="fw-bold fs-1" id="utilActiveSigCount-${id}">{{ up_count }}</div>
             </div>`;
   }
   if (type === 'live-spectrum') {
