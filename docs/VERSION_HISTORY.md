@@ -1,7 +1,16 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.31.10**
+Current version: **0.31.11**
+
+---
+
+## 0.31.11 — Signal Log Retention & Archiving
+
+- **Old signal logs can now be archived and pruned.** Signal log rows for closed serials older than a configurable number of months are exported to a spreadsheet in the serial archive directory and then removed from the live table, keeping the database from growing indefinitely while preserving every entry offline.
+- **Configurable retention period.** Administrators can set the retention period (1–120 months, default 12) under **Admin > App Config > System**. The existing signal-log-retain setting is also respected by a standalone `scripts/archive_logs.py` script for cron/scheduled use.
+- **Manual archive trigger from the UI.** A new "Archive Signal Logs" section on the System tab lets administrators run a dry-run preview or trigger an immediate archive. A short confirmation dialog prevents accidental runs.
+- **Testing-scope data is discarded, not archived.** Signal logs created in the Testing/Sandbox workspace are deleted without exporting, consistent with the existing audit-log retention behaviour.
 
 ---
 

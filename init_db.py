@@ -728,6 +728,8 @@ def main():
             db.add(AppSetting(key="cbm_ber_log_threshold", value="1e-07"))
         if not db.query(AppSetting).filter(AppSetting.key == "cbm_ber_log_enabled").first():
             db.add(AppSetting(key="cbm_ber_log_enabled", value="0"))
+        if not db.query(AppSetting).filter(AppSetting.key == "signal_log_retain_months").first():
+            db.add(AppSetting(key="signal_log_retain_months", value="12"))
         db.commit()
         print("Ensured default system settings")
 

@@ -35,6 +35,12 @@ from app.settings import (
     get_cbm_ber_log_enabled,
     SANDBOX_HARDWARE_SYNC_PAUSED_KEY,
     get_sandbox_hardware_sync_paused,
+    SIGNAL_LOG_RETAIN_MONTHS_KEY,
+    MIN_SIGNAL_LOG_RETAIN_MONTHS,
+    MAX_SIGNAL_LOG_RETAIN_MONTHS,
+    DEFAULT_SIGNAL_LOG_RETAIN_MONTHS,
+    clamp_signal_log_retain_months,
+    get_signal_log_retain_months,
 )
 
 router = APIRouter(prefix="/config")
@@ -150,6 +156,9 @@ async def config_page(
         # sandbox_hardware_sync_paused() in Testing mode. A same-named context bool
         # shadows it and makes the call fail ('bool' object is not callable').
         "sandbox_sync_paused_cfg": get_sandbox_hardware_sync_paused(db),
+        "signal_log_retain_months": get_signal_log_retain_months(db),
+        "signal_log_retain_months_min": MIN_SIGNAL_LOG_RETAIN_MONTHS,
+        "signal_log_retain_months_max": MAX_SIGNAL_LOG_RETAIN_MONTHS,
         "system_health": {
             "database": str(db_path) if db_path else DATABASE_URL,
             "database_size_mb": database_size_mb,
@@ -244,6 +253,7 @@ async def system_settings_save(
     cbm_ber_log_threshold: str = Form("1e-7"),
     cbm_ber_log_enabled: str = Form(""),
     sandbox_hardware_sync_paused: str = Form(""),
+    signal_log_retain_months: str = Form("12"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_supervisor),
 ):
@@ -263,8 +273,35 @@ async def system_settings_save(
     set_setting(db, CBM_BER_LOG_THRESHOLD_KEY, f"{ber_thr:g}")
     set_setting(db, CBM_BER_LOG_ENABLED_KEY, "1" if cbm_ber_log_enabled == "1" else "0")
     set_setting(db, SANDBOX_HARDWARE_SYNC_PAUSED_KEY, "1" if sandbox_hardware_sync_paused == "1" else "0")
+    set_setting(db, SIGNAL_LOG_RETAIN_MONTHS_KEY, str(clamp_signal_log_retain_months(signal_log_retain_months)))
     db.commit()
     return RedirectResponse("/config?toast=System+settings+saved", status_code=302)
+
+
+@router.post("/archive-signal-logs", response_class=HTMLResponse)
+async def archive_signal_logs(
+    request: Request,
+    dry_run: str = Form(""),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    from app.signal_log_archive import archive_old_signal_logs
+    retain = get_signal_log_retain_months(db)
+    is_dry = dry_run == "1"
+    result = archive_old_signal_logs(db, retain_months=retain, actor_id=current_user.id, dry_run=is_dry)
+    if result.ok:
+        css = "text-success"
+    else:
+        css = "text-warning"
+    msg = result.summary()
+    if result.errors:
+        msg += " Errors: " + "; ".join(result.errors)
+    return HTMLResponse(
+        f'<div class="small {css} mt-2" id="signal-log-archive-result">'
+        f'<i class="bi bi-{"check2" if result.ok else "exclamation-triangle"} me-1"></i>'
+        f"{msg}"
+        f"</div>"
+    )
 
 
 @router.post("/sandbox-hardware-sync")

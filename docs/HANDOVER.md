@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.31.10` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.31.11` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -65,8 +65,8 @@ Dashboard masonry (0.29.0) and the activity create/clone workflow (0.29.2) are *
 ## ⚡ Performance / efficiency plan (how to de-sluggify)
 
 As features have piled up the app has started to feel sluggish. Diagnosis and a
-**prioritised, low-risk-first** plan. Steps 1, 2, 3, 4, 5 and 7 are **done**
-(0.31.7–0.31.10); step 6 remains. Measure
+**prioritised, low-risk-first** plan. All steps are now **done**
+(0.31.7–0.31.11). Measure
 before/after with the browser Network tab (request count + timing) and, for DB
 work, SQLite `EXPLAIN QUERY PLAN`.
 
@@ -83,12 +83,18 @@ work, SQLite `EXPLAIN QUERY PLAN`.
 3. ✅ **Collapse the poll storm into one heartbeat.** Done in 0.31.9. `GET /status/heartbeat` (`dashboard.py`) returns one JSON payload (range state, up-count, pre-rendered buzzer + active-serials badge HTML, CEASE state), computing the shared active-signal set once. Client `heartbeat()` (app.js, every 5s) fans it out to the banner, all three nav badges, the dashboard active-signals widgets and the CEASE splash — replacing five separate timers (range-state 5s, CEASE 3s, buzzer 10s, active-count 10s, active-serials 15s). It also **pauses while `document.hidden`** and fires immediately on re-show, and **detects the login redirect** (`response.redirected`) to bounce a kicked/idle session to `/login` from any page (the per-badge HTMX pollers used to do this). Chat pollers (`refreshChatState` 10s, `pollKnownChatRooms` 2.5s) now also pause when hidden. The old `/status/{buzzer,active-count,serials,active-count-raw}` + `/range-state/status` + `/cease/state` endpoints are **kept** (used by direct callers / back-compat) but no longer polled on a timer. **Left as-is:** the dashboard signal-table fragment poll (`/dashboard/fragment/{id}`, every 5s) — it renders HTML, not status, and the browser throttles it while backgrounded.
 4. ✅ **Kill the N+1s in `_dashboard_ctx`.** Done across 0.31.8 and 0.31.10. `_latest_signal_status` fetches only the latest row per signal via a `max(id)` group-by subquery; `_pkg_rf_by_signal` batch-loads the serial's packages+signals once with `selectinload`; active dashboard serials now eager-load packages, package signals, CDA tables/windows and activity in one pass; the serial fragment route uses a lean per-serial context instead of rebuilding every widget. The old per-serial CDA loop and `has_cbm_mapping` lazy-load were removed in 0.31.10.
 5. ✅ **304 the hot pollers.** Done in 0.31.10. The shared heartbeat and dashboard signal-table fragments now send weak `ETag`s with `Cache-Control: no-cache`, so unchanged polls return `304 Not Modified` instead of re-rendering full HTML/JSON.
-6. **Prune/archive old rows.** Add a retention job (reuse the backup/cron pattern) that archives `signal_logs`/`audit_logs` older than N months to a side table or export, keeping the live table small. Keeps every query and export fast long-term.
+6. ✅ **Prune/archive old rows.** Done in 0.31.11. `app/signal_log_archive.py` exports signal log rows for closed serials older than the retention period to XLSX in `SERIAL_ARCHIVE_DIR`, then deletes them; testing-scope rows are deleted without archiving. Admin > App Config > System exposes the retention period setting and manual trigger (with dry-run). `scripts/archive_logs.py` provides a cron-compatible CLI entry point.
 7. ✅ **SQLite WAL + pragmas.** Done in 0.31.8 (`app/database.py` connect listener: `journal_mode=WAL`, `synchronous=NORMAL`, `busy_timeout=5000`) so the frequent poll reads don't block against background CBM/SNMP sync writes. **Note:** WAL adds `range.db-wal`/`-shm` sidecars; `scripts/backup_db.py` now runs `PRAGMA wal_checkpoint(TRUNCATE)` in the container before copying so the single-file backup stays complete, and the sidecars are gitignored.
 
-**Do NOT** reach for a bigger server or a rewrite first — items 1–5 are the 80/20 and are all local, reversible changes. Re-measure after each. **Next up: step 6 (log retention/archive)** so `signal_logs`/`audit_logs` stay small over long deployments.
+**Do NOT** reach for a bigger server or a rewrite first — all six steps are the 80/20 and are all local, reversible changes.
 
 ### Shipped (all on `main`, in order)
+- **0.31.11 — Signal log retention and archiving (performance step 6):**
+  - **`app/signal_log_archive.py`:** new `archive_old_signal_logs(db, retain_months, actor_id, dry_run)` function. Queries closed serials with `closed_at < now - retain_months×30d`; for each, loads all `signal_log` rows, exports live-scope rows to an XLSX in `SERIAL_ARCHIVE_DIR`, deletes them from the DB, writes an `AUDIT_LOG` entry (`SIGNAL_LOG_ARCHIVE`). Testing-scope logs are deleted without archiving. Serial records are kept so history remains intact.
+  - **Admin > App Config > System:** new "Signal log retention (months)" input field (1–120, default 12). Existing "Archive Signal Logs" section with Dry Run (HTMX, inline result) and Archive Now (with confirmation dialog) buttons.
+  - **`POST /config/archive-signal-logs`:** HTMX-targeted endpoint returns an inline HTML result fragment (row count, any errors). Requires Administrator/Supervisor role.
+  - **`scripts/archive_logs.py`:** standalone script runnable via `docker compose exec web python scripts/archive_logs.py [--months N] [--dry-run]`. Reads retain_months from the DB setting unless overridden.
+  - **`init_db.py`:** seeds `AppSetting(key="signal_log_retain_months", value="12")` for fresh databases; existing databases pick it up via `get_setting` fallback.
 - **0.31.10 — Performance pass 4 (dashboard query + 304 refresh pass):**
   - **Dashboard context eager-loading:** active serials now load package links, package signal entries, CDA tables/windows and activity data in batches (`selectinload`) before widget rendering, removing the remaining CDA and CBM-mapping lazy-loads from `_dashboard_ctx`.
   - **Lean fragment refreshes:** `/dashboard/fragment/{serial_id}` now builds only the selected serial widget context instead of recomputing the full dashboard context for every 5s signal-table poll.

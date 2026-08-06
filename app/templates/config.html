@@ -889,12 +889,54 @@ document.addEventListener('DOMContentLoaded', () => {
               Testing/Sandbox only. When paused, automatic and force EBEM/CBM + SNMP syncs do not update sandbox signals or observed routing.
             </div>
           </div>
+          <div class="col-lg-3 col-md-5">
+            <label class="form-label small">Signal log retention (months)</label>
+            <input type="number" class="form-control form-control-sm" name="signal_log_retain_months"
+                   value="{{ signal_log_retain_months }}" min="{{ signal_log_retain_months_min }}"
+                   max="{{ signal_log_retain_months_max }}" step="1">
+            <div class="form-text">
+              Signal log rows for closed serials older than this are archived to XLSX and removed from the live table. Range: {{ signal_log_retain_months_min }}–{{ signal_log_retain_months_max }} months.
+            </div>
+          </div>
           <div class="col-auto align-self-start mt-4">
             <button type="submit" class="btn btn-sm btn-primary">
               <i class="bi bi-check2 me-1"></i>Save System Settings
             </button>
           </div>
         </form>
+        <hr class="border-secondary my-4">
+        <!-- Signal log archive trigger -->
+        <div class="row g-3 mb-3">
+          <div class="col-12">
+            <h6 class="mb-1"><i class="bi bi-journal-minus me-1"></i>Archive Signal Logs</h6>
+            <p class="small text-muted mb-2">
+              Exports signal log rows for closed serials older than the retention period to XLSX in the serial archive directory, then removes them from the live table. Testing-scope logs are deleted without archiving. The serial record is kept so history remains intact.
+            </p>
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+              <form method="post" action="/config/archive-signal-logs"
+                    hx-post="/config/archive-signal-logs"
+                    hx-target="#signal-log-archive-result"
+                    hx-swap="outerHTML"
+                    hx-include="[name='dry_run_hidden']">
+                <input type="hidden" name="dry_run" value="1">
+                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-eye me-1"></i>Dry Run
+                </button>
+              </form>
+              <form method="post" action="/config/archive-signal-logs"
+                    hx-post="/config/archive-signal-logs"
+                    hx-target="#signal-log-archive-result"
+                    hx-swap="outerHTML">
+                <input type="hidden" name="dry_run" value="">
+                <button type="submit" class="btn btn-sm btn-warning text-dark"
+                        onclick="return confirm('Archive and delete signal logs older than {{ signal_log_retain_months }} months? This cannot be undone.')">
+                  <i class="bi bi-archive me-1"></i>Archive Now
+                </button>
+              </form>
+            </div>
+            <div id="signal-log-archive-result" class="mt-2"></div>
+          </div>
+        </div>
         <hr class="border-secondary my-4">
         <div class="row g-3">
           <div class="col-lg-4">

@@ -44,6 +44,16 @@ DEFAULT_CBM_BER_LOG_ENABLED = False
 SANDBOX_HARDWARE_SYNC_PAUSED_KEY = "sandbox_hardware_sync_paused"
 DEFAULT_SANDBOX_HARDWARE_SYNC_PAUSED = False
 
+# How many months of signal log rows to keep in the live table before archiving.
+# Signal logs for closed serials older than this are exported to XLSX in the
+# serial archive directory and then deleted from signal_logs. Testing-scope logs
+# are deleted without archiving. Setting applies to the manual archive action in
+# Admin > App Config > System and to scripts/archive_logs.py.
+SIGNAL_LOG_RETAIN_MONTHS_KEY = "signal_log_retain_months"
+DEFAULT_SIGNAL_LOG_RETAIN_MONTHS = 12
+MIN_SIGNAL_LOG_RETAIN_MONTHS = 1
+MAX_SIGNAL_LOG_RETAIN_MONTHS = 120
+
 try:
     TIME_ZONES = ["UTC"] + sorted(tz for tz in available_timezones() if tz != "UTC")
 except Exception:
@@ -100,6 +110,20 @@ def get_cbm_ber_log_enabled(db: Session) -> bool:
 def get_sandbox_hardware_sync_paused(db: Session) -> bool:
     raw = get_setting(db, SANDBOX_HARDWARE_SYNC_PAUSED_KEY, "0")
     return raw.lower() in ("1", "true", "yes", "on")
+
+
+def clamp_signal_log_retain_months(value: int | str | None) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = DEFAULT_SIGNAL_LOG_RETAIN_MONTHS
+    return max(MIN_SIGNAL_LOG_RETAIN_MONTHS, min(parsed, MAX_SIGNAL_LOG_RETAIN_MONTHS))
+
+
+def get_signal_log_retain_months(db: Session) -> int:
+    return clamp_signal_log_retain_months(
+        get_setting(db, SIGNAL_LOG_RETAIN_MONTHS_KEY, str(DEFAULT_SIGNAL_LOG_RETAIN_MONTHS))
+    )
 
 
 def get_cbm_ebno_log_threshold(db: Session) -> float:
