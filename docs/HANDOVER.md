@@ -13,7 +13,7 @@
 > the source of truth is **[ROADMAP.md](ROADMAP.md)**; for *current behaviour* trust
 > the code. This block summarises where things actually are.
 
-**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.31.9` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
+**App name:** "SEW Range" (re-branded from "Project Range"). **Version:** `0.31.10` (single source: `app/config.py` `APP_VERSION`, shown in the top-right of the UI near the theme toggle).
 **Repo:** github.com/Moose151/project-range · all work is on **`main`**.
 **Deploy:** `git pull && docker compose up -d --build` → http://<host>:**7474** (Docker publishes 7474→container 8001). Dev: `python run.py` (port 8001).
 **First login:** `admin` / `changeme` works **once**, then forces a password change before anything else loads. Set a real `SECRET_KEY` in `.env` (compose requires it).
@@ -65,8 +65,8 @@ Dashboard masonry (0.29.0) and the activity create/clone workflow (0.29.2) are *
 ## ⚡ Performance / efficiency plan (how to de-sluggify)
 
 As features have piled up the app has started to feel sluggish. Diagnosis and a
-**prioritised, low-risk-first** plan. Steps 1, 2, 3, 7 and most of 4 are **done**
-(0.31.7–0.31.9); steps 5, 6 (and the last two N+1s in 4) remain. Measure
+**prioritised, low-risk-first** plan. Steps 1, 2, 3, 4, 5 and 7 are **done**
+(0.31.7–0.31.10); step 6 remains. Measure
 before/after with the browser Network tab (request count + timing) and, for DB
 work, SQLite `EXPLAIN QUERY PLAN`.
 
@@ -81,14 +81,19 @@ work, SQLite `EXPLAIN QUERY PLAN`.
 1. ✅ **DB indexes on `signal_logs` (+ audit/serials/package hot paths).** Done in 0.31.7 (`init_db._migrate` + `SignalLog.__table_args__`). Biggest single win for the poll path.
 2. ✅ **GZip + long-lived static caching.** Done in 0.31.8. `GZipMiddleware(minimum_size=500)` added before `SessionMiddleware` (keeps Session outermost for the Observer check); `/static` served via a `CachedStaticFiles` subclass sending `Cache-Control: public, max-age=604800` (1 week — conservative rather than `immutable` because not every asset is `?v=`-versioned; JS/CSS still are, so bump the version to bust them).
 3. ✅ **Collapse the poll storm into one heartbeat.** Done in 0.31.9. `GET /status/heartbeat` (`dashboard.py`) returns one JSON payload (range state, up-count, pre-rendered buzzer + active-serials badge HTML, CEASE state), computing the shared active-signal set once. Client `heartbeat()` (app.js, every 5s) fans it out to the banner, all three nav badges, the dashboard active-signals widgets and the CEASE splash — replacing five separate timers (range-state 5s, CEASE 3s, buzzer 10s, active-count 10s, active-serials 15s). It also **pauses while `document.hidden`** and fires immediately on re-show, and **detects the login redirect** (`response.redirected`) to bounce a kicked/idle session to `/login` from any page (the per-badge HTMX pollers used to do this). Chat pollers (`refreshChatState` 10s, `pollKnownChatRooms` 2.5s) now also pause when hidden. The old `/status/{buzzer,active-count,serials,active-count-raw}` + `/range-state/status` + `/cease/state` endpoints are **kept** (used by direct callers / back-compat) but no longer polled on a timer. **Left as-is:** the dashboard signal-table fragment poll (`/dashboard/fragment/{id}`, every 5s) — it renders HTML, not status, and the browser throttles it while backgrounded.
-4. ⚠️ **Kill the N+1s in `_dashboard_ctx`.** *Mostly done (0.31.8):* `_latest_signal_status` now fetches only the latest row per signal via a `max(id)` group-by subquery (was: load every historical row for the serial + dedupe in Python, every 5s); `_pkg_rf_by_signal` batch-loads the serial's packages+signals once with `selectinload` and resolves each signal in Python (was: `serial_package_rf_config` per signal). **Still remaining:** the per-serial CDA loop (`SerialCDATable` then a `CDAWindow` query per link) and the `has_cbm_mapping` `serial.package_links` lazy-load in `_dashboard_ctx` — batch these with `selectinload` too.
-5. **Add `Cache-Control: no-store` only where needed and 304 the pollers.** Let the heartbeat/fragments send `ETag`s so unchanged polls return `304` (tiny) instead of re-rendering full HTML.
+4. ✅ **Kill the N+1s in `_dashboard_ctx`.** Done across 0.31.8 and 0.31.10. `_latest_signal_status` fetches only the latest row per signal via a `max(id)` group-by subquery; `_pkg_rf_by_signal` batch-loads the serial's packages+signals once with `selectinload`; active dashboard serials now eager-load packages, package signals, CDA tables/windows and activity in one pass; the serial fragment route uses a lean per-serial context instead of rebuilding every widget. The old per-serial CDA loop and `has_cbm_mapping` lazy-load were removed in 0.31.10.
+5. ✅ **304 the hot pollers.** Done in 0.31.10. The shared heartbeat and dashboard signal-table fragments now send weak `ETag`s with `Cache-Control: no-cache`, so unchanged polls return `304 Not Modified` instead of re-rendering full HTML/JSON.
 6. **Prune/archive old rows.** Add a retention job (reuse the backup/cron pattern) that archives `signal_logs`/`audit_logs` older than N months to a side table or export, keeping the live table small. Keeps every query and export fast long-term.
 7. ✅ **SQLite WAL + pragmas.** Done in 0.31.8 (`app/database.py` connect listener: `journal_mode=WAL`, `synchronous=NORMAL`, `busy_timeout=5000`) so the frequent poll reads don't block against background CBM/SNMP sync writes. **Note:** WAL adds `range.db-wal`/`-shm` sidecars; `scripts/backup_db.py` now runs `PRAGMA wal_checkpoint(TRUNCATE)` in the container before copying so the single-file backup stays complete, and the sidecars are gitignored.
 
-**Do NOT** reach for a bigger server or a rewrite first — items 1–4 are the 80/20 and are all local, reversible changes. Re-measure after each. **Next up: step 5 (ETag/304 the heartbeat + fragment polls)** and **step 6 (log retention/archive)**, plus finishing the last two N+1s in step 4 (CDA loop + `has_cbm_mapping` lazy-load).
+**Do NOT** reach for a bigger server or a rewrite first — items 1–5 are the 80/20 and are all local, reversible changes. Re-measure after each. **Next up: step 6 (log retention/archive)** so `signal_logs`/`audit_logs` stay small over long deployments.
 
 ### Shipped (all on `main`, in order)
+- **0.31.10 — Performance pass 4 (dashboard query + 304 refresh pass):**
+  - **Dashboard context eager-loading:** active serials now load package links, package signal entries, CDA tables/windows and activity data in batches (`selectinload`) before widget rendering, removing the remaining CDA and CBM-mapping lazy-loads from `_dashboard_ctx`.
+  - **Lean fragment refreshes:** `/dashboard/fragment/{serial_id}` now builds only the selected serial widget context instead of recomputing the full dashboard context for every 5s signal-table poll.
+  - **ETag/304 pollers:** the shared `/status/heartbeat`, legacy `/dashboard/fragment`, and per-serial `/dashboard/fragment/{serial_id}` responses now include weak `ETag`s plus `Cache-Control: no-cache`; unchanged polls return `304 Not Modified`.
+  - **Active-signal summary tightened:** `_active_serial_signals` now uses a latest-row-per-signal grouped subquery over active serials instead of loading every active signal log and de-duplicating in Python.
 - **0.31.9 — Performance pass 3 (poll-storm → single heartbeat):**
   - **One consolidated status poll.** New `GET /status/heartbeat` (`dashboard.py`) returns range state, up-count, pre-rendered buzzer + active-serials badge HTML, and CEASE state in a single response (shared active-signal set computed once). Client `heartbeat()` (app.js, `?v=35`) drives the banner, all three nav badges, dashboard active-signals widgets and the CEASE splash — replacing **five** separate timers (range-state 5s, CEASE 3s, buzzer 10s, active-count 10s, active-serials 15s → **1× 5s**).
   - **Pauses when the tab is hidden** (both the heartbeat and the chat pollers) and fires immediately on re-show — idle/backgrounded terminals stop hammering the server.

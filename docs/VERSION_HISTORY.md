@@ -1,7 +1,15 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.31.9**
+Current version: **0.31.10**
+
+---
+
+## 0.31.10 — Snappier Live Dashboard
+
+- **The live dashboard does less repeated work.** Active serials, packages, signal settings, CDA windows, and related activity data are now loaded in batches instead of being fetched row-by-row during dashboard refreshes.
+- **Unchanged refreshes are tiny.** Dashboard signal-table refreshes and the shared heartbeat now return a lightweight "nothing changed" response when the browser already has the latest data, cutting down repeated HTML/JSON rendering during steady periods.
+- **Faster active-signal lookups.** The active-signal summary now asks the database for only the latest row per signal instead of loading all active logs and de-duplicating them in Python.
 
 ---
 

@@ -63,7 +63,7 @@ def get_setting(db: Session, key: str, default: str = "") -> str:
 def set_setting(db: Session, key: str, value: str) -> None:
     row = db.query(AppSetting).filter(AppSetting.key == key).first()
     if row:
-        row.value = value
+        row.value = value  
     else:
         db.add(AppSetting(key=key, value=value))
 

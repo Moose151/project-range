@@ -1,19 +1,20 @@
 import json
+import hashlib
 import re
 from typing import Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy import func
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from urllib.parse import quote_plus
 from app.chameleon import chameleon_base_name, next_chameleon_name
 from app.config import CBM_AUTO_SYNC_SECONDS
 from app.database import get_db
 from app.deps import get_current_user, get_current_range_state, get_active_serials, is_testing_state
-from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage, SerialCDATable, CDAWindow, RFDevice, CallType, SignalPackage, SignalPackageEntry, SerialPackage
+from app.models import User, Signal, SignalLog, ModulationType, FecType, SignalSource, AntennaType, AuditLog, RangeStateLog, Serial, DocPage, CDATable, SerialCDATable, CDAWindow, RFDevice, CallType, SignalPackage, SignalPackageEntry, SerialPackage
 from app.cbm_sync import sync_active_cbms
 from app.rf_config import serial_package_rf_config, recalculate_from_values, package_rf_config, package_has_rf_config
 from app.signal_warnings import warning_flags_for
@@ -56,6 +57,20 @@ router = APIRouter()
 from app.templating import templates
 
 
+def _weak_etag(payload) -> str:
+    raw = json.dumps(payload, sort_keys=True, default=str, separators=(",", ":")).encode("utf-8")
+    return f'W/"{hashlib.sha256(raw).hexdigest()[:24]}"'
+
+
+def _not_modified_if_matched(request: Request, etag: str) -> Response | None:
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={
+            "ETag": etag,
+            "Cache-Control": "no-cache",
+        })
+    return None
+
+
 def _latest_signal_status(db: Session, serial_id: int | None = None) -> list:
     """Return the most recent log entry per unique signal name (non-deleted).
 
@@ -93,24 +108,19 @@ def _active_serial_signals(db: Session) -> list:
     active_ids = [s.id for s in get_active_serials(db)]
     if not active_ids:
         return []
-    logs = (
+    filters = [
+        SignalLog.is_deleted == False,
+        SignalLog.signal_name != "[NOTE]",
+        SignalLog.is_testing == is_testing_state(db),
+        SignalLog.serial_id.in_(active_ids),
+    ]
+    latest_ids = db.query(func.max(SignalLog.id)).filter(*filters).group_by(SignalLog.signal_name)
+    return (
         db.query(SignalLog)
-        .filter(
-            SignalLog.is_deleted == False,
-            SignalLog.signal_name != "[NOTE]",
-            SignalLog.is_testing == is_testing_state(db),
-            SignalLog.serial_id.in_(active_ids),
-        )
-        .order_by(SignalLog.signal_name, SignalLog.timestamp.desc())
+        .filter(SignalLog.id.in_(latest_ids))
+        .order_by(SignalLog.signal_name)
         .all()
     )
-    seen: set[str] = set()
-    result = []
-    for log in logs:
-        if log.signal_name not in seen:
-            seen.add(log.signal_name)
-            result.append(log)
-    return result
 
 
 def _buzzer_active(signals: list, range_state: str) -> bool:
@@ -464,7 +474,72 @@ def _get_exclusivity_map(db: Session) -> dict[str, list[str]]:
     return result
 
 
-def _display_order_by_signal(db: Session, serial_id: int | None, signals: list) -> dict:
+def _active_serials_for_dashboard(db: Session) -> list[Serial]:
+    """Load active serials with the relationships the dashboard repeatedly uses.
+
+    The dashboard refresh path touches package links/signals for RF plans,
+    display order, priorities and CBM mapping; CDA links/windows for countdowns;
+    and activity for the serial badge. Loading them once avoids several lazy-load
+    bursts on every dashboard render/poll.
+    """
+    testing = is_testing_state(db)
+    return (
+        db.query(Serial)
+        .options(
+            selectinload(Serial.package_links)
+            .selectinload(SerialPackage.package)
+            .selectinload(SignalPackage.signals),
+            selectinload(Serial.cda_links)
+            .selectinload(SerialCDATable.cda_table)
+            .selectinload(CDATable.windows),
+            selectinload(Serial.activity),
+        )
+        .filter(
+            Serial.closed_at == None,
+            Serial.is_started == True,
+            Serial.is_testing == testing,
+        )
+        .order_by(Serial.opened_at.asc())
+        .all()
+    )
+
+
+def _serial_package_links(
+    db: Session,
+    serial_id: int,
+    serial: Serial | None = None,
+) -> list[SerialPackage]:
+    if serial is not None:
+        return sorted(serial.package_links, key=lambda link: link.id or 0)
+    return (
+        db.query(SerialPackage)
+        .filter(SerialPackage.serial_id == serial_id)
+        .order_by(SerialPackage.id)
+        .options(selectinload(SerialPackage.package).selectinload(SignalPackage.signals))
+        .all()
+    )
+
+
+def _serial_for_dashboard(db: Session, serial_id: int) -> Serial | None:
+    return (
+        db.query(Serial)
+        .options(
+            selectinload(Serial.package_links)
+            .selectinload(SerialPackage.package)
+            .selectinload(SignalPackage.signals),
+            selectinload(Serial.activity),
+        )
+        .filter(Serial.id == serial_id, Serial.is_testing == is_testing_state(db))
+        .first()
+    )
+
+
+def _display_order_by_signal(
+    db: Session,
+    serial_id: int | None,
+    signals: list,
+    serial: Serial | None = None,
+) -> dict:
     """Map each displayed signal name to its package-entry display_order (if any).
 
     Mirrors _priority_by_signal: display_order lives on the signal package entry,
@@ -476,13 +551,20 @@ def _display_order_by_signal(db: Session, serial_id: int | None, signals: list) 
     names = {log.signal_name.strip().casefold() for log in signals}
     if not names:
         return {}
-    rows = (
-        db.query(SignalPackageEntry.signal_name, SignalPackageEntry.display_order)
-        .join(SerialPackage, SerialPackage.package_id == SignalPackageEntry.package_id)
-        .filter(SerialPackage.serial_id == serial_id)
-        .order_by(SignalPackageEntry.display_order)
-        .all()
-    )
+    if serial is not None:
+        rows = [
+            (entry.signal_name, entry.display_order)
+            for link in _serial_package_links(db, serial_id, serial)
+            for entry in link.package.signals
+        ]
+    else:
+        rows = (
+            db.query(SignalPackageEntry.signal_name, SignalPackageEntry.display_order)
+            .join(SerialPackage, SerialPackage.package_id == SignalPackageEntry.package_id)
+            .filter(SerialPackage.serial_id == serial_id)
+            .order_by(SignalPackageEntry.display_order)
+            .all()
+        )
     out: dict[str, int] = {}
     for name, order in rows:
         if name.strip().casefold() in names and name not in out:
@@ -490,7 +572,12 @@ def _display_order_by_signal(db: Session, serial_id: int | None, signals: list) 
     return out
 
 
-def _order_signals(db: Session, serial_id: int | None, signals: list) -> list:
+def _order_signals(
+    db: Session,
+    serial_id: int | None,
+    signals: list,
+    serial: Serial | None = None,
+) -> list:
     """Sort a serial's signals by their package display_order, then name.
 
     Signals with no package entry (or an unreordered serial where every entry is
@@ -499,28 +586,130 @@ def _order_signals(db: Session, serial_id: int | None, signals: list) -> list:
     """
     if serial_id is None or not signals:
         return signals
-    order = _display_order_by_signal(db, serial_id, signals)
+    order = _display_order_by_signal(db, serial_id, signals, serial)
     return sorted(signals, key=lambda log: order.get(log.signal_name, 10 ** 6))
+
+
+def _dashboard_static_lists(db: Session) -> dict:
+    return {
+        "mod_types": _get_mod_types(db),
+        "fec_types": _get_fec_types(db),
+        "signal_sources": _get_sources(db),
+        "antenna_types": _get_antennas(db),
+        "exclusivity_map": _get_exclusivity_map(db),
+        "call_types": _get_call_types(db),
+    }
+
+
+def _dashboard_summary_ctx(db: Session) -> dict:
+    range_state = get_current_range_state(db)
+    last_state_change = (
+        db.query(RangeStateLog)
+        .options(joinedload(RangeStateLog.changed_by_user))
+        .order_by(RangeStateLog.id.desc())
+        .first()
+    )
+    active_signals = _active_serial_signals(db)
+    up_count = sum(1 for s in active_signals if s.signal_status == "Up")
+    faulted_count = sum(1 for s in active_signals if s.signal_status == "Faulted")
+    any_buzzer = _buzzer_active(active_signals, range_state)
+    return {
+        "range_state": range_state,
+        "last_state_change": last_state_change,
+        "up_count": up_count,
+        "faulted_count": faulted_count,
+        "any_buzzer": any_buzzer,
+        "buzzer_active": any_buzzer,
+    }
+
+
+def _dashboard_fragment_ctx(db: Session, current_user: User | None = None) -> dict:
+    """Lean context for the 5s serial table poll.
+
+    Unlike _dashboard_ctx, this deliberately avoids building every active
+    serial's widget/CDA data. The fragment template only needs the current
+    serial table plus OOB summary/buzzer fields.
+    """
+    summary = _dashboard_summary_ctx(db)
+    lists = _dashboard_static_lists(db)
+    testing = is_testing_state(db)
+    return {
+        **summary,
+        "cbm_status_by_source": _cbm_status_by_source(db, testing),
+        "mod_types": lists["mod_types"],
+        "fec_types": lists["fec_types"],
+        "signal_sources": lists["signal_sources"],
+        "antenna_types": lists["antenna_types"],
+        "exclusivity_map": lists["exclusivity_map"],
+        "call_types": lists["call_types"],
+        "can_edit": bool(current_user and current_user.role != "observer"),
+    }
+
+
+def _signal_fragment_etag_payload(
+    ctx: dict,
+    serial_id: int | None,
+    signals: list[SignalLog],
+    buzzer_active: bool,
+    has_cbm_mapping: bool,
+    extra: dict | None = None,
+) -> dict:
+    cbm_status = ctx.get("cbm_status_by_source") or {}
+    sources = {signal.source for signal in signals if signal.source}
+    payload = {
+        "serial_id": serial_id,
+        "range_state": ctx.get("range_state"),
+        "up_count": ctx.get("up_count"),
+        "faulted_count": ctx.get("faulted_count"),
+        "any_buzzer": ctx.get("any_buzzer"),
+        "buzzer_active": buzzer_active,
+        "has_cbm_mapping": has_cbm_mapping,
+        "cbm": {source: cbm_status.get(source) for source in sorted(sources)},
+        "signals": [
+            {
+                "id": signal.id,
+                "timestamp": signal.timestamp,
+                "updated_at": signal.updated_at,
+                "name": signal.signal_name,
+                "status": signal.signal_status,
+                "source": signal.source,
+                "engaged": signal.engaged,
+                "tx_if": signal.tx_if,
+                "tx_rf": signal.tx_rf,
+                "rx_rf": signal.rx_rf,
+                "rx_if": signal.rx_if,
+                "unit": signal.freq_unit,
+                "band": signal.band,
+                "modulation": signal.modulation,
+                "symbol_rate": signal.symbol_rate,
+                "fec": signal.fec,
+                "antenna": signal.antenna,
+                "power": signal.power,
+                "power_unit": signal.power_unit,
+                "eb_no": signal.eb_no,
+                "ber": signal.ber_estimate,
+                "warnings": signal.warning_flags,
+            }
+            for signal in signals
+        ],
+    }
+    if extra:
+        payload["extra"] = extra
+    return payload
 
 
 def _dashboard_ctx(db: Session, current_user: User | None = None) -> dict:
     """Shared context dict for dashboard + fragment endpoints."""
-    range_state = get_current_range_state(db)
-    last_state_change = db.query(RangeStateLog).order_by(RangeStateLog.id.desc()).first()
-    mod_types = _get_mod_types(db)
-    fec_types = _get_fec_types(db)
-    signal_sources = _get_sources(db)
-    antenna_types = _get_antennas(db)
-    exclusivity_map = _get_exclusivity_map(db)
-
-    call_types = _get_call_types(db)
-    active_serials = get_active_serials(db)
+    summary = _dashboard_summary_ctx(db)
+    range_state = summary["range_state"]
+    lists = _dashboard_static_lists(db)
+    active_serials = _active_serials_for_dashboard(db)
 
     if active_serials:
         serial_data = []
         all_buzzer = False
         for serial in active_serials:
-            signals = _order_signals(db, serial.id, _latest_signal_status(db, serial_id=serial.id))
+            signals = _order_signals(db, serial.id, _latest_signal_status(db, serial_id=serial.id), serial)
             buzzer = _buzzer_active(signals, range_state)
             if buzzer:
                 all_buzzer = True
@@ -528,8 +717,8 @@ def _dashboard_ctx(db: Session, current_user: User | None = None) -> dict:
                 "serial": serial,
                 "signals": signals,
                 "buzzer_active": buzzer,
-                "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial.id, signals),
-                "priority_by_signal": _priority_by_signal(db, serial.id, signals),
+                "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial.id, signals, serial),
+                "priority_by_signal": _priority_by_signal(db, serial.id, signals, serial),
                 "has_cbm_mapping": any(
                     entry.cbm_device_id
                     for link in serial.package_links
@@ -546,12 +735,9 @@ def _dashboard_ctx(db: Session, current_user: User | None = None) -> dict:
     # CDA data: map serial_id → list of {table_name, windows: [{start, end, label, max_power_dbm}]}
     cda_by_serial: dict[int, list] = {}
     for serial in active_serials:
-        links = db.query(SerialCDATable).filter(SerialCDATable.serial_id == serial.id).all()
         tables = []
-        for link in links:
-            windows = db.query(CDAWindow).filter(
-                CDAWindow.cda_table_id == link.cda_table_id
-            ).order_by(CDAWindow.start_zulu).all()
+        for link in serial.cda_links:
+            windows = link.cda_table.windows
             tables.append({
                 "table_id": link.cda_table_id,
                 "table_name": link.cda_table.name,
@@ -575,13 +761,6 @@ def _dashboard_ctx(db: Session, current_user: User | None = None) -> dict:
             cda_by_serial[serial.id] = tables
 
     global_signals = [s for sd in serial_data for s in sd["signals"]]
-    # Transmitting + Up/Faulted counts are authoritative from ACTIVE serials only,
-    # so a signal in a closed/historical serial (or with no serial) can never make
-    # the dashboard read "transmitting" or inflate the Up count.
-    active_signals = _active_serial_signals(db)
-    up_count = sum(1 for s in active_signals if s.signal_status == "Up")
-    faulted_count = sum(1 for s in active_signals if s.signal_status == "Faulted")
-    any_buzzer = _buzzer_active(active_signals, range_state)
     testing = is_testing_state(db)
     return {
         "serial_data": serial_data,
@@ -590,20 +769,20 @@ def _dashboard_ctx(db: Session, current_user: User | None = None) -> dict:
         # Flat signals list kept for the OOB buzzer swap (any signal across all serials)
         "signals": global_signals,
         # Global aggregates for the summary cards (kept fresh on every poll via OOB)
-        "up_count": up_count,
-        "faulted_count": faulted_count,
-        "any_buzzer": any_buzzer,
+        "up_count": summary["up_count"],
+        "faulted_count": summary["faulted_count"],
+        "any_buzzer": summary["any_buzzer"],
         "range_state": range_state,
-        "buzzer_active": any_buzzer,
-        "mod_types": mod_types,
-        "fec_types": fec_types,
-        "signal_sources": signal_sources,
-        "antenna_types": antenna_types,
-        "last_state_change": last_state_change,
-        "exclusivity_map": exclusivity_map,
+        "buzzer_active": summary["buzzer_active"],
+        "mod_types": lists["mod_types"],
+        "fec_types": lists["fec_types"],
+        "signal_sources": lists["signal_sources"],
+        "antenna_types": lists["antenna_types"],
+        "last_state_change": summary["last_state_change"],
+        "exclusivity_map": lists["exclusivity_map"],
         "local_timezone": get_local_timezone(db),
         "cda_by_serial": cda_by_serial,
-        "call_types": call_types,
+        "call_types": lists["call_types"],
         "can_edit": bool(current_user and current_user.role != "observer"),
     }
 
@@ -873,24 +1052,42 @@ async def dashboard_fragment_legacy(
     current_user: User = Depends(get_current_user),
 ):
     """HTMX polling — fallback when no serial is active (all signals)."""
-    ctx = _dashboard_ctx(db, current_user)
+    ctx = _dashboard_fragment_ctx(db, current_user)
     signals = _latest_signal_status(db)
     range_state = ctx["range_state"]
-    return templates.TemplateResponse(request, "partials/dashboard_fragment.html", {
+    buzzer_active = _buzzer_active(signals, range_state)
+    etag = _weak_etag(_signal_fragment_etag_payload(ctx, None, signals, buzzer_active, False))
+    not_modified = _not_modified_if_matched(request, etag)
+    if not_modified:
+        return not_modified
+    response = templates.TemplateResponse(request, "partials/dashboard_fragment.html", {
         **ctx,
         "signals": signals,
-        "buzzer_active": _buzzer_active(signals, range_state),
+        "buzzer_active": buzzer_active,
         "serial_id": None,
         "has_cbm_mapping": False,
     })
+    response.headers["ETag"] = etag
+    response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
-def _pkg_rf_for_serial(db: Session, serial_id: int) -> dict | None:
+def _pkg_rf_for_serial(db: Session, serial_id: int, serial: Serial | None = None) -> dict | None:
     """Return the first configured package-level RF plan for a serial."""
+    if serial is not None:
+        for link in _serial_package_links(db, serial_id, serial):
+            if package_has_rf_config(link.package):
+                return package_rf_config(link.package)
+        return None
     return serial_package_rf_config(db, serial_id)
 
 
-def _pkg_rf_by_signal(db: Session, serial_id: int, signals: list[SignalLog]) -> dict:
+def _pkg_rf_by_signal(
+    db: Session,
+    serial_id: int,
+    signals: list[SignalLog],
+    serial: Serial | None = None,
+) -> dict:
     """Map each displayed signal to the RF plan of its assigned package.
 
     Batches the serial's packages + their signals in a single load and resolves
@@ -900,13 +1097,7 @@ def _pkg_rf_by_signal(db: Session, serial_id: int, signals: list[SignalLog]) -> 
     """
     if not signals:
         return {}
-    links = (
-        db.query(SerialPackage)
-        .filter(SerialPackage.serial_id == serial_id)
-        .order_by(SerialPackage.id)
-        .options(selectinload(SerialPackage.package).selectinload(SignalPackage.signals))
-        .all()
-    )
+    links = _serial_package_links(db, serial_id, serial)
     configured = [link.package for link in links if package_has_rf_config(link.package)]
     if not configured:
         return {log.signal_name: None for log in signals}
@@ -925,7 +1116,12 @@ def _pkg_rf_by_signal(db: Session, serial_id: int, signals: list[SignalLog]) -> 
     }
 
 
-def _priority_by_signal(db: Session, serial_id: int | None, signals: list[SignalLog]) -> dict:
+def _priority_by_signal(
+    db: Session,
+    serial_id: int | None,
+    signals: list[SignalLog],
+    serial: Serial | None = None,
+) -> dict:
     """Map each displayed signal name to its package-entry priority (if any).
 
     Priority lives on the signal package entry, so we resolve it by name across
@@ -936,12 +1132,19 @@ def _priority_by_signal(db: Session, serial_id: int | None, signals: list[Signal
     names = {log.signal_name.strip().casefold() for log in signals}
     if not names:
         return {}
-    rows = (
-        db.query(SignalPackageEntry.signal_name, SignalPackageEntry.priority)
-        .join(SerialPackage, SerialPackage.package_id == SignalPackageEntry.package_id)
-        .filter(SerialPackage.serial_id == serial_id)
-        .all()
-    )
+    if serial is not None:
+        rows = [
+            (entry.signal_name, entry.priority)
+            for link in _serial_package_links(db, serial_id, serial)
+            for entry in link.package.signals
+        ]
+    else:
+        rows = (
+            db.query(SignalPackageEntry.signal_name, SignalPackageEntry.priority)
+            .join(SerialPackage, SerialPackage.package_id == SignalPackageEntry.package_id)
+            .filter(SerialPackage.serial_id == serial_id)
+            .all()
+        )
     out: dict[str, int] = {}
     for name, priority in rows:
         if priority is not None and name.strip().casefold() in names:
@@ -1013,23 +1216,52 @@ async def dashboard_fragment(
     current_user: User = Depends(get_current_user),
 ):
     """HTMX polling endpoint — returns the serial's table + OOB summary/buzzer."""
-    serial = db.query(Serial).filter(Serial.id == serial_id, Serial.is_testing == is_testing_state(db)).first()
+    serial = _serial_for_dashboard(db, serial_id)
     if not serial:
         return HTMLResponse("")
-    ctx = _dashboard_ctx(db, current_user)
-    signals = _order_signals(db, serial_id, _latest_signal_status(db, serial_id=serial_id))
+    ctx = _dashboard_fragment_ctx(db, current_user)
+    signals = _order_signals(db, serial_id, _latest_signal_status(db, serial_id=serial_id), serial)
     range_state = ctx["range_state"]
-    return templates.TemplateResponse(request, "partials/dashboard_fragment.html", {
+    buzzer_active = _buzzer_active(signals, range_state)
+    has_cbm_mapping = any(
+        entry.cbm_device_id
+        for link in serial.package_links
+        for entry in link.package.signals
+    )
+    pkg_rf = _pkg_rf_for_serial(db, serial_id, serial)
+    pkg_rf_by_signal = _pkg_rf_by_signal(db, serial_id, signals, serial)
+    priority_by_signal = _priority_by_signal(db, serial_id, signals, serial)
+    display_order_by_signal = _display_order_by_signal(db, serial_id, signals, serial)
+    etag = _weak_etag(_signal_fragment_etag_payload(
+        ctx,
+        serial_id,
+        signals,
+        buzzer_active,
+        has_cbm_mapping,
+        extra={
+            "pkg_rf": pkg_rf,
+            "pkg_rf_by_signal": pkg_rf_by_signal,
+            "priority_by_signal": priority_by_signal,
+            "display_order_by_signal": display_order_by_signal,
+        },
+    ))
+    not_modified = _not_modified_if_matched(request, etag)
+    if not_modified:
+        return not_modified
+    response = templates.TemplateResponse(request, "partials/dashboard_fragment.html", {
         **ctx,
         "signals": signals,
-        "buzzer_active": _buzzer_active(signals, range_state),
+        "buzzer_active": buzzer_active,
         "serial_id": serial_id,
         "closed_loop": bool(serial and serial.is_closed_loop),
-        "pkg_rf": _pkg_rf_for_serial(db, serial_id),
-        "pkg_rf_by_signal": _pkg_rf_by_signal(db, serial_id, signals),
-        "priority_by_signal": _priority_by_signal(db, serial_id, signals),
-        "has_cbm_mapping": _serial_has_cbm_mapping(db, serial_id),
+        "pkg_rf": pkg_rf,
+        "pkg_rf_by_signal": pkg_rf_by_signal,
+        "priority_by_signal": priority_by_signal,
+        "has_cbm_mapping": has_cbm_mapping,
     })
+    response.headers["ETag"] = etag
+    response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 @router.get("/dashboard/doc-widget/{slug}", response_class=HTMLResponse)
@@ -1758,6 +1990,7 @@ async def buzzer_fragment(
 
 @router.get("/status/heartbeat")
 async def status_heartbeat(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -1795,10 +2028,18 @@ async def status_heartbeat(
     else:
         cease = {"active": False}
 
-    return JSONResponse({
+    payload = {
         "rangeState": range_state,
         "upCount": up_count,
         "buzzerHtml": buzzer_html,
         "serialsHtml": serials_html,
         "cease": cease,
+    }
+    etag = _weak_etag(payload)
+    not_modified = _not_modified_if_matched(request, etag)
+    if not_modified:
+        return not_modified
+    return JSONResponse(payload, headers={
+        "ETag": etag,
+        "Cache-Control": "no-cache",
     })
