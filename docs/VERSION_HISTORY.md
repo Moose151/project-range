@@ -1,7 +1,15 @@
 # SEW Range — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.31.11**
+Current version: **0.31.12**
+
+---
+
+## 0.31.12 — Activity Bulk Signal Updates & Cross-Workspace Copy
+
+- **Bulk-update signals on the Activities page.** Each signal in a package now has a select checkbox. Tick the signals you want to change, tick which fields to overwrite (band, modulation, FEC, inner code, symbol rate, antenna, power, power unit, notes), and apply them to every selected signal in one go — instead of opening and saving each signal's editor one at a time.
+- **Activities can now be copied between Sandbox and Live in either direction.** Packages, serials, and CDA tables already supported this; Activities previously had no equivalent. Copying an activity brings its serials and their packages along as fresh Pending serials in the other workspace.
+- **Dashboard no longer shows removed signals when nothing is active.** When no serial is running, the dashboard's reference signal list used to keep showing signals long after they were removed from their package (or the package itself was deleted). It now only shows signals that still exist in a current signal package.
 
 ---
 
