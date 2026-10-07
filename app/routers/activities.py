@@ -409,6 +409,92 @@ async def activity_clone_serial(
     return RedirectResponse(f"/activities/{activity_id}?toast=Serial+cloned+as+pending", status_code=302)
 
 
+@router.post("/{activity_id}/copy-to-other")
+async def activity_copy_to_other(
+    activity_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Copy an activity into the other workspace (Live ↔ Sandbox).
+
+    Each of the activity's serials is carried across as a fresh Pending serial
+    (same resolve-or-copy package logic as the standalone serial copy), mirroring
+    `serial_copy_to_other`. Signal logs, CDA assignments and lifecycle state are
+    not copied — everything arrives ready to plan/start in the target workspace.
+    """
+    from urllib.parse import quote_plus
+    from app.routers.packages import _copy_package_to_workspace
+
+    if current_user.role == "observer":
+        raise HTTPException(status_code=403)
+    testing = is_testing_state(db)
+    orig = db.query(Activity).filter(
+        Activity.id == activity_id, Activity.is_testing == testing,
+    ).first()
+    if not orig:
+        return RedirectResponse("/activities", status_code=302)
+
+    target = not testing
+    dest = "Sandbox" if target else "Live"
+
+    new_activity = Activity(
+        name=orig.name,
+        activity_type_id=orig.activity_type_id,
+        description=orig.description,
+        created_by_id=current_user.id,
+        is_testing=target,
+    )
+    new_activity._preserve_testing_scope = True
+    db.add(new_activity)
+    db.flush()
+
+    pkg_cache: dict[int, int] = {}
+    for orig_serial in orig.serials or []:
+        target_pkg_ids: list[int] = []
+        for link in orig_serial.package_links:
+            pkg = link.package
+            if pkg is None:
+                continue
+            if pkg.id in pkg_cache:
+                target_pkg_ids.append(pkg_cache[pkg.id])
+                continue
+            existing = db.query(SignalPackage).filter(
+                SignalPackage.name == pkg.name,
+                SignalPackage.is_testing == target,
+            ).first()
+            if existing:
+                pkg_cache[pkg.id] = existing.id
+                target_pkg_ids.append(existing.id)
+            else:
+                copy_pkg = _copy_package_to_workspace(db, pkg, target, current_user.id)
+                db.flush()
+                pkg_cache[pkg.id] = copy_pkg.id
+                target_pkg_ids.append(copy_pkg.id)
+
+        new_serial = Serial(
+            title=orig_serial.title,
+            notes=orig_serial.notes,
+            instructions=orig_serial.instructions,
+            opened_by_id=current_user.id,
+            is_testing=target,
+            activity_id=new_activity.id,
+        )
+        new_serial._preserve_testing_scope = True
+        db.add(new_serial)
+        db.flush()
+        for pkg_id in target_pkg_ids:
+            db.add(SerialPackage(serial_id=new_serial.id, package_id=pkg_id))
+
+    db.add(AuditLog(
+        user_id=current_user.id, action_type="ACTIVITY_COPY_WORKSPACE",
+        entity_type="Activity", entity_id=new_activity.id,
+        new_value=f"Copied '{orig.name}' from {'Sandbox' if testing else 'Live'} to {dest}",
+    ))
+    db.commit()
+    msg = f'Activity "{orig.name}" copied to {dest}'
+    return RedirectResponse(f"/activities?toast={quote_plus(msg)}", status_code=302)
+
+
 @router.post("/{activity_id}/serials/{serial_id}/edit")
 async def activity_serial_edit(
     activity_id: int,
@@ -647,6 +733,91 @@ async def activity_package_signal_update(
         ))
         db.commit()
     return RedirectResponse(f"/activities/{activity_id}?toast=Signal+updated", status_code=302)
+
+
+@router.post("/{activity_id}/packages/{pkg_id}/signals/bulk-update")
+async def activity_package_signal_bulk_update(
+    activity_id: int,
+    pkg_id: int,
+    entry_ids: list[int] = Form(...),
+    apply_band: bool = Form(False),
+    band: str = Form(""),
+    apply_modulation: bool = Form(False),
+    modulation: str = Form(""),
+    apply_fec: bool = Form(False),
+    fec: str = Form(""),
+    apply_inner_code: bool = Form(False),
+    inner_code: str = Form(""),
+    apply_symbol_rate: bool = Form(False),
+    symbol_rate: str = Form(""),
+    apply_antenna: bool = Form(False),
+    antenna: str = Form(""),
+    apply_power: bool = Form(False),
+    power: float | None = Form(None),
+    apply_power_unit: bool = Form(False),
+    power_unit: str = Form("dBm"),
+    apply_notes: bool = Form(False),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Apply the checked fields to every selected signal in a package at once, instead
+    of opening and saving each signal's editor individually. Unchecked fields are left
+    untouched. Source/CBM path are deliberately excluded — a modem source can only be
+    assigned to one signal at a time (see `_clear_modem_from_other_entries`), so bulk-
+    assigning the same source to multiple signals would just clobber itself."""
+    if current_user.role == "observer":
+        raise HTTPException(status_code=403)
+    if apply_symbol_rate and not symbol_rate.strip():
+        return RedirectResponse(f"/activities/{activity_id}?error=Symbol+rate+cannot+be+blank", status_code=302)
+
+    testing = is_testing_state(db)
+    activity = _activity_or_redirect(db, activity_id, testing)
+    if not activity:
+        return RedirectResponse("/activities", status_code=302)
+    package = db.query(SignalPackage).filter(
+        SignalPackage.id == pkg_id, SignalPackage.is_testing == testing,
+    ).first()
+    if not package or not _activity_has_open_package(activity, pkg_id):
+        return RedirectResponse(f"/activities/{activity_id}?error=Package+not+editable", status_code=302)
+
+    entries = db.query(SignalPackageEntry).filter(
+        SignalPackageEntry.id.in_(entry_ids),
+        SignalPackageEntry.package_id == pkg_id,
+    ).all()
+    if not entries:
+        return RedirectResponse(f"/activities/{activity_id}?error=No+signals+selected", status_code=302)
+
+    for entry in entries:
+        if apply_band:
+            entry.band = band or None
+        if apply_modulation:
+            entry.modulation = modulation or None
+        if apply_fec:
+            entry.fec = fec or None
+        if apply_inner_code:
+            entry.inner_code = inner_code.strip() or None
+        if apply_symbol_rate:
+            entry.symbol_rate = symbol_rate.strip()
+        if apply_antenna:
+            entry.antenna = antenna.strip() or None
+        if apply_power:
+            entry.power = power
+        if apply_power_unit:
+            entry.power_unit = power_unit or "dBm"
+        if apply_notes:
+            entry.notes = notes.strip() or None
+
+    package.updated_at = datetime.utcnow()
+    db.add(AuditLog(
+        user_id=current_user.id,
+        action_type="ACTIVITY_PACKAGE_SIGNAL_BULK_UPDATE",
+        entity_type="SignalPackage",
+        entity_id=package.id,
+        new_value=f"Bulk-updated {len(entries)} signal(s) in '{package.name}'",
+    ))
+    db.commit()
+    return RedirectResponse(f"/activities/{activity_id}?toast={len(entries)}+signal(s)+updated", status_code=302)
 
 
 @router.get("/{activity_id}/export/csv")

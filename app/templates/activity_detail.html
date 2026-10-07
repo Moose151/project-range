@@ -42,6 +42,12 @@
     <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#editActivityPanel">
       <i class="bi bi-pencil me-1"></i>Edit Activity
     </button>
+    <form method="post" action="/activities/{{ activity.id }}/copy-to-other"
+          title="Copy to {% if range_state == 'Testing' %}Live{% else %}Sandbox{% endif %}">
+      <button type="submit" class="btn btn-sm btn-outline-info">
+        <i class="bi bi-box-arrow-in-right me-1"></i>→ {% if range_state == 'Testing' %}Live{% else %}Sandbox{% endif %}
+      </button>
+    </form>
     {% if not activity.completed_at %}
     <form method="post" action="/activities/{{ activity.id }}/complete"
           data-confirm="Mark '{{ activity.name | e }}' complete? Its running serials will be ended and moved to history.">
@@ -130,7 +136,15 @@
 
 {% macro signal_editor(serial, package, entry) %}
 <div class="activity-signal-row">
-  <button class="activity-signal-summary" type="button" data-bs-toggle="collapse"
+  <div class="d-flex align-items-center">
+    {% if user.role != 'observer' and not serial.closed_at %}
+    <input class="form-check-input ms-3 activity-bulk-check" type="checkbox"
+           name="entry_ids" value="{{ entry.id }}"
+           form="bulkform_{{ serial.id }}_{{ package.id }}"
+           data-bulk-group="{{ serial.id }}_{{ package.id }}"
+           title="Select {{ entry.signal_name }} for bulk update">
+    {% endif %}
+  <button class="activity-signal-summary" style="width:auto;flex:1 1 auto" type="button" data-bs-toggle="collapse"
           data-bs-target="#sig_{{ serial.id }}_{{ package.id }}_{{ entry.id }}">
     <span class="fw-semibold">{{ entry.signal_name }}</span>
     <span class="badge bg-body-secondary border border-secondary text-body-secondary">{{ entry.modulation or 'No mod' }}{% if entry.fec %} / {{ entry.fec }}{% endif %}</span>
@@ -138,6 +152,7 @@
     {% if entry.source %}<span class="badge bg-secondary">{{ entry.source }}</span>{% else %}<span class="badge bg-warning text-dark">No source</span>{% endif %}
     <i class="bi bi-chevron-down ms-auto"></i>
   </button>
+  </div>
   <div class="collapse" id="sig_{{ serial.id }}_{{ package.id }}_{{ entry.id }}">
     <div class="activity-inline-editor">
       {% if user.role != 'observer' and not serial.closed_at %}
@@ -289,6 +304,12 @@
           <i class="bi bi-box-arrow-up-right me-1"></i>Open Package
         </a>
         {% if user.role != 'observer' and not serial.closed_at %}
+        {% if package.signals %}
+        <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2" data-bs-toggle="collapse"
+                data-bs-target="#bulkpanel_{{ serial.id }}_{{ package.id }}">
+          <i class="bi bi-ui-checks me-1"></i>Bulk Update
+        </button>
+        {% endif %}
         <form method="post" action="/activities/{{ activity.id }}/serials/{{ serial.id }}/packages/{{ package.id }}/remove"
               data-confirm="Remove package {{ package.name | e }} from {{ serial.title | e }}?">
           <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">
@@ -297,6 +318,110 @@
         </form>
         {% endif %}
       </div>
+      {% if user.role != 'observer' and not serial.closed_at and package.signals %}
+      <div class="collapse mb-2" id="bulkpanel_{{ serial.id }}_{{ package.id }}">
+        <div class="activity-inline-editor border border-warning-subtle rounded">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="form-check mb-0">
+              <input class="form-check-input" type="checkbox" id="bulkall_{{ serial.id }}_{{ package.id }}"
+                     onclick="activityBulkToggleAll('{{ serial.id }}_{{ package.id }}', this.checked)">
+              <label class="form-check-label small" for="bulkall_{{ serial.id }}_{{ package.id }}">Select / deselect all signals in this package</label>
+            </div>
+          </div>
+          <form id="bulkform_{{ serial.id }}_{{ package.id }}" method="post"
+                action="/activities/{{ activity.id }}/packages/{{ package.id }}/signals/bulk-update"
+                data-confirm="Apply the checked fields to every selected signal in {{ package.name | e }}?">
+            <div class="small text-muted mb-2">
+              Tick a signal above, tick the fields below you want to overwrite, then Apply. Unticked fields are left untouched on every selected signal.
+            </div>
+            <div class="row g-2 align-items-end">
+              <div class="col-md-3">
+                <div class="form-check mb-1">
+                  <input class="form-check-input" type="checkbox" name="apply_band" value="1" id="ab_{{ serial.id }}_{{ package.id }}">
+                  <label class="form-check-label small" for="ab_{{ serial.id }}_{{ package.id }}">Band</label>
+                </div>
+                <select class="form-select form-select-sm" name="band">
+                  <option value="">—</option>
+                  {% for b in bands %}<option value="{{ b }}">{{ b }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-md-3">
+                <div class="form-check mb-1">
+                  <input class="form-check-input" type="checkbox" name="apply_modulation" value="1" id="am_{{ serial.id }}_{{ package.id }}">
+                  <label class="form-check-label small" for="am_{{ serial.id }}_{{ package.id }}">Modulation</label>
+                </div>
+                <select class="form-select form-select-sm" name="modulation">
+                  <option value="">—</option>
+                  {% for m in mod_types %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-md-3">
+                <div class="form-check mb-1">
+                  <input class="form-check-input" type="checkbox" name="apply_fec" value="1" id="af_{{ serial.id }}_{{ package.id }}">
+                  <label class="form-check-label small" for="af_{{ serial.id }}_{{ package.id }}">FEC</label>
+                </div>
+                <select class="form-select form-select-sm" name="fec">
+                  <option value="">—</option>
+                  {% for f in fec_types %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-md-3">
+                <div class="form-check mb-1">
+                  <input class="form-check-input" type="checkbox" name="apply_inner_code" value="1" id="aic_{{ serial.id }}_{{ package.id }}">
+                  <label class="form-check-label small" for="aic_{{ serial.id }}_{{ package.id }}">Inner Code</label>
+                </div>
+                <input type="text" class="form-control form-control-sm" name="inner_code">
+              </div>
+              <div class="col-md-3">
+                <div class="form-check mb-1">
+                  <input class="form-check-input" type="checkbox" name="apply_symbol_rate" value="1" id="asr_{{ serial.id }}_{{ package.id }}">
+                  <label class="form-check-label small" for="asr_{{ serial.id }}_{{ package.id }}">Symbol Rate</label>
+                </div>
+                <input type="text" class="form-control form-control-sm" name="symbol_rate">
+              </div>
+              <div class="col-md-3">
+                <div class="form-check mb-1">
+                  <input class="form-check-input" type="checkbox" name="apply_antenna" value="1" id="aa_{{ serial.id }}_{{ package.id }}">
+                  <label class="form-check-label small" for="aa_{{ serial.id }}_{{ package.id }}">Antenna</label>
+                </div>
+                <select class="form-select form-select-sm" name="antenna">
+                  <option value="">—</option>
+                  {% for a in antenna_types %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-md-2">
+                <div class="form-check mb-1">
+                  <input class="form-check-input" type="checkbox" name="apply_power" value="1" id="ap_{{ serial.id }}_{{ package.id }}">
+                  <label class="form-check-label small" for="ap_{{ serial.id }}_{{ package.id }}">Power</label>
+                </div>
+                <input type="number" class="form-control form-control-sm" name="power" step="any">
+              </div>
+              <div class="col-md-2">
+                <div class="form-check mb-1">
+                  <input class="form-check-input" type="checkbox" name="apply_power_unit" value="1" id="apu_{{ serial.id }}_{{ package.id }}">
+                  <label class="form-check-label small" for="apu_{{ serial.id }}_{{ package.id }}">Power Unit</label>
+                </div>
+                <select class="form-select form-select-sm" name="power_unit">
+                  {% for u in power_units %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-md-5">
+                <div class="form-check mb-1">
+                  <input class="form-check-input" type="checkbox" name="apply_notes" value="1" id="an_{{ serial.id }}_{{ package.id }}">
+                  <label class="form-check-label small" for="an_{{ serial.id }}_{{ package.id }}">Notes</label>
+                </div>
+                <input type="text" class="form-control form-control-sm" name="notes">
+              </div>
+              <div class="col-md-2">
+                <button type="submit" class="btn btn-sm btn-warning w-100">
+                  <i class="bi bi-check2-all me-1"></i>Apply
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+      {% endif %}
       {% if package.signals %}
       {% for entry in package.signals %}
       {{ signal_editor(serial, package, entry) }}
@@ -513,4 +638,12 @@
   </div>
 </div>
 {% endif %}
+
+<script>
+function activityBulkToggleAll(groupKey, checked) {
+  document.querySelectorAll('.activity-bulk-check[data-bulk-group="' + groupKey + '"]').forEach(function (cb) {
+    cb.checked = checked;
+  });
+}
+</script>
 {% endblock %}

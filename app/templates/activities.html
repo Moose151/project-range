@@ -105,6 +105,12 @@
         <i class="bi bi-eye me-1"></i>View
       </a>
       {% if user.role != 'observer' %}
+      <form method="post" action="/activities/{{ act.id }}/copy-to-other"
+            title="Copy to {% if range_state == 'Testing' %}Live{% else %}Sandbox{% endif %}">
+        <button type="submit" class="btn btn-sm btn-outline-info py-0 px-2">
+          <i class="bi bi-box-arrow-in-right"></i>
+        </button>
+      </form>
       <form method="post" action="/activities/{{ act.id }}/delete"
             data-confirm="Delete activity '{{ act.name | e }}'? Its serials will be unassigned (not deleted).">
         <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Delete activity"><i class="bi bi-trash"></i></button>

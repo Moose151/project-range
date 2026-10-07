@@ -97,6 +97,21 @@ def _latest_signal_status(db: Session, serial_id: int | None = None) -> list:
     )
 
 
+def _current_package_signal_names(db: Session) -> set[str]:
+    """Signal names that still exist in a signal package in the current workspace.
+
+    Used to scope the no-active-serial legacy signal list so logs for signals that
+    have since been removed from their package (or whose package was deleted) don't
+    linger there forever — there's no active serial to naturally scope them out.
+    """
+    return {
+        name for (name,) in db.query(SignalPackageEntry.signal_name)
+        .join(SignalPackage, SignalPackageEntry.package_id == SignalPackage.id)
+        .filter(SignalPackage.is_testing == is_testing_state(db))
+        .all()
+    }
+
+
 def _active_serial_signals(db: Session) -> list:
     """Latest log per signal, restricted to serials that are currently running.
 
@@ -726,9 +741,13 @@ def _dashboard_ctx(db: Session, current_user: User | None = None) -> dict:
                 ),
             })
     else:
-        # No serials running — show all logs for reference (legacy / no-serial mode),
-        # but nothing can be transmitting: with no active serial no signal is "Up".
-        signals = _latest_signal_status(db)
+        # No serials running — show logs for reference (legacy / no-serial mode), but
+        # nothing can be transmitting: with no active serial no signal is "Up". Restrict
+        # to signal names that still exist in a current signal package — otherwise stale
+        # logs for signals removed from their package (or whose package was deleted)
+        # linger here forever since there's no active serial to scope them to.
+        current_signal_names = _current_package_signal_names(db)
+        signals = [s for s in _latest_signal_status(db) if s.signal_name in current_signal_names]
         all_buzzer = False
         serial_data = [{"serial": None, "signals": signals, "buzzer_active": False, "has_cbm_mapping": False}]
 
@@ -1053,7 +1072,8 @@ async def dashboard_fragment_legacy(
 ):
     """HTMX polling — fallback when no serial is active (all signals)."""
     ctx = _dashboard_fragment_ctx(db, current_user)
-    signals = _latest_signal_status(db)
+    current_signal_names = _current_package_signal_names(db)
+    signals = [s for s in _latest_signal_status(db) if s.signal_name in current_signal_names]
     range_state = ctx["range_state"]
     buzzer_active = _buzzer_active(signals, range_state)
     etag = _weak_etag(_signal_fragment_etag_payload(ctx, None, signals, buzzer_active, False))
