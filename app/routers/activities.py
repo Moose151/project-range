@@ -12,7 +12,7 @@ from app.models import (
     SignalLog, SignalPackage, SignalPackageEntry, User, AuditLog,
 )
 from app.ops_health import package_health_badges, serial_readiness_badges
-from app.routers.packages import _cbm_source_device, _dropdown_lists
+from app.routers.packages import _cbm_source_device, _clear_modem_from_other_entries, _dropdown_lists
 from app.templating import templates
 
 router = APIRouter(prefix="/activities")
@@ -735,41 +735,26 @@ async def activity_package_signal_update(
     return RedirectResponse(f"/activities/{activity_id}?toast=Signal+updated", status_code=302)
 
 
-@router.post("/{activity_id}/packages/{pkg_id}/signals/bulk-update")
-async def activity_package_signal_bulk_update(
+@router.post("/{activity_id}/packages/{pkg_id}/signals/save-all")
+async def activity_package_signals_save_all(
     activity_id: int,
     pkg_id: int,
-    entry_ids: list[int] = Form(...),
-    apply_band: bool = Form(False),
-    band: str = Form(""),
-    apply_modulation: bool = Form(False),
-    modulation: str = Form(""),
-    apply_fec: bool = Form(False),
-    fec: str = Form(""),
-    apply_inner_code: bool = Form(False),
-    inner_code: str = Form(""),
-    apply_symbol_rate: bool = Form(False),
-    symbol_rate: str = Form(""),
-    apply_antenna: bool = Form(False),
-    antenna: str = Form(""),
-    apply_power: bool = Form(False),
-    power: float | None = Form(None),
-    apply_power_unit: bool = Form(False),
-    power_unit: str = Form("dBm"),
-    apply_notes: bool = Form(False),
-    notes: str = Form(""),
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Apply the checked fields to every selected signal in a package at once, instead
-    of opening and saving each signal's editor individually. Unchecked fields are left
-    untouched. Source/CBM path are deliberately excluded — a modem source can only be
-    assigned to one signal at a time (see `_clear_modem_from_other_entries`), so bulk-
-    assigning the same source to multiple signals would just clobber itself."""
+    """Save every signal in a package in one submit, each with its own field values.
+
+    `activity_detail.html` renders one `<form>` per package wrapping *every* signal's
+    editor (fields named e.g. `source__{entry_id}`), so a user can expand several
+    signals, give each a different value — e.g. assign a different modem to each —
+    and commit them all together instead of opening, saving, and getting bounced back
+    to the top of the page once per signal.
+    """
+    from urllib.parse import quote_plus
+
     if current_user.role == "observer":
         raise HTTPException(status_code=403)
-    if apply_symbol_rate and not symbol_rate.strip():
-        return RedirectResponse(f"/activities/{activity_id}?error=Symbol+rate+cannot+be+blank", status_code=302)
 
     testing = is_testing_state(db)
     activity = _activity_or_redirect(db, activity_id, testing)
@@ -781,43 +766,73 @@ async def activity_package_signal_bulk_update(
     if not package or not _activity_has_open_package(activity, pkg_id):
         return RedirectResponse(f"/activities/{activity_id}?error=Package+not+editable", status_code=302)
 
-    entries = db.query(SignalPackageEntry).filter(
-        SignalPackageEntry.id.in_(entry_ids),
-        SignalPackageEntry.package_id == pkg_id,
-    ).all()
-    if not entries:
-        return RedirectResponse(f"/activities/{activity_id}?error=No+signals+selected", status_code=302)
+    entries = db.query(SignalPackageEntry).filter(SignalPackageEntry.package_id == pkg_id).all()
+    form = await request.form()
 
-    for entry in entries:
-        if apply_band:
-            entry.band = band or None
-        if apply_modulation:
-            entry.modulation = modulation or None
-        if apply_fec:
-            entry.fec = fec or None
-        if apply_inner_code:
-            entry.inner_code = inner_code.strip() or None
-        if apply_symbol_rate:
-            entry.symbol_rate = symbol_rate.strip()
-        if apply_antenna:
-            entry.antenna = antenna.strip() or None
-        if apply_power:
-            entry.power = power
-        if apply_power_unit:
-            entry.power_unit = power_unit or "dBm"
-        if apply_notes:
-            entry.notes = notes.strip() or None
+    def field(name: str, entry_id: int, default: str = "") -> str:
+        return str(form.get(f"{name}__{entry_id}", default))
+
+    def field_float(name: str, entry_id: int) -> float | None:
+        raw = field(name, entry_id).strip()
+        if not raw:
+            return None
+        try:
+            return float(raw)
+        except ValueError:
+            return None
+
+    # Only act on entries actually present in the submitted form (guards against a
+    # signal added/removed by someone else between page load and submit).
+    submitted = [e for e in entries if f"signal_name__{e.id}" in form]
+    if not submitted:
+        return RedirectResponse(f"/activities/{activity_id}?error=No+signals+to+save", status_code=302)
+
+    missing_sr = [e for e in submitted if not field("symbol_rate", e.id).strip()]
+    if missing_sr:
+        names = ", ".join(e.signal_name for e in missing_sr)
+        return RedirectResponse(
+            f"/activities/{activity_id}?error=Symbol+rate+is+required+({quote_plus(names)})",
+            status_code=302,
+        )
+
+    for entry in submitted:
+        source_name = field("source", entry.id).strip()
+        cbm_device = _cbm_source_device(db, source_name, testing)
+        cbm_device_id = cbm_device.id if cbm_device else None
+        if cbm_device:
+            source_name = cbm_device.name
+            _clear_modem_from_other_entries(db, cbm_device_id, except_entry_id=entry.id)
+
+        entry.signal_name = field("signal_name", entry.id, entry.signal_name).strip() or entry.signal_name
+        entry.description = field("description", entry.id).strip() or None
+        entry.band = field("band", entry.id) or None
+        entry.tx_if = field_float("tx_if", entry.id)
+        entry.tx_rf = field_float("tx_rf", entry.id)
+        entry.rx_rf = field_float("rx_rf", entry.id)
+        entry.rx_if = field_float("rx_if", entry.id)
+        entry.freq_unit = field("freq_unit", entry.id, "MHz") or "MHz"
+        entry.modulation = field("modulation", entry.id) or None
+        entry.fec = field("fec", entry.id) or None
+        entry.inner_code = field("inner_code", entry.id).strip() or None
+        entry.symbol_rate = field("symbol_rate", entry.id).strip()
+        entry.power = field_float("power", entry.id)
+        entry.power_unit = field("power_unit", entry.id, "dBm") or "dBm"
+        entry.source = source_name or None
+        entry.antenna = field("antenna", entry.id).strip() or None
+        entry.cbm_device_id = cbm_device_id
+        entry.cbm_path = field("cbm_path", entry.id) or None
+        entry.notes = field("notes", entry.id).strip() or None
 
     package.updated_at = datetime.utcnow()
     db.add(AuditLog(
         user_id=current_user.id,
-        action_type="ACTIVITY_PACKAGE_SIGNAL_BULK_UPDATE",
+        action_type="ACTIVITY_PACKAGE_SIGNALS_SAVE_ALL",
         entity_type="SignalPackage",
         entity_id=package.id,
-        new_value=f"Bulk-updated {len(entries)} signal(s) in '{package.name}'",
+        new_value=f"Saved {len(submitted)} signal(s) in '{package.name}'",
     ))
     db.commit()
-    return RedirectResponse(f"/activities/{activity_id}?toast={len(entries)}+signal(s)+updated", status_code=302)
+    return RedirectResponse(f"/activities/{activity_id}?toast={len(submitted)}+signal(s)+saved", status_code=302)
 
 
 @router.get("/{activity_id}/export/csv")

@@ -136,15 +136,7 @@
 
 {% macro signal_editor(serial, package, entry) %}
 <div class="activity-signal-row">
-  <div class="d-flex align-items-center">
-    {% if user.role != 'observer' and not serial.closed_at %}
-    <input class="form-check-input ms-3 activity-bulk-check" type="checkbox"
-           name="entry_ids" value="{{ entry.id }}"
-           form="bulkform_{{ serial.id }}_{{ package.id }}"
-           data-bulk-group="{{ serial.id }}_{{ package.id }}"
-           title="Select {{ entry.signal_name }} for bulk update">
-    {% endif %}
-  <button class="activity-signal-summary" style="width:auto;flex:1 1 auto" type="button" data-bs-toggle="collapse"
+  <button class="activity-signal-summary" type="button" data-bs-toggle="collapse"
           data-bs-target="#sig_{{ serial.id }}_{{ package.id }}_{{ entry.id }}">
     <span class="fw-semibold">{{ entry.signal_name }}</span>
     <span class="badge bg-body-secondary border border-secondary text-body-secondary">{{ entry.modulation or 'No mod' }}{% if entry.fec %} / {{ entry.fec }}{% endif %}</span>
@@ -152,116 +144,111 @@
     {% if entry.source %}<span class="badge bg-secondary">{{ entry.source }}</span>{% else %}<span class="badge bg-warning text-dark">No source</span>{% endif %}
     <i class="bi bi-chevron-down ms-auto"></i>
   </button>
-  </div>
   <div class="collapse" id="sig_{{ serial.id }}_{{ package.id }}_{{ entry.id }}">
     <div class="activity-inline-editor">
       {% if user.role != 'observer' and not serial.closed_at %}
-      <form method="post" action="/activities/{{ activity.id }}/packages/{{ package.id }}/signals/{{ entry.id }}/update">
-        <div class="row g-2">
-          <div class="col-md-4">
-            <label class="form-label small">Signal</label>
-            <input type="text" class="form-control form-control-sm" name="signal_name" value="{{ entry.signal_name }}" required>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label small">Description</label>
-            <input type="text" class="form-control form-control-sm" name="description" value="{{ entry.description or '' }}">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label small">Band</label>
-            <select class="form-select form-select-sm" name="band">
-              <option value="">—</option>
-              {% for b in bands %}<option value="{{ b }}" {% if entry.band == b %}selected{% endif %}>{{ b }}</option>{% endfor %}
-            </select>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label small">Unit</label>
-            <select class="form-select form-select-sm" name="freq_unit">
-              {% for u in freq_units %}<option value="{{ u }}" {% if entry.freq_unit == u %}selected{% endif %}>{{ u }}</option>{% endfor %}
-            </select>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label small">TxIF</label>
-            <input type="number" class="form-control form-control-sm" name="tx_if" step="any" value="{{ entry.tx_if if entry.tx_if is not none else '' }}">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label small">TxRF</label>
-            <input type="number" class="form-control form-control-sm" name="tx_rf" step="any" value="{{ entry.tx_rf if entry.tx_rf is not none else '' }}">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label small">RxRF</label>
-            <input type="number" class="form-control form-control-sm" name="rx_rf" step="any" value="{{ entry.rx_rf if entry.rx_rf is not none else '' }}">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label small">RxIF</label>
-            <input type="number" class="form-control form-control-sm" name="rx_if" step="any" value="{{ entry.rx_if if entry.rx_if is not none else '' }}">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label small">Modulation</label>
-            <select class="form-select form-select-sm" name="modulation">
-              <option value="">—</option>
-              {% if entry.modulation and entry.modulation not in mod_types %}<option value="{{ entry.modulation }}" selected>{{ entry.modulation }}</option>{% endif %}
-              {% for m in mod_types %}<option value="{{ m }}" {% if entry.modulation == m %}selected{% endif %}>{{ m }}</option>{% endfor %}
-            </select>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label small">FEC</label>
-            <select class="form-select form-select-sm" name="fec">
-              <option value="">—</option>
-              {% if entry.fec and entry.fec not in fec_types %}<option value="{{ entry.fec }}" selected>{{ entry.fec }}</option>{% endif %}
-              {% for f in fec_types %}<option value="{{ f }}" {% if entry.fec == f %}selected{% endif %}>{{ f }}</option>{% endfor %}
-            </select>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label small">Inner Code</label>
-            <input type="text" class="form-control form-control-sm" name="inner_code" value="{{ entry.inner_code or '' }}">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label small">Symbol Rate <span class="text-danger">*</span></label>
-            <input type="text" class="form-control form-control-sm" name="symbol_rate" value="{{ entry.symbol_rate or '' }}" required>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label small">Source</label>
-            <select class="form-select form-select-sm" name="source">
-              <option value="">No modem assigned</option>
-              {% if entry.source and entry.source not in signal_sources %}<option value="{{ entry.source }}" selected>{{ entry.source }}</option>{% endif %}
-              {% for s in signal_sources %}<option value="{{ s }}" {% if entry.source == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
-            </select>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label small">CBM Path</label>
-            <select class="form-select form-select-sm" name="cbm_path">
-              {% for value, label in cbm_paths %}<option value="{{ value }}" {% if (entry.cbm_path or '') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
-            </select>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label small">Antenna</label>
-            <select class="form-select form-select-sm" name="antenna">
-              <option value="">—</option>
-              {% if entry.antenna and entry.antenna not in antenna_types %}<option value="{{ entry.antenna }}" selected>{{ entry.antenna }}</option>{% endif %}
-              {% for a in antenna_types %}<option value="{{ a }}" {% if entry.antenna == a %}selected{% endif %}>{{ a }}</option>{% endfor %}
-            </select>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label small">Power</label>
-            <input type="number" class="form-control form-control-sm" name="power" step="any" value="{{ entry.power if entry.power is not none else '' }}">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label small">Power Unit</label>
-            <select class="form-select form-select-sm" name="power_unit">
-              {% for u in power_units %}<option value="{{ u }}" {% if entry.power_unit == u %}selected{% endif %}>{{ u }}</option>{% endfor %}
-            </select>
-          </div>
-          <div class="col-md-8">
-            <label class="form-label small">Notes</label>
-            <input type="text" class="form-control form-control-sm" name="notes" value="{{ entry.notes or '' }}">
-          </div>
-          <div class="col-md-4 d-flex align-items-end">
-            <button type="submit" class="btn btn-sm btn-primary w-100">
-              <i class="bi bi-check2 me-1"></i>Save Signal
-            </button>
-          </div>
+      {# Fields below belong to the one combined "Save All Signals" form for this package
+         (see package_panel) — NOT their own form — so several signals can be edited with
+         different values (e.g. different modems) and saved together in a single submit. #}
+      <div class="row g-2">
+        <div class="col-md-4">
+          <label class="form-label small">Signal</label>
+          <input type="text" class="form-control form-control-sm" name="signal_name__{{ entry.id }}" value="{{ entry.signal_name }}" required>
         </div>
-      </form>
+        <div class="col-md-4">
+          <label class="form-label small">Description</label>
+          <input type="text" class="form-control form-control-sm" name="description__{{ entry.id }}" value="{{ entry.description or '' }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small">Band</label>
+          <select class="form-select form-select-sm" name="band__{{ entry.id }}">
+            <option value="">—</option>
+            {% for b in bands %}<option value="{{ b }}" {% if entry.band == b %}selected{% endif %}>{{ b }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small">Unit</label>
+          <select class="form-select form-select-sm" name="freq_unit__{{ entry.id }}">
+            {% for u in freq_units %}<option value="{{ u }}" {% if entry.freq_unit == u %}selected{% endif %}>{{ u }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">TxIF</label>
+          <input type="number" class="form-control form-control-sm" name="tx_if__{{ entry.id }}" step="any" value="{{ entry.tx_if if entry.tx_if is not none else '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">TxRF</label>
+          <input type="number" class="form-control form-control-sm" name="tx_rf__{{ entry.id }}" step="any" value="{{ entry.tx_rf if entry.tx_rf is not none else '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">RxRF</label>
+          <input type="number" class="form-control form-control-sm" name="rx_rf__{{ entry.id }}" step="any" value="{{ entry.rx_rf if entry.rx_rf is not none else '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">RxIF</label>
+          <input type="number" class="form-control form-control-sm" name="rx_if__{{ entry.id }}" step="any" value="{{ entry.rx_if if entry.rx_if is not none else '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">Modulation</label>
+          <select class="form-select form-select-sm" name="modulation__{{ entry.id }}">
+            <option value="">—</option>
+            {% if entry.modulation and entry.modulation not in mod_types %}<option value="{{ entry.modulation }}" selected>{{ entry.modulation }}</option>{% endif %}
+            {% for m in mod_types %}<option value="{{ m }}" {% if entry.modulation == m %}selected{% endif %}>{{ m }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small">FEC</label>
+          <select class="form-select form-select-sm" name="fec__{{ entry.id }}">
+            <option value="">—</option>
+            {% if entry.fec and entry.fec not in fec_types %}<option value="{{ entry.fec }}" selected>{{ entry.fec }}</option>{% endif %}
+            {% for f in fec_types %}<option value="{{ f }}" {% if entry.fec == f %}selected{% endif %}>{{ f }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small">Inner Code</label>
+          <input type="text" class="form-control form-control-sm" name="inner_code__{{ entry.id }}" value="{{ entry.inner_code or '' }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small">Symbol Rate <span class="text-danger">*</span></label>
+          <input type="text" class="form-control form-control-sm" name="symbol_rate__{{ entry.id }}" value="{{ entry.symbol_rate or '' }}" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">Source</label>
+          <select class="form-select form-select-sm" name="source__{{ entry.id }}">
+            <option value="">No modem assigned</option>
+            {% if entry.source and entry.source not in signal_sources %}<option value="{{ entry.source }}" selected>{{ entry.source }}</option>{% endif %}
+            {% for s in signal_sources %}<option value="{{ s }}" {% if entry.source == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small">CBM Path</label>
+          <select class="form-select form-select-sm" name="cbm_path__{{ entry.id }}">
+            {% for value, label in cbm_paths %}<option value="{{ value }}" {% if (entry.cbm_path or '') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">Antenna</label>
+          <select class="form-select form-select-sm" name="antenna__{{ entry.id }}">
+            <option value="">—</option>
+            {% if entry.antenna and entry.antenna not in antenna_types %}<option value="{{ entry.antenna }}" selected>{{ entry.antenna }}</option>{% endif %}
+            {% for a in antenna_types %}<option value="{{ a }}" {% if entry.antenna == a %}selected{% endif %}>{{ a }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small">Power</label>
+          <input type="number" class="form-control form-control-sm" name="power__{{ entry.id }}" step="any" value="{{ entry.power if entry.power is not none else '' }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small">Power Unit</label>
+          <select class="form-select form-select-sm" name="power_unit__{{ entry.id }}">
+            {% for u in power_units %}<option value="{{ u }}" {% if entry.power_unit == u %}selected{% endif %}>{{ u }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-8">
+          <label class="form-label small">Notes</label>
+          <input type="text" class="form-control form-control-sm" name="notes__{{ entry.id }}" value="{{ entry.notes or '' }}">
+        </div>
+      </div>
       {% else %}
       <div class="row g-2 small">
         <div class="col-md-3"><span class="text-muted">TxIF</span><br>{{ entry.tx_if or '—' }}</div>
@@ -305,9 +292,8 @@
         </a>
         {% if user.role != 'observer' and not serial.closed_at %}
         {% if package.signals %}
-        <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2" data-bs-toggle="collapse"
-                data-bs-target="#bulkpanel_{{ serial.id }}_{{ package.id }}">
-          <i class="bi bi-ui-checks me-1"></i>Bulk Update
+        <button type="submit" form="pkgsignals_{{ serial.id }}_{{ package.id }}" class="btn btn-sm btn-success py-0 px-2">
+          <i class="bi bi-check2-all me-1"></i>Save All Signals
         </button>
         {% endif %}
         <form method="post" action="/activities/{{ activity.id }}/serials/{{ serial.id }}/packages/{{ package.id }}/remove"
@@ -319,108 +305,13 @@
         {% endif %}
       </div>
       {% if user.role != 'observer' and not serial.closed_at and package.signals %}
-      <div class="collapse mb-2" id="bulkpanel_{{ serial.id }}_{{ package.id }}">
-        <div class="activity-inline-editor border border-warning-subtle rounded">
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <div class="form-check mb-0">
-              <input class="form-check-input" type="checkbox" id="bulkall_{{ serial.id }}_{{ package.id }}"
-                     onclick="activityBulkToggleAll('{{ serial.id }}_{{ package.id }}', this.checked)">
-              <label class="form-check-label small" for="bulkall_{{ serial.id }}_{{ package.id }}">Select / deselect all signals in this package</label>
-            </div>
-          </div>
-          <form id="bulkform_{{ serial.id }}_{{ package.id }}" method="post"
-                action="/activities/{{ activity.id }}/packages/{{ package.id }}/signals/bulk-update"
-                data-confirm="Apply the checked fields to every selected signal in {{ package.name | e }}?">
-            <div class="small text-muted mb-2">
-              Tick a signal above, tick the fields below you want to overwrite, then Apply. Unticked fields are left untouched on every selected signal.
-            </div>
-            <div class="row g-2 align-items-end">
-              <div class="col-md-3">
-                <div class="form-check mb-1">
-                  <input class="form-check-input" type="checkbox" name="apply_band" value="1" id="ab_{{ serial.id }}_{{ package.id }}">
-                  <label class="form-check-label small" for="ab_{{ serial.id }}_{{ package.id }}">Band</label>
-                </div>
-                <select class="form-select form-select-sm" name="band">
-                  <option value="">—</option>
-                  {% for b in bands %}<option value="{{ b }}">{{ b }}</option>{% endfor %}
-                </select>
-              </div>
-              <div class="col-md-3">
-                <div class="form-check mb-1">
-                  <input class="form-check-input" type="checkbox" name="apply_modulation" value="1" id="am_{{ serial.id }}_{{ package.id }}">
-                  <label class="form-check-label small" for="am_{{ serial.id }}_{{ package.id }}">Modulation</label>
-                </div>
-                <select class="form-select form-select-sm" name="modulation">
-                  <option value="">—</option>
-                  {% for m in mod_types %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
-                </select>
-              </div>
-              <div class="col-md-3">
-                <div class="form-check mb-1">
-                  <input class="form-check-input" type="checkbox" name="apply_fec" value="1" id="af_{{ serial.id }}_{{ package.id }}">
-                  <label class="form-check-label small" for="af_{{ serial.id }}_{{ package.id }}">FEC</label>
-                </div>
-                <select class="form-select form-select-sm" name="fec">
-                  <option value="">—</option>
-                  {% for f in fec_types %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
-                </select>
-              </div>
-              <div class="col-md-3">
-                <div class="form-check mb-1">
-                  <input class="form-check-input" type="checkbox" name="apply_inner_code" value="1" id="aic_{{ serial.id }}_{{ package.id }}">
-                  <label class="form-check-label small" for="aic_{{ serial.id }}_{{ package.id }}">Inner Code</label>
-                </div>
-                <input type="text" class="form-control form-control-sm" name="inner_code">
-              </div>
-              <div class="col-md-3">
-                <div class="form-check mb-1">
-                  <input class="form-check-input" type="checkbox" name="apply_symbol_rate" value="1" id="asr_{{ serial.id }}_{{ package.id }}">
-                  <label class="form-check-label small" for="asr_{{ serial.id }}_{{ package.id }}">Symbol Rate</label>
-                </div>
-                <input type="text" class="form-control form-control-sm" name="symbol_rate">
-              </div>
-              <div class="col-md-3">
-                <div class="form-check mb-1">
-                  <input class="form-check-input" type="checkbox" name="apply_antenna" value="1" id="aa_{{ serial.id }}_{{ package.id }}">
-                  <label class="form-check-label small" for="aa_{{ serial.id }}_{{ package.id }}">Antenna</label>
-                </div>
-                <select class="form-select form-select-sm" name="antenna">
-                  <option value="">—</option>
-                  {% for a in antenna_types %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
-                </select>
-              </div>
-              <div class="col-md-2">
-                <div class="form-check mb-1">
-                  <input class="form-check-input" type="checkbox" name="apply_power" value="1" id="ap_{{ serial.id }}_{{ package.id }}">
-                  <label class="form-check-label small" for="ap_{{ serial.id }}_{{ package.id }}">Power</label>
-                </div>
-                <input type="number" class="form-control form-control-sm" name="power" step="any">
-              </div>
-              <div class="col-md-2">
-                <div class="form-check mb-1">
-                  <input class="form-check-input" type="checkbox" name="apply_power_unit" value="1" id="apu_{{ serial.id }}_{{ package.id }}">
-                  <label class="form-check-label small" for="apu_{{ serial.id }}_{{ package.id }}">Power Unit</label>
-                </div>
-                <select class="form-select form-select-sm" name="power_unit">
-                  {% for u in power_units %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
-                </select>
-              </div>
-              <div class="col-md-5">
-                <div class="form-check mb-1">
-                  <input class="form-check-input" type="checkbox" name="apply_notes" value="1" id="an_{{ serial.id }}_{{ package.id }}">
-                  <label class="form-check-label small" for="an_{{ serial.id }}_{{ package.id }}">Notes</label>
-                </div>
-                <input type="text" class="form-control form-control-sm" name="notes">
-              </div>
-              <div class="col-md-2">
-                <button type="submit" class="btn btn-sm btn-warning w-100">
-                  <i class="bi bi-check2-all me-1"></i>Apply
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
+      <div class="small text-muted mb-2">
+        Expand any signal to edit it — e.g. assign a different modem to each. Nothing is saved
+        until you click <strong>Save All Signals</strong>, so you can set up every signal first
+        and commit them together in one go.
       </div>
+      <form id="pkgsignals_{{ serial.id }}_{{ package.id }}" method="post"
+            action="/activities/{{ activity.id }}/packages/{{ package.id }}/signals/save-all">
       {% endif %}
       {% if package.signals %}
       {% for entry in package.signals %}
@@ -428,6 +319,12 @@
       {% endfor %}
       {% else %}
       <div class="text-muted small fst-italic py-2">No signals in this package.</div>
+      {% endif %}
+      {% if user.role != 'observer' and not serial.closed_at and package.signals %}
+        <button type="submit" class="btn btn-sm btn-success mt-2">
+          <i class="bi bi-check2-all me-1"></i>Save All Signals
+        </button>
+      </form>
       {% endif %}
     </div>
   </div>
@@ -638,12 +535,4 @@
   </div>
 </div>
 {% endif %}
-
-<script>
-function activityBulkToggleAll(groupKey, checked) {
-  document.querySelectorAll('.activity-bulk-check[data-bulk-group="' + groupKey + '"]').forEach(function (cb) {
-    cb.checked = checked;
-  });
-}
-</script>
 {% endblock %}
