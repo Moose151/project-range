@@ -1,8 +1,8 @@
-# Project Range — Initial Application Scope
+# R.I.M.S (Range Information Management System) — Initial Application Scope
 
 ## 1. Project Overview
 
-**Project Range** is an internal RF range operations support application. It is intended to help range operators calculate RF and IF frequencies, perform power conversions, track live signal status, log range activity, manage range state, and maintain range operating documentation.
+**R.I.M.S** (Range Information Management System), formerly known as Project Range / SEW Range, is an internal RF range operations support application. It is intended to help range operators calculate RF and IF frequencies, perform power conversions, track live signal status, log range activity, manage range state, and maintain range operating documentation.
 
 The application will initially be built, deployed, and tested on a Linux workstation during early development and prototyping. Once the prototype has been validated, it should be prepared for deployment on the main range server.
 

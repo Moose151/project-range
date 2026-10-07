@@ -5,17 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Apply saved mode + palette before paint to avoid a flash of the wrong theme -->
   <script>(function(){try{var d=document.documentElement;d.setAttribute('data-bs-theme',localStorage.getItem('rangeTheme')||'dark');d.setAttribute('data-theme',localStorage.getItem('rangePalette')||'classic');}catch(e){}})();</script>
-  <title>{% block title %}SEW Range{% endblock %}</title>
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
   <!-- Vendored locally so styling works on LAN devices with no internet access -->
   <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="/static/vendor/bootstrap-icons/bootstrap-icons.min.css">
   <link rel="stylesheet" href="/static/css/app.css?v=40">
   <link rel="icon" type="image/png" href="/static/img/sew-range-logo.png">
-  <!-- Installable-app (PWA) metadata: lets browsers add "Range Dashboard" to the
+  <!-- Installable-app (PWA) metadata: lets browsers add "{{ app_name }}" to the
        desktop with the logo as its icon. See the Desktop App tab in System Config. -->
   <link rel="manifest" href="/static/manifest.json">
   <meta name="theme-color" content="#10151c">
-  <meta name="application-name" content="Range Dashboard">
+  <meta name="application-name" content="{{ app_name }}">
   <link rel="apple-touch-icon" href="/static/img/range-icon-192.png">
 </head>
 <body>
@@ -31,8 +31,8 @@
 
     <!-- Brand -->
     <div class="sidebar-brand">
-      <img src="/static/img/sew-range-logo.png" alt="SEW Range" height="26" style="flex-shrink:0">
-      <span class="sidebar-label fw-bold" style="color:var(--range-gold);letter-spacing:.04em;font-size:.95rem">SEW Range</span>
+      <img src="/static/img/sew-range-logo.png" alt="{{ app_name }}" height="26" style="flex-shrink:0">
+      <span class="sidebar-label fw-bold" style="color:var(--range-gold);letter-spacing:.04em;font-size:.95rem">{{ app_name }}</span>
     </div>
 
     <!-- Navigation links -->
@@ -209,7 +209,7 @@
         </ul>
       </div>
       {% endif %}
-      <span class="topbar-brand d-none d-lg-inline ms-1">SEW Range</span>
+      <span class="topbar-brand d-none d-lg-inline ms-1">{{ app_name }}</span>
       <div class="ms-auto d-flex align-items-center gap-2">
         <span class="app-version-badge" title="Application version">v{{ app_version }}</span>
         <button id="themeToggle" type="button" class="topbar-btn" onclick="toggleTheme()" title="Toggle light / dark">
@@ -378,7 +378,7 @@
 
 <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="/static/vendor/htmx/htmx.min.js"></script>
-<script src="/static/js/app.js?v=35"></script>
+<script src="/static/js/app.js?v=36"></script>
 <script>
   // Auto-open a create panel when arriving via a top-bar "+ New" link (?new=1).
   document.addEventListener('DOMContentLoaded', function () {

@@ -1344,7 +1344,7 @@ function saveRecentPages(items) {
 
 function rememberCurrentPage() {
   if (!document.body || location.pathname === '/login') return;
-  const title = (document.title || 'SEW Range').replace(/\s+[-–]\s+SEW Range$/, '').trim();
+  const title = (document.title || 'R.I.M.S').replace(/\s+[-–]\s+R\.I\.M\.S$/, '').trim();
   const url = location.pathname + location.search;
   const items = recentPages().filter(item => item.url !== url);
   items.unshift({ title, url, at: Date.now() });

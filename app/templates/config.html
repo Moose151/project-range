@@ -1012,12 +1012,12 @@ document.addEventListener('DOMContentLoaded', () => {
   <!-- Desktop App -->
   <div class="tab-pane fade" id="cfg-desktop" role="tabpanel">
     <div class="card border-secondary">
-      <div class="card-header"><i class="bi bi-window-desktop me-1"></i>Add Range Dashboard to your desktop</div>
+      <div class="card-header"><i class="bi bi-window-desktop me-1"></i>Add {{ app_name }} to your desktop</div>
       <div class="card-body">
         <p class="text-secondary mb-4">
           Give users one-click access to this dashboard from their desktop. The download
-          creates a launcher named <strong>Range Dashboard</strong> that opens this site at its
-          current address. For the SEW Range logo to appear as the app icon, use
+          creates a launcher named <strong>{{ app_name }}</strong> that opens this site at its
+          current address. For the {{ app_name }} logo to appear as the app icon, use
           <em>Install app</em> below.
         </p>
 
@@ -1027,7 +1027,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="border border-secondary rounded p-3 h-100">
               <h6 class="mb-2"><i class="bi bi-windows me-2"></i>Windows</h6>
               <p class="small text-secondary">
-                Downloads <code>Range&nbsp;Dashboard.url</code>. Save it to your Desktop and
+                Downloads <code>{{ app_name }}.url</code>. Save it to your Desktop and
                 double-click to open the dashboard.
               </p>
               <a href="/config/shortcut/windows" class="btn btn-sm btn-primary">
@@ -1041,7 +1041,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="border border-secondary rounded p-3 h-100">
               <h6 class="mb-2"><i class="bi bi-ubuntu me-2"></i>Ubuntu / Linux</h6>
               <p class="small text-secondary">
-                Downloads <code>Range&nbsp;Dashboard.desktop</code>. Move it to your Desktop,
+                Downloads <code>{{ app_name }}.desktop</code>. Move it to your Desktop,
                 then right-click &rarr; <em>Allow Launching</em> (or
                 <code>chmod +x</code>) to enable double-click.
               </p>
@@ -1057,9 +1057,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <h6 class="mb-2"><i class="bi bi-box-arrow-down me-2"></i>Install app (recommended — shows the logo icon)</h6>
         <p class="small text-secondary mb-1">
           In <strong>Chrome</strong> or <strong>Edge</strong>, open the browser menu and choose
-          <em>Install Range Dashboard</em> (or the install <i class="bi bi-box-arrow-in-down"></i>
+          <em>Install {{ app_name }}</em> (or the install <i class="bi bi-box-arrow-in-down"></i>
           icon in the address bar). This adds a real app window to the desktop / Start menu / dock
-          with the SEW Range logo as its icon.
+          with the {{ app_name }} logo as its icon.
         </p>
         <p class="small text-secondary mb-0">
           Note: the <em>Install app</em> option only appears when the site is served over HTTPS

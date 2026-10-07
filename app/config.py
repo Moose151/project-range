@@ -51,9 +51,11 @@ CBM_AUTO_SYNC_SECONDS = int(os.environ.get("CBM_AUTO_SYNC_SECONDS", "5"))
 # Read-only SNMP polling of routing matrices (splitter/combiner). Opt-in and
 # disabled by default (0) since SNMP access on the range is not yet confirmed.
 SNMP_AUTO_SYNC_SECONDS = int(os.environ.get("SNMP_AUTO_SYNC_SECONDS", "0"))
-# Single source of truth for the app version (shown in the top-right UI and
-# reported as the FastAPI app version). Bump on each release.
-APP_VERSION = "0.31.12"
+# Single source of truth for the app name/version (shown in the UI brand, login
+# page, browser tab title, manifest, and reported as the FastAPI app version/title).
+APP_NAME = "R.I.M.S"
+APP_FULL_NAME = "Range Information Management System"
+APP_VERSION = "0.31.13"
 
 FREQUENCY_BANDS = {
     "C":  {"tx_min": 5.850, "tx_max": 6.725, "rx_min": 3.625, "rx_max": 4.200},

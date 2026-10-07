@@ -1,7 +1,14 @@
-# SEW Range — Version History
+# R.I.M.S — Version History
 
 This document records the major user-facing changes shipped in each beta version.
-Current version: **0.31.12**
+Current version: **0.31.13**
+
+---
+
+## 0.31.13 — Renamed to R.I.M.S
+
+- **The app has a new name: R.I.M.S (Range Information Management System)** — previously "SEW Range" (and originally "Project Range"). The new name now appears everywhere the old one did: the browser tab title, the sidebar and top bar, the login page, the dashboard heading, the installable desktop app/shortcuts, and the printable Handover and Wiki pages.
+- Older release notes below that mention "SEW Range" or "Project Range" are left as-is — they're an accurate record of what the app was called at the time.
 
 ---
 

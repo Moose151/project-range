@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Shift Handover — Project Range</title>
+  <title>Shift Handover — {{ app_name }}</title>
   <style>
     body { font-family: Arial, sans-serif; font-size: 10pt; color: #000; margin: 1.5cm; }
     h1 { font-size: 16pt; margin: 0 0 0.2em; }
@@ -28,7 +28,7 @@
 <body>
   <h1>Shift Handover Summary</h1>
   <div class="meta">
-    Project Range · Generated {{ generated_at.strftime('%H:%M:%S %d %B %Y') }} UTC by {{ user.display_name }}
+    {{ app_name }} · Generated {{ generated_at.strftime('%H:%M:%S %d %B %Y') }} UTC by {{ user.display_name }}
   </div>
 
   <table class="summary">

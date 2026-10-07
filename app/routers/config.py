@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, require_supervisor, get_current_range_state, is_testing_state
-from app.config import AUDIT_ARCHIVE_DIR, DATABASE_URL, SERIAL_ARCHIVE_DIR
+from app.config import AUDIT_ARCHIVE_DIR, DATABASE_URL, SERIAL_ARCHIVE_DIR, APP_NAME
 from app.file_security import permission_status
 from app.models import AuditLog, ModulationType, FecType, SignalSource, AntennaType, Signal, FrequencyTemplate, User, DutyRole, RFDevice, ActivityType, Activity, CallType
 from app.settings import (
@@ -197,6 +197,7 @@ async def archive_download(
 # the host/port the admin is currently using so it works on the local network.
 # The logo icon on the launcher itself is best delivered by "Install app" (PWA);
 # these files guarantee easy one-click access on any Windows or Ubuntu desktop.
+# Launcher label/filename comes from APP_NAME (app/config.py) — update there, not here.
 
 @router.get("/shortcut/windows")
 async def shortcut_windows(
@@ -213,7 +214,7 @@ async def shortcut_windows(
     return Response(
         content=content,
         media_type="application/x-mswinurl",
-        headers={"Content-Disposition": 'attachment; filename="Range Dashboard.url"'},
+        headers={"Content-Disposition": f'attachment; filename="{APP_NAME}.url"'},
     )
 
 
@@ -227,8 +228,8 @@ async def shortcut_linux(
         "[Desktop Entry]\n"
         "Version=1.0\n"
         "Type=Application\n"
-        "Name=Range Dashboard\n"
-        "Comment=SEW Range Dashboard\n"
+        f"Name={APP_NAME}\n"
+        f"Comment={APP_NAME} Dashboard\n"
         f"Exec=xdg-open {base}\n"
         "Icon=web-browser\n"
         "Terminal=false\n"
@@ -238,7 +239,7 @@ async def shortcut_linux(
     return Response(
         content=content,
         media_type="application/x-desktop",
-        headers={"Content-Disposition": 'attachment; filename="Range Dashboard.desktop"'},
+        headers={"Content-Disposition": f'attachment; filename="{APP_NAME}.desktop"'},
     )
 
 

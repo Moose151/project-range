@@ -436,26 +436,26 @@ CBM_SYNC_DOC = (
     "cbm-400-read-only-signal-sync",
     """# CBM-400 Read-Only Signal Sync
 
-This page explains how Project Range is intended to read signal settings from the Viasat CBM-400 EBEM modems so operators do not have to enter the same signal changes twice.
+This page explains how R.I.M.S is intended to read signal settings from the Viasat CBM-400 EBEM modems so operators do not have to enter the same signal changes twice.
 
-> Current status: this feature is at the setup/manual-test stage. Project Range can store modem mappings and credentials, test a read-only CBM poll, and run a manual active-sync. Automatic timed polling still needs range-network testing before operational use.
+> Current status: this feature is at the setup/manual-test stage. R.I.M.S can store modem mappings and credentials, test a read-only CBM poll, and run a manual active-sync. Automatic timed polling still needs range-network testing before operational use.
 
 ## What This Does
 
-Project Range does **not** configure the CBM-400 modem.
+R.I.M.S does **not** configure the CBM-400 modem.
 
 The integration is designed to:
 
 - read current modem values from the CBM over the management network;
-- compare those values with the active Project Range signal;
-- write an automatic Project Range signal log entry when mapped modem values change;
-- keep the normal Project Range package and serial workflow as the source of the planned signal list.
+- compare those values with the active R.I.M.S signal;
+- write an automatic R.I.M.S signal log entry when mapped modem values change;
+- keep the normal R.I.M.S package and serial workflow as the source of the planned signal list.
 
 The integration is **read-only by policy**. Operators should continue to configure the modem using the approved EBEM/LCT/modem workflow.
 
-## How Project Range Knows Which Signal Belongs To Which Modem
+## How R.I.M.S Knows Which Signal Belongs To Which Modem
 
-Project Range does not guess from modem state alone.
+R.I.M.S does not guess from modem state alone.
 
 Each signal in a **Signal Package** can be mapped to a CBM modem through its
 Source:
@@ -464,7 +464,7 @@ Source:
   CBM modem devices automatically appear in the Source list.
 - **CBM Path**: which part of the modem to read, such as `Tx`, `Rx`, `Tx/Rx`, or `DVB`.
 
-When a serial starts, Project Range creates the dashboard signals from the package. The CBM sync then only updates the active signal that has a matching package mapping.
+When a serial starts, R.I.M.S creates the dashboard signals from the package. The CBM sync then only updates the active signal that has a matching package mapping.
 
 Example:
 
@@ -473,9 +473,9 @@ Example:
 | S101 | CBM-400-1 | Tx |
 | S102 | CBM-400-2 | Tx |
 
-If S101 goes down on its modem and S102 comes up on its modem, Project Range can update S101 and S102 separately because the package tells it which signal owns which modem/path.
+If S101 goes down on its modem and S102 comes up on its modem, R.I.M.S can update S101 and S102 separately because the package tells it which signal owns which modem/path.
 
-If two active signals claim the same modem/path, Project Range skips that mapping instead of guessing.
+If two active signals claim the same modem/path, R.I.M.S skips that mapping instead of guessing.
 
 ## Seeded CBM Devices
 
@@ -510,7 +510,7 @@ Important: the server `SECRET_KEY` must remain stable. If `SECRET_KEY` changes, 
 2. Open the relevant package.
 3. For each signal, use the edit pencil.
 4. Set **Source** to the modem that carries that planned signal.
-5. Set **CBM Path** to the path Project Range should read.
+5. Set **CBM Path** to the path R.I.M.S should read.
 6. Save the signal.
 
 Keep package mappings clear and one-to-one for active serials. If the same CBM/path is reused by different signals at different times, update the package or use the package that matches the planned serial.
@@ -523,7 +523,7 @@ After the CBM devices and package mappings are configured:
 2. Go to **Devices**.
 3. Click **Sync Active CBMs**.
 
-Project Range will:
+R.I.M.S will:
 
 - inspect active serials;
 - find package signals with CBM mappings;
@@ -552,7 +552,7 @@ Before using this operationally:
 3. Test polling each CBM from the range server.
 4. Confirm the ICC shell prompt/command flow matches the manual and the live firmware.
 5. Confirm field mapping with real modem output.
-6. Decide whether `TX_OP=OFF` should always mean Project Range status **Down**, or whether some states should map to **Configured** or **Standby**.
+6. Decide whether `TX_OP=OFF` should always mean R.I.M.S status **Down**, or whether some states should map to **Configured** or **Standby**.
 7. Decide whether automatic timed polling should be enabled, and at what interval.
 
 Until those checks are complete, treat CBM sync as a manual test feature, not an operational automation.

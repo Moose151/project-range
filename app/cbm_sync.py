@@ -1,4 +1,4 @@
-"""Map read-only CBM snapshots into active Project Range signal logs."""
+"""Map read-only CBM snapshots into active R.I.M.S signal logs."""
 
 from __future__ import annotations
 

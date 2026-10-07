@@ -18,7 +18,7 @@ from pathlib import Path
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Back up SEW Range SQLite DB from Docker Compose.")
+    parser = argparse.ArgumentParser(description="Back up R.I.M.S SQLite DB from Docker Compose.")
     parser.add_argument("--service", default="web", help="Docker Compose service name. Default: web")
     parser.add_argument("--db-path", default="/app/data/range.db", help="Path to DB inside the container.")
     parser.add_argument("--output-dir", default="backups", help="Directory for backup files.")

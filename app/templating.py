@@ -8,10 +8,12 @@ import json
 
 from fastapi.templating import Jinja2Templates
 
-from app.config import APP_VERSION
+from app.config import APP_VERSION, APP_NAME, APP_FULL_NAME
 
 templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["app_version"] = APP_VERSION
+templates.env.globals["app_name"] = APP_NAME
+templates.env.globals["app_full_name"] = APP_FULL_NAME
 
 
 def _sandbox_hardware_sync_paused() -> bool:

@@ -1,4 +1,4 @@
-# Project Range
+# R.I.M.S (Range Information Management System)
 
 A FastAPI + SQLite application for managing RF range operations: signal packages,
 serials, real-time dashboard, RF/power calculators, shift handover, and audit logs.

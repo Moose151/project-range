@@ -15,7 +15,7 @@ from app.models import (
     User, Signal, SignalPackage, SignalPackageEntry,
     ModulationType, FecType, SignalSource, AntennaType, AuditLog, RFDevice, SerialPackage,
 )
-from app.config import MAX_UPLOAD_BYTES
+from app.config import MAX_UPLOAD_BYTES, APP_NAME
 from app.upload_validation import (
     validate_total_upload_size,
     validate_upload_file,
@@ -261,7 +261,7 @@ def _dict_to_entries(data: dict) -> list[dict]:
 def _validated_json_package(content: bytes) -> dict:
     data = json.loads(content.decode("utf-8-sig"))
     if not isinstance(data, dict) or not isinstance(data.get("signals"), list):
-        raise ValueError("JSON file must be a Project Range package object with a 'signals' list.")
+        raise ValueError(f"JSON file must be a {APP_NAME} package object with a 'signals' list.")
     if len(data["signals"]) > 500:
         raise ValueError("JSON package contains too many signals. Maximum is 500.")
     for i, signal in enumerate(data["signals"], start=1):
@@ -525,7 +525,7 @@ async def _uploaded_signal_files(request: Request) -> list[tuple[str, bytes]]:
     form = await request.form()
     uploads = [item for _, item in form.multi_items() if hasattr(item, "filename") and item.filename]
     if not uploads:
-        raise ValueError("Select at least one CBM .txt, .zip, or legacy Project Range .json file.")
+        raise ValueError(f"Select at least one CBM .txt, .zip, or legacy {APP_NAME} .json file.")
 
     files: list[tuple[str, bytes]] = []
     total_bytes = 0

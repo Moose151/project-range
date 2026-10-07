@@ -1,8 +1,8 @@
-# Project Range — Roadmap to v1.0
+# R.I.M.S — Roadmap to v1.0
 
 **Current version:** `0.31.9` (beta) · shown in the top-right navbar area and in `app/config.py`.
 
-This roadmap takes Project Range from its current beta to a **1.0 operational
+This roadmap takes R.I.M.S from its current beta to a **1.0 operational
 release** — a stable, documented system deployed on the range network, meeting
 the MVP success criteria in [Scope.txt](Scope.txt), with the day-to-day features
 operators have asked for.
@@ -465,7 +465,7 @@ serial (CDM-600L) clients.
   can be logged into, but whether **SNMP is enabled** and what community/v3
   credentials apply is **unconfirmed**. Confirm SNMP is turned on per device, obtain
   v2c community strings or SNMPv3 creds, and verify reachability (UDP 161) from the
-  Project Range server before committing build effort.
+  R.I.M.S server before committing build effort.
 - [x] **New `app/snmp.py` client + `RFDevice` SNMP fields** — shipped in **0.19.0**.
   SNMP v2c/v3 client (pysnmp 7.x async, bridged to a sync worker thread), creds
   encrypted via `app/crypto.py`, `app/snmp_sync.py` mapper writing observed routing
@@ -538,9 +538,9 @@ Current foundation now in place:
 
 - CBM modem manuals and exported modem config samples have been reviewed locally.
 - Package import/export can use CBM-style modem text config files, using the
-  Project Range fields it understands and ignoring modem-only parameters.
+  R.I.M.S fields it understands and ignoring modem-only parameters.
 - Package signals can carry modem mapping metadata (`cbm_device_id`, `cbm_path`)
-  so a Project Range signal can be tied to a specific modem source. The selected
+  so a R.I.M.S signal can be tied to a specific modem source. The selected
   Source is now the user-facing modem selector when it matches a CBM modem device.
 
 Future target: **full CBM integration complete**.
@@ -648,7 +648,7 @@ committing to a milestone.
 - [ ] Prototype `cdm600.py` against the documented packet format (can start offline, no HW).
 - [ ] Add `RFDevice` protocol-type + `host:port` + optional RS-485 address fields; route sync
   to the right client (EBEM-SSH vs CDM-600L-serial).
-- [ ] Agree the CDM-600L status → Project Range state mapping; add guarded config-write actions.
+- [ ] Agree the CDM-600L status → R.I.M.S state mapping; add guarded config-write actions.
 - [ ] Validate against real hardware (parsed values vs. front panel / SatMac).
 
 ### Other future enhancements (Scope §12)

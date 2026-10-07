@@ -101,12 +101,12 @@
 
           <hr class="border-secondary my-3">
           <div class="mb-3">
-            <label class="form-label">Select CBM .txt file(s), a .zip of CBM configs, or legacy Project Range .json</label>
+            <label class="form-label">Select CBM .txt file(s), a .zip of CBM configs, or legacy {{ app_name }} .json</label>
             <input type="file" class="form-control" name="files"
                    accept=".txt,.cfg,.conf,.zip,.json,text/plain,application/json,application/zip" multiple required>
             <div class="form-text">
               CBM imports use the modem's <code>STR_CFG</code> text export. Extra modem fields are ignored.
-              If TxRF/RxRF are not in the import, Project Range calculates them from the package LOs and imported IF values.
+              If TxRF/RxRF are not in the import, {{ app_name }} calculates them from the package LOs and imported IF values.
             </div>
           </div>
           {% if user.role == 'observer' %}</fieldset>{% endif %}
@@ -120,10 +120,10 @@
     </div>
 
     <div class="card border-secondary mt-3">
-      <div class="card-header small text-muted"><i class="bi bi-file-earmark-code me-1"></i>CBM fields Project Range imports</div>
+      <div class="card-header small text-muted"><i class="bi bi-file-earmark-code me-1"></i>CBM fields {{ app_name }} imports</div>
       <div class="card-body">
         <p class="text-muted small mb-2">
-          The signal name comes from the filename. Project Range reads:
+          The signal name comes from the filename. {{ app_name }} reads:
         </p>
         <pre class="text-muted small mb-0" style="white-space:pre-wrap">TXIF_FRQ -> TxIF MHz
 RXIF_FRQ -> RxIF MHz

@@ -1,7 +1,7 @@
 {
-  "name": "Range Dashboard",
-  "short_name": "Range Dashboard",
-  "description": "SEW Range Dashboard",
+  "name": "R.I.M.S",
+  "short_name": "R.I.M.S",
+  "description": "Range Information Management System (R.I.M.S) Dashboard",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

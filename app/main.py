@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from app.config import (
-    SECRET_KEY, APP_VERSION, SESSION_MAX_AGE_DAYS,
+    SECRET_KEY, APP_VERSION, APP_NAME, SESSION_MAX_AGE_DAYS,
     SESSION_SAME_SITE, SESSION_HTTPS_ONLY, CBM_AUTO_SYNC_SECONDS, SNMP_AUTO_SYNC_SECONDS,
 )
 from app.database import SessionLocal
@@ -22,7 +22,7 @@ from app.routers import (
     cease, chat, search, activities,
 )
 
-app = FastAPI(title="SEW Range", version=APP_VERSION, docs_url=None, redoc_url=None)
+app = FastAPI(title=APP_NAME, version=APP_VERSION, docs_url=None, redoc_url=None)
 _cbm_sync_running = False
 _cbm_sync_task = None
 _snmp_sync_running = False

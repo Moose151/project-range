@@ -1,4 +1,4 @@
-# Deploying Project Range with Docker
+# Deploying R.I.M.S with Docker
 
 The app is a FastAPI service (uvicorn) using a SQLite database. The image bundles
 the code and dependencies; the database lives on a Docker **named volume** so it
